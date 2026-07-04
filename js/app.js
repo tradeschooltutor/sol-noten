@@ -271,6 +271,9 @@
           portfolio: {}, quarterOverrides: null, dismissedQuarterHint: {}
         };
         st.courses.push(course);
+        Store.save();
+        go('maxPoints', { id: course.id, intro: true });
+        return;
       }
       Store.save();
       go('course', { id: course.id });
@@ -382,8 +385,9 @@
       h('span', {}, 'Das ' + q + '. Quartal ist laut Plan beendet (' + UI.fmtDate(quarters[q - 1].end) + '). In das ' + (q + 1) + '. Quartal wechseln?'),
       h('div.banner-actions',
         h('button.btn-small.btn-primary', { onclick: function () {
-          course.currentQuarter = q + 1; Store.save(); render();
+          course.currentQuarter = q + 1; Store.save();
           toast('Der Kurs ist jetzt im ' + (q + 1) + '. Quartal.');
+          go('maxPoints', { id: course.id, intro: true });
         } }, 'Jetzt wechseln'),
         h('button.btn-small.btn-plain', { onclick: function () {
           course.dismissedQuarterHint[q] = true; Store.save(); render();
@@ -401,6 +405,13 @@
     var current = course.maxPoints[q].slice();
     var status = h('p.hint');
     var sumEl = h('span.sum-pill');
+    var warnHost = h('div');
+
+    function entriesInQuarter(qq) {
+      return S().soleiEntries.filter(function (e) {
+        return e.courseId === course.id && e.quarter === qq;
+      }).length;
+    }
 
     var qSel = h('select.input', { style: { maxWidth: '10rem' } });
     [1, 2, 3, 4].forEach(function (n) {
@@ -409,6 +420,7 @@
     qSel.addEventListener('change', function () {
       q = Number(qSel.value); current = course.maxPoints[q].slice(); redraw();
     });
+    if (p.intro) qSel.disabled = true;
 
     var rowsHost = h('div');
     function redraw() {
@@ -425,24 +437,50 @@
       sumEl.textContent = 'Summe: ' + Calc.fmt(v.sum || current.reduce(function (a, b) { return Calc.round1(a + b); }, 0), 1) + ' / 15';
       sumEl.className = 'sum-pill' + (v.ok ? ' ok' : ' bad');
       status.textContent = v.ok ? '' : v.msg;
+      clear(warnHost);
+      var n = entriesInQuarter(q);
+      if (n > 0) {
+        warnHost.appendChild(h('div.banner-warn', {},
+          h('span', {}, 'In diesem Quartal wurden bereits ' + n + ' Punktevergaben erfasst. ' +
+            'Eine Änderung der Maximalpunkte verschiebt die Tipp-Stufen – bereits vergebene Punkte behalten ihren Wert, ' +
+            'passen dann aber unter Umständen nicht mehr zur neuen Skala. Ändern Sie die Maximalpunkte am besten nur, ' +
+            'bevor die ersten Punkte vergeben werden.')));
+      }
     }
     redraw();
 
+    function doSave() {
+      course.maxPoints[q] = current.slice();
+      Store.save();
+      toast('Maximalpunkte für das ' + q + '. Quartal gespeichert.');
+      go('course', { id: course.id });
+    }
+
     return h('div.screen',
       header('Maximalpunkte', { name: 'course', params: { id: course.id } }),
+      p.intro ? h('div.banner-info', {},
+        h('span', {}, 'Bitte prüfen Sie die Maximalpunkte der Kriterien für das ' + q + '. Quartal, ' +
+          'bevor Sie die ersten Punkte vergeben. Der Standard ist 5 × 3 Punkte.')) : null,
       h('div.card',
         h('div.row-between', qSel, sumEl),
         h('p.hint', {}, 'Jedes Kriterium kann 1,5 / 3 / 4,5 oder 6 Maximalpunkte erhalten. Die Summe muss immer 15 Punkte ergeben. Die Tipp-Stufen ergeben sich automatisch (Maximum, ⅔, ⅓, 0).'),
+        warnHost,
         rowsHost,
         status,
         h('button.btn-primary.btn-block', { onclick: function () {
           var v = Calc.validateMaxPoints(current);
           if (!v.ok) { status.textContent = v.msg; return; }
-          course.maxPoints[q] = current.slice();
-          Store.save();
-          toast('Maximalpunkte für das ' + q + '. Quartal gespeichert.');
-          go('course', { id: course.id });
-        } }, 'Speichern')
+          var unchanged = JSON.stringify(current) === JSON.stringify(course.maxPoints[q]);
+          if (!unchanged && entriesInQuarter(q) > 0) {
+            UI.confirmDialog('Maximalpunkte trotzdem ändern?',
+              'In diesem Quartal wurden bereits Punkte vergeben. Bereits erfasste Vergaben behalten ihren Punktwert ' +
+              'und fließen weiter in die Durchschnitte ein, liegen aber unter Umständen nicht mehr auf der neuen Skala. ' +
+              'Sie können solche Vergaben anschließend im Punkteprotokoll der Schüler/innen anpassen.',
+              'Trotzdem ändern', true).then(function (ok) { if (ok) doSave(); });
+            return;
+          }
+          doSave();
+        } }, p.intro ? 'Übernehmen und weiter' : 'Speichern')
       )
     );
   };
@@ -925,6 +963,9 @@
     return h('div.screen',
       header('Einstellungen', back, h('span')),
 
+      h('div.banner-info', {},
+        h('span', {}, 'Maximalpunkte der Kriterien, Quartalszeiträume, Gewichtung sowie die Anzahl der Klausuren und Open Book Tests stellen Sie je Kurs ein: Kurs auf dem Startbildschirm antippen, dann finden Sie diese Punkte unterhalb der Schülerliste.')),
+
       h('div.section-head', {}, 'Datensicherung'),
       h('div.card',
         h('p.hint', {}, st.settings.lastExport
@@ -987,7 +1028,7 @@
       h('div.section-head', {}, 'Über diese App'),
       h('div.card',
         h('p', {}, 'SOL-Noten · Notenverwaltung zum selbstorganisierten Lernen'),
-        h('p.hint', {}, 'Version 0.1 (MVP) · © 2026 Andreas Vandelaar · Alle Daten bleiben ausschließlich auf diesem Gerät.')
+        h('p.hint', {}, 'Version 0.1.1 (MVP) · © 2026 Andreas Vandelaar · Alle Daten bleiben ausschließlich auf diesem Gerät.')
       )
     );
   };
