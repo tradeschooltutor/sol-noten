@@ -1,4 +1,4 @@
-# SOL-Noten (MVP, Version 0.1)
+# SOL-Noten (Version 0.2)
 
 Notenverwaltung zum selbstorganisierten Lernen (SOL) als Progressive Web App (PWA).
 Basierend auf der Excel-Notenverwaltung V8.0 von Andreas Vandelaar.
@@ -14,12 +14,13 @@ Basierend auf der Excel-Notenverwaltung V8.0 von Andreas Vandelaar.
   - pro Kriterium und Tag gilt der letzte Tipp (erneutes Tippen korrigiert, gleicher Wert entfernt die Vergabe),
   - live sichtbar: Kriteriendurchschnitte (auf 1 Nachkommastelle gerundet), Punktesumme (Summe der gerundeten Durchschnitte, selbst ungerundet) und aktuelle Note nach dem 15-Punkte-Bewertungsspiegel (11,9 Punkte → Note 2; 1,75 erst ab vollen 12 Punkten).
 - **Maximalpunkte je Kriterium und Quartal** – wählbar aus 1,5 / 3 / 4,5 / 6, Summe muss 15 ergeben (Live-Prüfung).
-- **Punkteprotokoll je Schüler/in** – jede Einzelvergabe einsehen, ändern, löschen.
+- **Punkteprotokoll je Schüler/in** – jede Einzelvergabe einsehen, ändern, löschen; Kriteriendurchschnitte mit grün/roter Entwicklungsanzeige gegenüber dem Vorquartal; Notenzeile (SL-Bogen, Portfolio, SoLei).
+- **Quartalsabschluss** – Portfolionoten je Schüler/in erfassen (1–6, Komma erlaubt); Note SL-Bogen aus der Punktesumme, Note SoLei = Durchschnitt aus SL-Bogen und Portfolio (ohne Portfolio bleibt sie leer); Punktesummen mit ▲/▼ gegenüber dem Vorquartal; „Speichern und ins nächste Quartal wechseln" führt anschließend zur Maximalpunkte-Prüfung.
 - **Schülerliste** – manuell pflegen oder per Kopieren & Einfügen aus Excel übernehmen (Nachname, Vorname, Telefon, E-Mail, Betrieb, Ausbilder/Eltern mit Telefon und E-Mail).
 - **Datensicherung** – alles bleibt lokal (IndexedDB). Backup-Datei speichern/einspielen, Erinnerung nach 7 Tagen, automatisches Backup in einen freigegebenen Ordner (Chrome/Edge am Computer und Android), interne tägliche Sicherungsstände der letzten 14 Tage gegen Fehlbedienung.
 - **Einstellungen** – Kriteriennamen (global), Bewertungsspiegel (15-Punkte-Schema, Standardwerte aus der Excel-Datei).
 
-Noch nicht enthalten (nächste Ausbaustufen): Portfolionoten/Quartalsabschluss, Open Book Tests mit Moodle-/Logineo-Import, Klausuren, Notenübersicht mit PDF-/Excel-Export, Notenausdruck je Schüler/in.
+Noch nicht enthalten (nächste Ausbaustufen): Open Book Tests mit Moodle-/Logineo-Import, Klausuren, Notenübersicht mit PDF-/Excel-Export, Notenausdruck je Schüler/in.
 
 ## Veröffentlichen über GitHub Pages
 

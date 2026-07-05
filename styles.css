@@ -286,3 +286,31 @@ button:focus-visible, .input:focus-visible, select:focus-visible {
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; animation: none !important; }
 }
+
+/* ---------- Quartalsabschluss & Entwicklung ---------- */
+.review-row {
+  display: flex; flex-direction: column; gap: 8px;
+  padding: 12px 16px; border-bottom: 1px solid var(--line);
+}
+.review-row:last-child { border-bottom: none; }
+.review-grades { display: flex; gap: 10px; align-items: stretch; }
+.review-cell {
+  flex: 1; background: var(--paper); border-radius: 10px; padding: 8px 10px;
+  display: flex; flex-direction: column; gap: 3px; justify-content: space-between;
+}
+.review-solei { font-size: 1.05rem; }
+.grade-input { min-height: 40px; padding: 6px 10px; font-weight: 700; max-width: 100%; }
+.input-error { border-color: var(--red); outline: 2px solid var(--red); }
+
+.sum-pill.up { background: var(--green); }
+.sum-pill.down { background: var(--red); }
+.crit-summary-item.up { background: var(--green-soft); }
+.crit-summary-item.up strong { color: var(--green); }
+.crit-summary-item.down { background: var(--red-soft); }
+.crit-summary-item.down strong { color: var(--red); }
+
+@media (min-width: 560px) {
+  .review-row { flex-direction: row; align-items: center; justify-content: space-between; }
+  .review-name { min-width: 0; flex: 1; }
+  .review-grades { flex: 1.2; }
+}

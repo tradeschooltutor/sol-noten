@@ -352,6 +352,8 @@
         ? h('div.empty', h('p', {}, 'Diese Klasse hat noch keine Schüler/innen.'))
         : h('div.card.card-list', {}, studentRows),
       h('div.actions-col',
+        h('button.btn-plain.btn-block', { onclick: function () { go('quarterReview', { id: course.id, quarter: q }); } },
+          'Quartalsabschluss: Portfolionoten & SoLei-Noten'),
         h('button.btn-plain.btn-block', { onclick: function () { go('students', { classId: cls.id, courseId: course.id }); } },
           'Schülerliste bearbeiten (' + cls.students.length + ')'),
         h('button.btn-plain.btn-block', { onclick: function () { go('maxPoints', { id: course.id }); } },
@@ -382,13 +384,11 @@
   function quarterHint(course, quarters) {
     var q = course.currentQuarter;
     return h('div.banner-info', {},
-      h('span', {}, 'Das ' + q + '. Quartal ist laut Plan beendet (' + UI.fmtDate(quarters[q - 1].end) + '). In das ' + (q + 1) + '. Quartal wechseln?'),
+      h('span', {}, 'Das ' + q + '. Quartal ist laut Plan beendet (' + UI.fmtDate(quarters[q - 1].end) + '). Tragen Sie die Portfolionoten ein und wechseln Sie dann in das ' + (q + 1) + '. Quartal.'),
       h('div.banner-actions',
         h('button.btn-small.btn-primary', { onclick: function () {
-          course.currentQuarter = q + 1; Store.save();
-          toast('Der Kurs ist jetzt im ' + (q + 1) + '. Quartal.');
-          go('maxPoints', { id: course.id, intro: true });
-        } }, 'Jetzt wechseln'),
+          go('quarterReview', { id: course.id, quarter: q, advance: true });
+        } }, 'Quartal abschließen'),
         h('button.btn-small.btn-plain', { onclick: function () {
           course.dismissedQuarterHint[q] = true; Store.save(); render();
         } }, 'Später')
@@ -481,6 +481,146 @@
           }
           doSave();
         } }, p.intro ? 'Übernehmen und weiter' : 'Speichern')
+      )
+    );
+  };
+
+  /* ================= Quartalsabschluss: Portfolio & SoLei-Noten ================= */
+
+  function portfolioGrade(course, q, studentId) {
+    if (!course.portfolio) course.portfolio = {};
+    var p = course.portfolio[q];
+    return (p && p[studentId] != null) ? p[studentId] : null;
+  }
+
+  /* Entwicklung gegenüber dem Vorquartal: 'up' (mehr Punkte, grün),
+     'down' (weniger, rot) oder null. */
+  function development(curr, prev) {
+    if (curr == null || prev == null) return null;
+    if (curr > prev + 1e-9) return 'up';
+    if (curr < prev - 1e-9) return 'down';
+    return null;
+  }
+
+  views.quarterReview = function (p) {
+    var course = Store.courseById(p.id);
+    if (!course.portfolio) course.portfolio = {};
+    var cls = Store.classById(course.classId);
+    var q = p.quarter || course.currentQuarter;
+    var grading = S().settings.grading15;
+    var students = cls.students.slice().sort(function (a, b) {
+      return (a.lastName + a.firstName).localeCompare(b.lastName + b.firstName, 'de');
+    });
+
+    var qSel = h('select.input', { style: { maxWidth: '10rem' } });
+    [1, 2, 3, 4].forEach(function (n) {
+      qSel.appendChild(h('option', { value: n, selected: n === q }, n + '. Quartal'));
+    });
+    qSel.addEventListener('change', function () {
+      go('quarterReview', { id: course.id, quarter: Number(qSel.value), advance: p.advance });
+    });
+
+    var inputs = {}; /* studentId -> input */
+    var soleiCells = {}; /* studentId -> Zelle für Note SoLei (Live-Aktualisierung) */
+
+    function parseGrade(str) {
+      var s = String(str).trim().replace(',', '.');
+      if (s === '') return { ok: true, value: null };
+      var n = Number(s);
+      if (isNaN(n) || n < 1 || n > 6) return { ok: false };
+      return { ok: true, value: Math.round(n * 100) / 100 };
+    }
+
+    var rows = students.map(function (stu) {
+      var e = Store.entriesFor(course.id, stu.id, q);
+      var stat = Calc.quarterStatus(e.byCriterion);
+      var slGrade = stat.rated > 0 ? Calc.gradeFor15(stat.sum, grading) : null;
+
+      var dev = null;
+      if (q > 1) {
+        var prev = Calc.quarterStatus(Store.entriesFor(course.id, stu.id, q - 1).byCriterion);
+        if (prev.rated > 0 && stat.rated > 0) dev = development(stat.sum, prev.sum);
+      }
+
+      var pg = portfolioGrade(course, q, stu.id);
+      var inp = h('input.input.grade-input', {
+        type: 'text', inputmode: 'decimal',
+        value: pg == null ? '' : Calc.fmt(pg), placeholder: '–', 'aria-label': 'Portfolionote'
+      });
+      inputs[stu.id] = inp;
+
+      var soleiCell = h('strong.review-solei');
+      soleiCells[stu.id] = soleiCell;
+
+      function refreshSolei() {
+        var r = parseGrade(inp.value);
+        inp.classList.toggle('input-error', !r.ok);
+        var g = (r.ok && r.value != null && slGrade) ? Calc.soleiGrade(slGrade.g, r.value) : null;
+        soleiCell.textContent = g == null ? '–' : Calc.fmt(g);
+      }
+      inp.addEventListener('input', refreshSolei);
+
+      var row = h('div.review-row',
+        h('div.review-name',
+          h('div.student-name', {}, stu.lastName + ', ' + stu.firstName),
+          h('div.tap-substats',
+            h('span.sum-pill.small' + (dev === 'up' ? '.up' : dev === 'down' ? '.down' : ''), {},
+              (dev === 'up' ? '▲ ' : dev === 'down' ? '▼ ' : '') + Calc.fmt(stat.sum, 1) + '/15'),
+            stat.rated > 0 && stat.rated < 5 ? h('span.hint', {}, stat.rated + '/5 Kriterien') : null
+          )
+        ),
+        h('div.review-grades',
+          h('div.review-cell', h('span.hint', {}, 'SL-Bogen'),
+            h('strong', {}, slGrade ? Calc.fmt(slGrade.g) : '–')),
+          h('div.review-cell', h('span.hint', {}, 'Portfolio'), inp),
+          h('div.review-cell', h('span.hint', {}, 'SoLei'), soleiCell)
+        )
+      );
+      refreshSolei();
+      return row;
+    });
+
+    function saveAll() {
+      var bad = [];
+      var result = {};
+      students.forEach(function (stu) {
+        var r = parseGrade(inputs[stu.id].value);
+        if (!r.ok) { bad.push(stu.lastName + ', ' + stu.firstName); return; }
+        if (r.value != null) result[stu.id] = r.value;
+      });
+      if (bad.length) {
+        UI.modal('Ungültige Portfolionote',
+          h('p', {}, 'Portfolionoten müssen zwischen 1 und 6 liegen. Bitte prüfen Sie: ' + bad.join('; ') + '.'));
+        return false;
+      }
+      course.portfolio[q] = result;
+      Store.save();
+      toast('Portfolionoten für das ' + q + '. Quartal gespeichert.');
+      return true;
+    }
+
+    return h('div.screen',
+      header('Quartalsabschluss', { name: 'course', params: { id: course.id } }),
+      h('div.card.card-tight',
+        h('div.row-between', qSel,
+          q > 1 ? h('span.hint', {}, '▲ / ▼ = Entwicklung zum Vorquartal') : null),
+        h('p.hint', {}, 'Die Note SL-Bogen ergibt sich aus der Punktesumme (15-Punkte-Schema). ' +
+          'Die Note SoLei ist der Durchschnitt aus Note SL-Bogen und Portfolionote – ' +
+          'ohne Portfolionote bleibt sie leer.')
+      ),
+      h('div.card.card-list', {},
+        students.length ? rows : h('div.empty', h('p', {}, 'Diese Klasse hat noch keine Schüler/innen.'))),
+      h('div.actions-col',
+        h('button.btn-primary.btn-block', { onclick: saveAll }, 'Portfolionoten speichern'),
+        p.advance && q < 4 && q === course.currentQuarter
+          ? h('button.btn-plain.btn-block', { onclick: function () {
+              if (!saveAll()) return;
+              course.currentQuarter = q + 1;
+              Store.save();
+              toast('Der Kurs ist jetzt im ' + (q + 1) + '. Quartal.');
+              go('maxPoints', { id: course.id, intro: true });
+            } }, 'Speichern und ins ' + (q + 1) + '. Quartal wechseln')
+          : null
       )
     );
   };
@@ -834,12 +974,28 @@
     var stat = Calc.quarterStatus(e.byCriterion);
     var grade = Calc.gradeFor15(stat.sum, S().settings.grading15);
 
+    var prevStat = shownQ > 1
+      ? Calc.quarterStatus(Store.entriesFor(course.id, stu.id, shownQ - 1).byCriterion)
+      : null;
+
     var critSummary = h('div.crit-summary', {}, names.map(function (n, ci) {
-      return h('div.crit-summary-item',
+      var dev = prevStat ? development(stat.averages[ci], prevStat.averages[ci]) : null;
+      return h('div.crit-summary-item' + (dev === 'up' ? '.up' : dev === 'down' ? '.down' : ''),
         h('span.hint', {}, n),
-        h('strong', {}, stat.averages[ci] === null ? '–' : 'ø ' + Calc.fmt(stat.averages[ci], 1))
+        h('strong', {}, stat.averages[ci] === null ? '–'
+          : (dev === 'up' ? '▲ ' : dev === 'down' ? '▼ ' : '') + 'ø ' + Calc.fmt(stat.averages[ci], 1))
       );
     }));
+
+    var pg = portfolioGrade(course, shownQ, stu.id);
+    var slG = stat.rated > 0 ? grade.g : null;
+    var soleiG = (slG != null && pg != null) ? Calc.soleiGrade(slG, pg) : null;
+    var gradeLine = (slG != null || pg != null)
+      ? h('div.crit-summary',
+          h('div.crit-summary-item', h('span.hint', {}, 'Note SL-Bogen'), h('strong', {}, slG != null ? Calc.fmt(slG) : '–')),
+          h('div.crit-summary-item', h('span.hint', {}, 'Note Portfolio'), h('strong', {}, pg != null ? Calc.fmt(pg) : '–')),
+          h('div.crit-summary-item', h('span.hint', {}, 'Note SoLei'), h('strong', {}, soleiG != null ? Calc.fmt(soleiG) : '–')))
+      : null;
 
     var list = e.list.slice().sort(function (a, b) {
       return b.date.localeCompare(a.date) || b.createdAt.localeCompare(a.createdAt);
@@ -868,6 +1024,7 @@
           )
         ),
         critSummary,
+        gradeLine,
         stat.rated > 0 && stat.rated < 5
           ? h('p.hint', {}, 'Erst ' + stat.rated + ' von 5 Kriterien bewertet – der Notenstand ist ein Zwischenstand.')
           : null
@@ -1028,7 +1185,7 @@
       h('div.section-head', {}, 'Über diese App'),
       h('div.card',
         h('p', {}, 'SOL-Noten · Notenverwaltung zum selbstorganisierten Lernen'),
-        h('p.hint', {}, 'Version 0.1.1 (MVP) · © 2026 Andreas Vandelaar · Alle Daten bleiben ausschließlich auf diesem Gerät.')
+        h('p.hint', {}, 'Version 0.2.0 · © 2026 Andreas Vandelaar · Alle Daten bleiben ausschließlich auf diesem Gerät.')
       )
     );
   };
