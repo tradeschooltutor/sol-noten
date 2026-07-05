@@ -1,4 +1,4 @@
-# SOL-Noten (Version 0.3)
+# SOL-Noten (Version 0.4)
 
 Notenverwaltung zum selbstorganisierten Lernen (SOL) als Progressive Web App (PWA).
 Basierend auf der Excel-Notenverwaltung V8.0 von Andreas Vandelaar.
@@ -18,10 +18,12 @@ Basierend auf der Excel-Notenverwaltung V8.0 von Andreas Vandelaar.
 - **Quartalsabschluss** – Portfolionoten je Schüler/in erfassen (1–6, Komma erlaubt); Note SL-Bogen aus der Punktesumme, Note SoLei = Durchschnitt aus SL-Bogen und Portfolio (ohne Portfolio bleibt sie leer); Punktesummen mit ▲/▼ gegenüber dem Vorquartal; „Speichern und ins nächste Quartal wechseln" führt anschließend zur Maximalpunkte-Prüfung.
 - **Schülerliste** – manuell pflegen oder per Kopieren & Einfügen aus Excel übernehmen (Nachname, Vorname, Telefon, E-Mail, Betrieb, Ausbilder/Eltern mit Telefon und E-Mail).
 - **Open Book Tests** – je Halbjahr die konfigurierte Anzahl OBT; Prozentwerte je Schüler/in eintragen (Note live aus dem Prozent-Bewertungsspiegel, Klassendurchschnitt sichtbar) oder den Moodle-/Logineo-Ergebnisexport direkt einlesen (Excel- oder CSV-Datei). Der Import erkennt die Kopfzeile (Nachname/Vorname/Bewertung), rechnet auch abweichende Maximalpunktzahlen („Bewertung/50,00") in Prozent um, überspringt „Gesamtdurchschnitt" und unbewertete Versuche und ordnet die Namen automatisch zu – nicht zuordenbare Zeilen werden zur manuellen Zuordnung angeboten.
+- **Klausuren** – je Halbjahr die konfigurierte Anzahl; einmal die Maximalpunktzahl der Klausur festlegen, dann je Schüler/in die erreichten Punkte eintragen. Prozent und Note (Prozent-Bewertungsspiegel) berechnet die App live; Punkte über dem Maximum werden rot markiert. Nicht geschriebene Klausuren bleiben einfach leer.
+- **Update-Anzeige** – die App prüft beim Start, ob eine neue Version veröffentlicht wurde, und zeigt dann das Banner „Eine neue Version von SOL-Noten ist geladen" mit einem Aktualisieren-Knopf. So ist immer eindeutig erkennbar, ob ein Update angekommen ist.
 - **Datensicherung** – alles bleibt lokal (IndexedDB). Backup-Datei speichern/einspielen, Erinnerung nach 7 Tagen, automatisches Backup in einen freigegebenen Ordner (Chrome/Edge am Computer und Android), interne tägliche Sicherungsstände der letzten 14 Tage gegen Fehlbedienung.
 - **Einstellungen** – Kriteriennamen (global), Bewertungsspiegel (15-Punkte-Schema, Standardwerte aus der Excel-Datei).
 
-Noch nicht enthalten (nächste Ausbaustufen): Klausuren, Notenübersicht mit PDF-/Excel-Export, Notenausdruck je Schüler/in.
+Noch nicht enthalten (nächste Ausbaustufe): Notenübersicht mit PDF-/Excel-Export, Notenausdruck je Schüler/in.
 
 ## Veröffentlichen über GitHub Pages
 

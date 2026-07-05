@@ -10,15 +10,38 @@
 
   /* ================= App-Start ================= */
 
+  var APP_VERSION = '0.4.0';
+
   Store.init().then(function () {
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('sw.js').catch(function () {});
+      navigator.serviceWorker.register('sw.js').then(function (reg) {
+        /* Beim Start aktiv nach einer neuen Version suchen */
+        if (reg.update) reg.update().catch(function () {});
+        reg.addEventListener('updatefound', function () {
+          var nw = reg.installing;
+          if (!nw) return;
+          nw.addEventListener('statechange', function () {
+            if (nw.state === 'activated' && navigator.serviceWorker.controller) {
+              showUpdateBanner();
+            }
+          });
+        });
+      }).catch(function () {});
     }
     if (!S().settings.bundesland || S().schoolYears.length === 0) go('setup');
     else go('home');
   }).catch(function (e) {
     document.body.textContent = 'Die App konnte nicht starten: ' + e.message;
   });
+
+  function showUpdateBanner() {
+    if (document.getElementById('update-banner')) return;
+    var b = h('div#update-banner.update-banner',
+      h('span', {}, 'Eine neue Version von SOL-Noten ist geladen.'),
+      h('button.btn-small.btn-primary', { onclick: function () { location.reload(); } }, 'Jetzt aktualisieren')
+    );
+    document.body.appendChild(b);
+  }
 
   /* ================= Grundgerüst ================= */
 
@@ -370,6 +393,8 @@
           'Quartalsabschluss: Portfolionoten & SoLei-Noten'),
         h('button.btn-plain.btn-block', { onclick: function () { go('obt', { id: course.id }); } },
           'Open Book Tests'),
+        h('button.btn-plain.btn-block', { onclick: function () { go('klausuren', { id: course.id }); } },
+          'Klausuren'),
         h('button.btn-plain.btn-block', { onclick: function () { go('students', { classId: cls.id, courseId: course.id }); } },
           'Schülerliste bearbeiten (' + cls.students.length + ')'),
         h('button.btn-plain.btn-block', { onclick: function () { go('maxPoints', { id: course.id }); } },
@@ -815,6 +840,146 @@
           'Moodle-Export einlesen (Excel/CSV)'),
         fileInput
       )
+    );
+  };
+
+  /* ================= Klausuren ================= */
+
+  function kaData(course, hj, idx) {
+    if (!course.ka) course.ka = {};
+    if (!course.ka[hj]) course.ka[hj] = {};
+    if (!course.ka[hj][idx]) course.ka[hj][idx] = { maxPoints: null, points: {} };
+    return course.ka[hj][idx];
+  }
+
+  views.klausuren = function (p) {
+    var course = Store.courseById(p.id);
+    var cls = Store.classById(course.classId);
+    var hj = p.hj || 1;
+    var idx = p.idx || 0;
+    var n = Math.max(1, course.numKA || 2);
+    if (idx >= n) idx = 0;
+    var pctTable = S().settings.gradingPct || Calc.DEFAULT_GRADING_PCT;
+    var students = cls.students.slice().sort(function (a, b) {
+      return (a.lastName + a.firstName).localeCompare(b.lastName + b.firstName, 'de');
+    });
+    var data = kaData(course, hj, idx);
+
+    var hjSeg = h('div.seg', {}, [1, 2].map(function (v) {
+      return h('button.seg-btn' + (hj === v ? '.active' : ''), {
+        onclick: function () { go('klausuren', { id: course.id, hj: v, idx: 0 }); }
+      }, v + '. Halbjahr');
+    }));
+
+    var tabs = h('div.crit-tabs', {}, Array.from({ length: n }, function (_, i) {
+      var d = course.ka && course.ka[hj] && course.ka[hj][i];
+      var has = d && d.points && Object.keys(d.points).length > 0;
+      return h('button.crit-tab' + (i === idx ? '.active' : ''), {
+        onclick: function () { go('klausuren', { id: course.id, hj: hj, idx: i }); }
+      }, 'Klausur ' + (i + 1) + (has ? ' ●' : ''));
+    }));
+
+    function parseNum(str) {
+      var s = String(str).trim().replace(',', '.');
+      if (s === '') return { ok: true, value: null };
+      var v = Number(s);
+      if (isNaN(v) || v < 0) return { ok: false };
+      return { ok: true, value: Math.round(v * 100) / 100 };
+    }
+
+    var maxInput = h('input.input.input-num', {
+      type: 'text', inputmode: 'decimal', placeholder: 'z. B. 100',
+      value: data.maxPoints == null ? '' : Calc.fmt(data.maxPoints)
+    });
+
+    function currentMax() {
+      var r = parseNum(maxInput.value);
+      return (r.ok && r.value != null && r.value > 0) ? r.value : null;
+    }
+
+    var inputs = {};
+    var refreshers = [];
+    function refreshAll() { refreshers.forEach(function (f) { f(); }); }
+    maxInput.addEventListener('input', refreshAll);
+
+    var rows = students.map(function (stu) {
+      var pts = data.points[stu.id] != null ? data.points[stu.id] : null;
+      var inp = h('input.input.grade-input', {
+        type: 'text', inputmode: 'decimal', placeholder: '–',
+        value: pts == null ? '' : Calc.fmt(pts), 'aria-label': 'Punkte'
+      });
+      inputs[stu.id] = inp;
+      var pctCell = h('span.hint');
+      var gradeCell = h('strong.review-solei');
+      function refresh() {
+        var max = currentMax();
+        var r = parseNum(inp.value);
+        var tooHigh = r.ok && r.value != null && max != null && r.value > max;
+        inp.classList.toggle('input-error', !r.ok || tooHigh);
+        if (!r.ok || r.value == null || max == null) {
+          pctCell.textContent = ''; gradeCell.textContent = '–';
+          return;
+        }
+        var pct = Math.round(r.value / max * 10000) / 100;
+        pctCell.textContent = Calc.fmt(Math.round(pct * 10) / 10, 1) + ' %';
+        var g = tooHigh ? null : Calc.gradeForPercent(pct, pctTable);
+        gradeCell.textContent = g ? Calc.fmt(g.g) : '–';
+      }
+      refreshers.push(refresh);
+      inp.addEventListener('input', refresh);
+      return h('div.review-row',
+        h('div.review-name', h('div.student-name', {}, stu.lastName + ', ' + stu.firstName)),
+        h('div.review-grades',
+          h('div.review-cell', h('span.hint', {}, 'Punkte'), inp),
+          h('div.review-cell', h('span.hint', {}, 'Prozent'), h('span.review-solei', {}, pctCell)),
+          h('div.review-cell', h('span.hint', {}, 'Note'), gradeCell)
+        )
+      );
+    });
+    refreshAll();
+
+    function saveAll() {
+      var maxR = parseNum(maxInput.value);
+      if (!maxR.ok || (maxR.value != null && maxR.value <= 0)) {
+        UI.modal('Ungültige Maximalpunktzahl', h('p', {}, 'Bitte geben Sie eine Zahl größer 0 ein.'));
+        return;
+      }
+      var max = maxR.value;
+      var bad = [], anyPoints = false, out = {};
+      students.forEach(function (stu) {
+        var r = parseNum(inputs[stu.id].value);
+        if (!r.ok || (r.value != null && max != null && r.value > max)) {
+          bad.push(stu.lastName + ', ' + stu.firstName); return;
+        }
+        if (r.value != null) { out[stu.id] = r.value; anyPoints = true; }
+      });
+      if (bad.length) {
+        UI.modal('Ungültige Punkteeingabe',
+          h('p', {}, 'Punkte müssen zwischen 0 und der Maximalpunktzahl liegen. Bitte prüfen Sie: ' + bad.join('; ') + '.'));
+        return;
+      }
+      if (anyPoints && max == null) {
+        UI.modal('Maximalpunktzahl fehlt',
+          h('p', {}, 'Bitte tragen Sie zuerst die Maximalpunktzahl der Klausur ein – ohne sie können Prozent und Note nicht berechnet werden.'));
+        return;
+      }
+      course.ka[hj][idx] = { maxPoints: max, points: out };
+      Store.save();
+      toast('Klausur ' + (idx + 1) + ' (' + hj + '. Halbjahr) gespeichert.');
+    }
+
+    return h('div.screen',
+      header('Klausuren', { name: 'course', params: { id: course.id } }),
+      h('div.card.card-tight',
+        h('div.row-between', hjSeg, null),
+        tabs,
+        h('label.field',
+          h('span.field-label', {}, 'Maximalpunktzahl dieser Klausur'), maxInput),
+        h('p.hint', {}, 'Je Schüler/in die erreichten Punkte eintragen – Prozent und Note (Prozent-Bewertungsspiegel) berechnet die App.')
+      ),
+      h('div.card.card-list', {},
+        students.length ? rows : h('div.empty', h('p', {}, 'Diese Klasse hat noch keine Schüler/innen.'))),
+      h('button.btn-primary.btn-block', { onclick: saveAll }, 'Speichern')
     );
   };
 
@@ -1417,7 +1582,7 @@
       h('div.section-head', {}, 'Über diese App'),
       h('div.card',
         h('p', {}, 'SOL-Noten · Notenverwaltung zum selbstorganisierten Lernen'),
-        h('p.hint', {}, 'Version 0.3.1 · © 2026 Andreas Vandelaar · Alle Daten bleiben ausschließlich auf diesem Gerät.')
+        h('p.hint', {}, 'Version ' + APP_VERSION + ' · © 2026 Andreas Vandelaar · Alle Daten bleiben ausschließlich auf diesem Gerät.')
       )
     );
   };
