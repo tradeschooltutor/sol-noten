@@ -1185,7 +1185,7 @@
       h('div.section-head', {}, 'Über diese App'),
       h('div.card',
         h('p', {}, 'SOL-Noten · Notenverwaltung zum selbstorganisierten Lernen'),
-        h('p.hint', {}, 'Version 0.2.0 · © 2026 Andreas Vandelaar · Alle Daten bleiben ausschließlich auf diesem Gerät.')
+        h('p.hint', {}, 'Version 0.2.1 · © 2026 Andreas Vandelaar · Alle Daten bleiben ausschließlich auf diesem Gerät.')
       )
     );
   };

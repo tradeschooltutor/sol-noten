@@ -114,7 +114,7 @@
   function quarterChangeDue(todayISO, currentQuarter, quarters) {
     if (currentQuarter >= 4) return false;
     var q = quarters[currentQuarter - 1];
-    return !!(q && q.end && todayISO > q.end);
+    return !!(q && q.end && todayISO >= q.end);
   }
 
   return {
