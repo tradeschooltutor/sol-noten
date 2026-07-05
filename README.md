@@ -1,4 +1,4 @@
-# SOL-Noten (Version 0.5)
+# SOL-Noten (Version 0.6)
 
 Notenverwaltung zum selbstorganisierten Lernen (SOL) als Progressive Web App (PWA).
 Basierend auf der Excel-Notenverwaltung V8.0 von Andreas Vandelaar.
@@ -22,6 +22,9 @@ Basierend auf der Excel-Notenverwaltung V8.0 von Andreas Vandelaar.
 - **Update-Anzeige** – die App prüft beim Start, ob eine neue Version veröffentlicht wurde, und zeigt dann das Banner „Eine neue Version von SOL-Noten ist geladen" mit einem Aktualisieren-Knopf. So ist immer eindeutig erkennbar, ob ein Update angekommen ist.
 - **Notenübersicht** (nach dem Excel-Blatt „Noten") – alle Schüler/innen und alle Noten des Schuljahres in einer Tabelle: SoLei-Noten der vier Quartale mit Halbjahres- und Jahresdurchschnitt, alle OBT- und Klausurnoten mit Durchschnitten, gewichtete Zeugnisnote je Halbjahr und Schuljahr (fehlende Bereiche werden automatisch neu normiert), Tendenzpfeil (↑↗→↘↓, 2. HJ gegenüber 1. HJ) sowie manuelle Spalten „HJ-Zeugnis" und „Jahreszeugnis" für die pädagogische Entscheidung. Export als echte Excel-Datei und Druck/PDF (Querformat).
 - **Notenausdruck je Schüler/in** (nach dem Excel-Blatt „Notenausdruck") – für das Notengespräch: je Quartal die Kriterien mit Maximal- und erreichten Punkten (grün/rot gegenüber dem Vorquartal), Punktesumme, Note SL-Bogen, Portfolio und SoLei-Note; alle OBT- und Klausurnoten; vorläufige Gesamtnote mit Tendenz. Blättern zwischen den Schüler/innen, Druck/PDF (Hochformat).
+- **Punkteprotokoll mit Kriterium-Filter und Diagramm** – ein Tipp auf ein Kriterium filtert alle Vergaben dieses Kriteriums im gewählten Quartal und zeigt die Entwicklung als Liniendiagramm (Rasterlinien auf den Tipp-Stufen, Datumsachse).
+- **Unentschuldigte Fehlzeiten** – je Kurs mit Datum erfassbar; jede Fehlzeit vergibt automatisch 0 Punkte in allen fünf SoLei-Kriterien des Tages (das Quartal ergibt sich aus dem Datum). Löschen einer Fehlzeit entfernt auch die 0-Punkte-Vergaben. Im Punkteprotokoll sind Fehlzeiten gekennzeichnet und nur über die Fehlzeiten-Seite veränderbar.
+- **Farbschemata** – in den globalen Einstellungen wählbar: Petrol (Standard), Ozeanblau, Aubergine, Waldgrün, Schieferblau.
 - **Datensicherung** – alles bleibt lokal (IndexedDB). Backup-Datei speichern/einspielen, Erinnerung nach 7 Tagen, automatisches Backup in einen freigegebenen Ordner (Chrome/Edge am Computer und Android), interne tägliche Sicherungsstände der letzten 14 Tage gegen Fehlbedienung.
 - **Einstellungen** – Kriteriennamen (global), Bewertungsspiegel (15-Punkte-Schema, Standardwerte aus der Excel-Datei).
 

@@ -63,9 +63,11 @@
         criteriaNames: Calc.DEFAULT_CRITERIA.slice(),
         grading15: JSON.parse(JSON.stringify(Calc.DEFAULT_GRADING15)),
         gradingPct: Calc.DEFAULT_GRADING_PCT.slice(),
+        theme: 'petrol',
         lastExport: null,
         autoBackupFolder: false
       },
+      absences: [],      /* {id, courseId, studentId, date, quarter} */
       schoolYears: [],   /* {id, name, startDate, holidays[], quarters[4], holidaySource} */
       classes: [],       /* {id, yearId, name, students[]} */
       courses: [],       /* {id, yearId, classId, subject, numOBT, numKA,
@@ -79,8 +81,10 @@
   /* ---------- Laden / Speichern ---------- */
 
   function migrate(s) {
-    if (s && s.settings && !s.settings.gradingPct) {
-      s.settings.gradingPct = Calc.DEFAULT_GRADING_PCT.slice();
+    if (s && s.settings) {
+      if (!s.settings.gradingPct) s.settings.gradingPct = Calc.DEFAULT_GRADING_PCT.slice();
+      if (!s.settings.theme) s.settings.theme = 'petrol';
+      if (!Array.isArray(s.absences)) s.absences = [];
     }
     return s;
   }
@@ -264,11 +268,48 @@
     if (i >= 0) { state.soleiEntries.splice(i, 1); save(); }
   }
 
+  /* ---------- Unentschuldigte Fehlzeiten ---------- */
+
+  /* Erfasst eine unentschuldigte Fehlzeit und vergibt automatisch
+     0 Punkte in allen 5 SoLei-Kriterien (verknüpft über absenceId). */
+  function addAbsence(courseId, studentId, dateISO, quarter) {
+    var dup = state.absences.some(function (a) {
+      return a.courseId === courseId && a.studentId === studentId && a.date === dateISO;
+    });
+    if (dup) return null;
+    var a = { id: uid(), courseId: courseId, studentId: studentId, date: dateISO, quarter: quarter };
+    state.absences.push(a);
+    for (var c = 0; c < 5; c++) {
+      state.soleiEntries.push({
+        id: uid(), courseId: courseId, studentId: studentId, quarter: quarter,
+        criterion: c, points: 0, date: dateISO, absenceId: a.id,
+        createdAt: new Date().toISOString()
+      });
+    }
+    save();
+    return a;
+  }
+
+  function removeAbsence(absenceId) {
+    state.absences = state.absences.filter(function (a) { return a.id !== absenceId; });
+    state.soleiEntries = state.soleiEntries.filter(function (e) { return e.absenceId !== absenceId; });
+    save();
+  }
+
+  function absencesFor(courseId, studentId, quarter) {
+    return state.absences.filter(function (a) {
+      return a.courseId === courseId &&
+        (studentId == null || a.studentId === studentId) &&
+        (quarter == null || a.quarter === quarter);
+    }).sort(function (x, y) { return x.date.localeCompare(y.date); });
+  }
+
   root.Store = {
     init: init, save: save, onChange: onChange, uid: uid, todayISO: todayISO,
     getState: getState, freshState: freshState,
     yearById: yearById, classById: classById, courseById: courseById, studentById: studentById,
     entriesFor: entriesFor, addEntry: addEntry, updateEntry: updateEntry, deleteEntry: deleteEntry,
+    addAbsence: addAbsence, removeAbsence: removeAbsence, absencesFor: absencesFor,
     exportJSON: exportJSON, importJSON: importJSON,
     listSnapshots: listSnapshots, restoreSnapshot: restoreSnapshot,
     folderBackupSupported: folderBackupSupported, chooseBackupFolder: chooseBackupFolder,

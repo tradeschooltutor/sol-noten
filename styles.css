@@ -401,3 +401,43 @@ button:focus-visible, .input:focus-visible, select:focus-visible {
   .table-scroll { overflow: visible; box-shadow: none; }
   .report-block { page-break-inside: avoid; }
 }
+
+/* ---------- Farbschemata ---------- */
+[data-theme="blau"]      { --teal: #1d63b8; --teal-dark: #154a8a; --teal-soft: #e4edf8; }
+[data-theme="aubergine"] { --teal: #7a3b78; --teal-dark: #5b2b5a; --teal-soft: #f2e7f1; }
+[data-theme="wald"]      { --teal: #3d7a3f; --teal-dark: #2c5a2e; --teal-soft: #e7f2e7; }
+[data-theme="schiefer"]  { --teal: #4a6274; --teal-dark: #364a59; --teal-soft: #e9eef2; }
+.theme-row { display: flex; flex-wrap: wrap; gap: 8px; }
+.theme-swatch {
+  display: inline-flex; align-items: center; gap: 8px;
+  border: 2px solid var(--line); background: var(--card); border-radius: 999px;
+  padding: 8px 14px 8px 9px; min-height: 44px; font-size: 0.9rem;
+}
+.theme-swatch.active { border-color: var(--teal); font-weight: 650; }
+.theme-dot { width: 22px; height: 22px; border-radius: 50%; flex-shrink: 0; }
+
+/* ---------- Protokoll-Filter & Diagramm ---------- */
+.crit-summary-item.clickable { cursor: pointer; border: 2px solid transparent; }
+.crit-summary-item.selected { border-color: var(--teal); background: var(--teal-soft); }
+.chart-host svg { width: 100%; height: auto; display: block; }
+
+/* ---------- Fehlzeiten ---------- */
+.abs-row { padding: 10px 16px; border-bottom: 1px solid var(--line); display: flex; flex-direction: column; gap: 8px; }
+.abs-row:last-child { border-bottom: none; }
+.abs-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.abs-count {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 22px; height: 22px; border-radius: 999px; margin-left: 8px;
+  background: var(--red); color: #fff; font-size: 0.75rem; font-weight: 750; padding: 0 6px;
+}
+.abs-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.abs-chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: var(--red-soft); color: var(--red); border-radius: 999px;
+  padding: 4px 6px 4px 12px; font-size: 0.85rem; font-weight: 600;
+}
+.abs-x {
+  border: none; background: none; color: var(--red); font-size: 1.1rem;
+  width: 26px; height: 26px; border-radius: 50%; line-height: 1;
+}
+.abs-x:active { background: rgba(180,56,47,0.15); }

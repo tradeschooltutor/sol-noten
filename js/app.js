@@ -10,7 +10,7 @@
 
   /* ================= App-Start ================= */
 
-  var APP_VERSION = '0.5.1';
+  var APP_VERSION = '0.6.0';
 
   Store.init().then(function () {
     if ('serviceWorker' in navigator) {
@@ -45,7 +45,20 @@
 
   /* ================= Grundgerüst ================= */
 
+  var THEMES = [
+    { id: 'petrol',    name: 'Petrol (Standard)', c: '#0e7c74' },
+    { id: 'blau',      name: 'Ozeanblau',         c: '#1d63b8' },
+    { id: 'aubergine', name: 'Aubergine',         c: '#7a3b78' },
+    { id: 'wald',      name: 'Waldgrün',          c: '#3d7a3f' },
+    { id: 'schiefer',  name: 'Schieferblau',      c: '#4a6274' }
+  ];
+  function applyTheme() {
+    var t = (S() && S().settings && S().settings.theme) || 'petrol';
+    document.documentElement.setAttribute('data-theme', t);
+  }
+
   function render() {
+    applyTheme();
     var appEl = document.getElementById('app');
     clear(appEl);
     var view = views[route.name];
@@ -407,6 +420,8 @@
           'Klausuren'),
         h('button.btn-plain.btn-block', { onclick: function () { go('grades', { id: course.id }); } },
           'Notenübersicht & Notenausdruck'),
+        h('button.btn-plain.btn-block', { onclick: function () { go('absences', { id: course.id }); } },
+          'Unentschuldigte Fehlzeiten'),
         h('button.btn-plain.btn-block', { onclick: function () { go('students', { classId: cls.id, courseId: course.id }); } },
           'Schülerliste bearbeiten (' + cls.students.length + ')'),
         h('button.btn-plain.btn-block', { onclick: function () { go('maxPoints', { id: course.id }); } },
@@ -428,6 +443,7 @@
           var st = S();
           st.courses = st.courses.filter(function (c) { return c.id !== course.id; });
           st.soleiEntries = st.soleiEntries.filter(function (e) { return e.courseId !== course.id; });
+          st.absences = (st.absences || []).filter(function (a) { return a.courseId !== course.id; });
           Store.save();
           go('home');
         });
@@ -1359,6 +1375,87 @@
     );
   };
 
+  /* ================= Unentschuldigte Fehlzeiten ================= */
+
+  views.absences = function (p) {
+    var course = Store.courseById(p.id);
+    var cls = Store.classById(course.classId);
+    var quarters = courseQuarters(course);
+    var students = cls.students.slice().sort(function (a, b) {
+      return (a.lastName + a.firstName).localeCompare(b.lastName + b.firstName, 'de');
+    });
+    var shownQ = p.quarter || course.currentQuarter;
+
+    var qSel = h('select.input', { style: { maxWidth: '10rem' } });
+    [1, 2, 3, 4].forEach(function (n) {
+      qSel.appendChild(h('option', { value: n, selected: n === shownQ }, n + '. Quartal'));
+    });
+    qSel.addEventListener('change', function () {
+      go('absences', { id: course.id, quarter: Number(qSel.value), date: dateInput.value });
+    });
+
+    var dateInput = h('input.input.date-inline', { type: 'date', value: p.date || Store.todayISO() });
+
+    function addFor(stu) {
+      var d = dateInput.value;
+      if (!d) { toast('Bitte zuerst ein Datum wählen.'); return; }
+      var quarter = Quarters.quarterForDate(d, quarters);
+      var a = Store.addAbsence(course.id, stu.id, d, quarter);
+      if (!a) {
+        toast('Für ' + stu.lastName + ' ist am ' + UI.fmtDate(d) + ' bereits eine Fehlzeit erfasst.');
+        return;
+      }
+      toast(stu.lastName + ': Fehlzeit am ' + UI.fmtDate(d) + ' erfasst – 0 Punkte in allen Kriterien (' +
+        quarter + '. Quartal).', function () { Store.removeAbsence(a.id); render(); });
+      if (quarter !== shownQ) {
+        go('absences', { id: course.id, quarter: quarter, date: d });
+      } else render();
+    }
+
+    function removeAbs(a, stu) {
+      UI.confirmDialog('Fehlzeit löschen?',
+        stu.lastName + ', ' + stu.firstName + ' – ' + UI.fmtDate(a.date) +
+        ': Die Fehlzeit und die damit verbundenen 0-Punkte-Vergaben werden entfernt.',
+        'Löschen', true).then(function (ok) {
+          if (!ok) return;
+          Store.removeAbsence(a.id);
+          toast('Fehlzeit gelöscht.');
+          render();
+        });
+    }
+
+    var total = 0;
+    var rows = students.map(function (stu) {
+      var abs = Store.absencesFor(course.id, stu.id, shownQ);
+      total += abs.length;
+      return h('div.abs-row',
+        h('div.abs-head',
+          h('div.student-name', {}, stu.lastName + ', ' + stu.firstName,
+            abs.length ? h('span.abs-count', {}, abs.length) : null),
+          h('button.btn-small.btn-plain', { onclick: function () { addFor(stu); } }, '+ Fehlzeit')
+        ),
+        abs.length ? h('div.abs-chips', {}, abs.map(function (a) {
+          return h('span.abs-chip', {}, UI.fmtDate(a.date),
+            h('button.abs-x', { onclick: function () { removeAbs(a, stu); }, 'aria-label': 'Fehlzeit löschen' }, '×'));
+        })) : null
+      );
+    });
+
+    return h('div.screen',
+      header('Unentschuldigte Fehlzeiten', { name: 'course', params: { id: course.id } }),
+      h('div.card.card-tight',
+        h('div.row-between', qSel,
+          h('label.hint', {}, 'Datum ', dateInput)),
+        h('p.hint', {}, '„+ Fehlzeit“ erfasst für das gewählte Datum eine unentschuldigte Fehlzeit – ' +
+          'die App vergibt dann automatisch 0 Punkte in allen fünf SoLei-Kriterien dieses Tages. ' +
+          'Das Quartal ergibt sich aus dem Datum. Löschen entfernt auch die 0-Punkte-Vergaben wieder.')
+      ),
+      h('div.section-head', {}, 'Fehlzeiten im ' + shownQ + '. Quartal (' + total + ')'),
+      h('div.card.card-list', {},
+        students.length ? rows : h('div.empty', h('p', {}, 'Diese Klasse hat noch keine Schüler/innen.')))
+    );
+  };
+
   /* ================= Quartalszeiträume je Kurs ================= */
 
   views.quarterDates = function (p) {
@@ -1464,6 +1561,7 @@
           cls.students = cls.students.filter(function (s) { return s.id !== stu.id; });
           var st = S();
           st.soleiEntries = st.soleiEntries.filter(function (e) { return e.studentId !== stu.id; });
+          st.absences = (st.absences || []).filter(function (a) { return a.studentId !== stu.id; });
           Store.save();
           render();
         });
@@ -1703,6 +1801,7 @@
       go('protokoll', { courseId: course.id, studentId: stu.id, quarter: Number(qSel.value) });
     });
     var shownQ = p.quarter || q;
+    var filterCrit = (p.crit != null) ? p.crit : null;
 
     var e = Store.entriesFor(course.id, stu.id, shownQ);
     var stat = Calc.quarterStatus(e.byCriterion);
@@ -1712,9 +1811,17 @@
       ? Calc.quarterStatus(Store.entriesFor(course.id, stu.id, shownQ - 1).byCriterion)
       : null;
 
+    function setFilter(ci) {
+      go('protokoll', { courseId: course.id, studentId: stu.id, quarter: shownQ,
+        crit: (filterCrit === ci ? null : ci) });
+    }
+
     var critSummary = h('div.crit-summary', {}, names.map(function (n, ci) {
       var dev = prevStat ? development(stat.averages[ci], prevStat.averages[ci]) : null;
-      return h('div.crit-summary-item' + (dev === 'up' ? '.up' : dev === 'down' ? '.down' : ''),
+      return h('div.crit-summary-item.clickable' +
+        (dev === 'up' ? '.up' : dev === 'down' ? '.down' : '') +
+        (filterCrit === ci ? '.selected' : ''),
+        { onclick: function () { setFilter(ci); }, role: 'button', tabindex: 0 },
         h('span.hint', {}, n),
         h('strong', {}, stat.averages[ci] === null ? '–'
           : (dev === 'up' ? '▲ ' : dev === 'down' ? '▼ ' : '') + 'ø ' + Calc.fmt(stat.averages[ci], 1))
@@ -1731,9 +1838,75 @@
           h('div.crit-summary-item', h('span.hint', {}, 'Note SoLei'), h('strong', {}, soleiG != null ? Calc.fmt(soleiG) : '–')))
       : null;
 
-    var list = e.list.slice().sort(function (a, b) {
+    /* --- Liniendiagramm der Punkteentwicklung im gefilterten Kriterium --- */
+    function lineChart(points, max) { /* points: [{date, points}] chronologisch */
+      var W = 560, H = 150, padL = 30, padR = 12, padT = 10, padB = 26;
+      var iw = W - padL - padR, ih = H - padT - padB;
+      var n = points.length;
+      function x(i) { return padL + (n === 1 ? iw / 2 : i * (iw / (n - 1))); }
+      function y(v) { return padT + ih - (v / max) * ih; }
+      var svg = ['<svg viewBox="0 0 ' + W + ' ' + H + '" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Punkteentwicklung">'];
+      /* Rasterlinien bei den Tipp-Stufen */
+      Calc.tapValues(max).forEach(function (v) {
+        svg.push('<line x1="' + padL + '" y1="' + y(v) + '" x2="' + (W - padR) + '" y2="' + y(v) +
+          '" stroke="var(--line)" stroke-width="1"/>');
+        svg.push('<text x="' + (padL - 6) + '" y="' + (y(v) + 3.5) + '" text-anchor="end" font-size="10" fill="var(--ink-soft)">' +
+          Calc.fmt(v, 1) + '</text>');
+      });
+      /* Linie */
+      if (n > 1) {
+        var d = points.map(function (pt, i) { return (i ? 'L' : 'M') + x(i) + ' ' + y(pt.points); }).join(' ');
+        svg.push('<path d="' + d + '" fill="none" stroke="var(--teal)" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>');
+      }
+      /* Punkte + Datumsbeschriftung (erste, letzte, dazwischen ausgedünnt) */
+      var step = Math.max(1, Math.ceil(n / 8));
+      points.forEach(function (pt, i) {
+        svg.push('<circle cx="' + x(i) + '" cy="' + y(pt.points) + '" r="4" fill="var(--teal)"/>');
+        if (i === 0 || i === n - 1 || i % step === 0) {
+          var pp = pt.date.split('-');
+          svg.push('<text x="' + x(i) + '" y="' + (H - 8) + '" text-anchor="middle" font-size="9.5" fill="var(--ink-soft)">' +
+            pp[2] + '.' + pp[1] + '.</text>');
+        }
+      });
+      svg.push('</svg>');
+      var host = h('div.chart-host');
+      host.innerHTML = svg.join('');
+      return host;
+    }
+
+    var chartCard = null;
+    if (filterCrit != null) {
+      var chartPoints = e.list.filter(function (x) { return x.criterion === filterCrit; })
+        .sort(function (a, b) { return a.date.localeCompare(b.date) || a.createdAt.localeCompare(b.createdAt); })
+        .map(function (x) { return { date: x.date, points: x.points }; });
+      chartCard = h('div.card.card-tight',
+        h('div.row-between',
+          h('strong', {}, names[filterCrit] + ' im ' + shownQ + '. Quartal'),
+          h('button.btn-small.btn-plain', { onclick: function () { setFilter(filterCrit); } }, 'Filter aufheben')),
+        chartPoints.length
+          ? lineChart(chartPoints, course.maxPoints[shownQ][filterCrit])
+          : h('p.hint', {}, 'In diesem Quartal wurden für dieses Kriterium noch keine Punkte vergeben.')
+      );
+    }
+
+    /* --- Vergabeliste: normale Vergaben editierbar, Fehlzeiten gekennzeichnet --- */
+    var absences = Store.absencesFor(course.id, stu.id, shownQ);
+    var shownEntries = e.list.filter(function (x) {
+      if (filterCrit != null) return x.criterion === filterCrit;
+      return !x.absenceId; /* ungefiltert: Fehlzeiten unten zusammengefasst */
+    });
+
+    var list = shownEntries.slice().sort(function (a, b) {
       return b.date.localeCompare(a.date) || b.createdAt.localeCompare(a.createdAt);
     }).map(function (entry) {
+      if (entry.absenceId) {
+        return h('div.log-row',
+          h('div',
+            h('strong', {}, '0 P.'), ' · ', names[entry.criterion],
+            h('span.hint.block', {}, UI.fmtDate(entry.date) + ' · unentschuldigte Fehlzeit')),
+          h('span.hint', {}, 'über „Unentschuldigte Fehlzeiten“ verwalten')
+        );
+      }
       return h('div.log-row',
         h('div',
           h('strong', {}, Calc.fmt(entry.points, 1) + ' P.'), ' · ', names[entry.criterion],
@@ -1748,6 +1921,17 @@
       );
     });
 
+    if (filterCrit == null && absences.length) {
+      absences.forEach(function (a) {
+        list.push(h('div.log-row',
+          h('div',
+            h('strong', {}, 'Unentschuldigte Fehlzeit'),
+            h('span.hint.block', {}, UI.fmtDate(a.date) + ' · 0 Punkte in allen Kriterien')),
+          h('span.hint', {}, 'über „Unentschuldigte Fehlzeiten“ verwalten')
+        ));
+      });
+    }
+
     return h('div.screen',
       header(stu.lastName + ', ' + stu.firstName, { name: 'course', params: { id: course.id } }),
       h('div.card.card-tight',
@@ -1757,13 +1941,17 @@
             stat.rated > 0 ? h('span.grade-pill.g' + Math.round(grade.g), {}, 'Note ' + Calc.fmt(grade.g) + ' (' + grade.label + ')') : null
           )
         ),
+        h('p.hint', {}, 'Tipp: Ein Kriterium antippen filtert die Vergaben und zeigt die Entwicklung als Diagramm.'),
         critSummary,
         gradeLine,
         stat.rated > 0 && stat.rated < 5
           ? h('p.hint', {}, 'Erst ' + stat.rated + ' von 5 Kriterien bewertet – der Notenstand ist ein Zwischenstand.')
           : null
       ),
-      h('div.section-head', {}, 'Alle Punktevergaben (' + e.list.length + ')'),
+      chartCard,
+      h('div.section-head', {}, filterCrit != null
+        ? 'Vergaben · ' + names[filterCrit] + ' (' + shownEntries.length + ')'
+        : 'Alle Punktevergaben (' + (shownEntries.length + absences.length) + ')'),
       h('div.card.card-list', {}, list.length ? list : h('div.empty', h('p', {}, 'In diesem Quartal wurden noch keine Punkte vergeben.')))
     );
 
@@ -1856,6 +2044,24 @@
 
       h('div.banner-info', {},
         h('span', {}, 'Maximalpunkte der Kriterien, Quartalszeiträume, Gewichtung sowie die Anzahl der Klausuren und Open Book Tests stellen Sie je Kurs ein: Kurs auf dem Startbildschirm antippen, dann finden Sie diese Punkte unterhalb der Schülerliste.')),
+
+      h('div.section-head', {}, 'Farbschema'),
+      h('div.card',
+        h('div.theme-row', {}, THEMES.map(function (t) {
+          var active = (st.settings.theme || 'petrol') === t.id;
+          return h('button.theme-swatch' + (active ? '.active' : ''), {
+            onclick: function () {
+              st.settings.theme = t.id;
+              Store.save();
+              applyTheme();
+              toast('Farbschema „' + t.name + '“ aktiviert.');
+              render();
+            }
+          },
+            h('span.theme-dot', { style: { background: t.c } }),
+            h('span', {}, t.name));
+        }))
+      ),
 
       h('div.section-head', {}, 'Datensicherung'),
       h('div.card',
