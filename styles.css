@@ -360,10 +360,16 @@ button:focus-visible, .input:focus-visible, select:focus-visible {
 .print-sub { margin: 0; color: var(--ink-soft); font-size: 0.9rem; }
 .report-section { margin: 4px 0 -6px; }
 .report-block h3 { margin: 0 0 6px; font-size: 0.95rem; }
-.report-table { border-collapse: collapse; font-size: 0.82rem; width: 100%; }
-.report-table th, .report-table td {
-  border: 1px solid var(--line); padding: 4px 7px; text-align: center; font-variant-numeric: tabular-nums;
+.report-table {
+  border-collapse: collapse; font-size: 0.72rem; width: 100%;
+  table-layout: fixed;
 }
+.report-table th, .report-table td {
+  border: 1px solid var(--line); padding: 3px 4px; text-align: center; font-variant-numeric: tabular-nums;
+  white-space: normal; overflow-wrap: break-word; word-break: break-word; hyphens: auto;
+}
+.report-table th:first-child, .report-table td:first-child { width: 3.6rem; }
+@media (max-width: 480px) { .report-table { font-size: 0.62rem; } }
 .report-table th { background: var(--teal-soft); color: var(--teal-dark); font-weight: 650; }
 .report-table .row-label { text-align: left; color: var(--ink-soft); }
 .report-table .val.strong { font-weight: 750; background: #f6f8f7; }
@@ -380,10 +386,14 @@ button:focus-visible, .input:focus-visible, select:focus-visible {
   #app, #toast-host, #modal-host, .update-banner { display: none !important; }
   .print-page { color: #000; }
   .print-page h2 { margin: 0 0 2mm; }
-  .grades-table, .report-table { font-size: 8pt; }
+  .grades-table { font-size: 6.5pt; width: 100%; }
+  .report-table { font-size: 8pt; }
   .grades-table th, .grades-table td, .report-table th, .report-table td {
-    border: 0.5pt solid #888; padding: 1.2mm 1.6mm;
+    border: 0.5pt solid #888; padding: 0.8mm 1mm;
   }
+  .grades-table th { white-space: normal; hyphens: auto; font-weight: 600; }
+  .grades-table td { white-space: nowrap; }
+  .grades-table .sticky-col { position: static; box-shadow: none; }
   .grades-table .group-row th { background: #eee !important; color: #000; }
   .grades-table tr:nth-child(2) th, .report-table th { background: #f2f2f2 !important; color: #000; }
   .report-table .val.up { background: #e4f2e8 !important; }

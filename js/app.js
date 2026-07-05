@@ -10,7 +10,7 @@
 
   /* ================= App-Start ================= */
 
-  var APP_VERSION = '0.5.0';
+  var APP_VERSION = '0.5.1';
 
   Store.init().then(function () {
     if ('serviceWorker' in navigator) {
@@ -66,15 +66,25 @@
     }
   }
 
+  var HOME_SVG = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l9-8 9 8"/><path d="M5 10v10h5v-6h4v6h5V10"/></svg>';
+
   function header(title, backTo, extra) {
+    var right = [];
+    if (extra) right.push(extra);
+    else if (route.name !== 'settings') {
+      right.push(h('button.icon-btn', { onclick: function () { go('settings', { back: route }); }, 'aria-label': 'Einstellungen' }, '⚙'));
+    }
+    if (backTo) {
+      right.push(h('button.icon-btn', {
+        onclick: function () { go('home'); }, 'aria-label': 'Zur Kursübersicht', html: HOME_SVG
+      }));
+    }
     return h('header.topbar', {},
       backTo
         ? h('button.icon-btn', { onclick: function () { go(backTo.name, backTo.params); }, 'aria-label': 'Zurück' }, '‹')
         : h('span.logo-dot', {}, ''),
       h('h1.topbar-title', {}, title),
-      extra || (route.name !== 'settings'
-        ? h('button.icon-btn', { onclick: function () { go('settings', { back: route }); }, 'aria-label': 'Einstellungen' }, '⚙')
-        : h('span'))
+      right
     );
   }
 
@@ -1063,7 +1073,7 @@
       return d;
     })();
     clear(host);
-    var style = h('style', {}, '@page { size: A4 ' + (landscape ? 'landscape' : 'portrait') + '; margin: 12mm; }');
+    var style = h('style', {}, '@page { size: A4 ' + (landscape ? 'landscape; margin: 7mm' : 'portrait; margin: 12mm') + '; }');
     host.appendChild(style);
     host.appendChild(node);
     window.print();
@@ -1327,8 +1337,13 @@
         : null
     );
 
+    function doReportPrint() {
+      printNode(reportContent.cloneNode(true), false);
+    }
+
     return h('div.screen',
-      header('Notenausdruck', { name: 'grades', params: { id: course.id } }),
+      header('Notenausdruck', { name: 'grades', params: { id: course.id } },
+        h('button.btn-small.btn-plain', { onclick: doReportPrint }, 'Drucken')),
       h('div.crit-nav',
         h('button.icon-btn', { onclick: function () {
           go('report', { id: course.id, studentId: students[(si + students.length - 1) % students.length].id });
@@ -1339,9 +1354,8 @@
         } }, '›')
       ),
       h('div.card', {}, reportContent),
-      h('button.btn-primary.btn-block', { onclick: function () {
-        printNode(reportContent.cloneNode(true), false);
-      } }, 'Drucken / als PDF speichern (für das Notengespräch)')
+      h('button.btn-primary.btn-block', { onclick: doReportPrint },
+        'Drucken / als PDF speichern (für das Notengespräch)')
     );
   };
 
@@ -1838,7 +1852,7 @@
     });
 
     return h('div.screen',
-      header('Einstellungen', back, h('span')),
+      header('Globale Einstellungen für alle Kurse', back, h('span')),
 
       h('div.banner-info', {},
         h('span', {}, 'Maximalpunkte der Kriterien, Quartalszeiträume, Gewichtung sowie die Anzahl der Klausuren und Open Book Tests stellen Sie je Kurs ein: Kurs auf dem Startbildschirm antippen, dann finden Sie diese Punkte unterhalb der Schülerliste.')),
