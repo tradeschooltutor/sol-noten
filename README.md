@@ -1,4 +1,4 @@
-# SOL-Noten (Version 0.6)
+# SOL-Noten (Version 0.7)
 
 Notenverwaltung zum selbstorganisierten Lernen (SOL) als Progressive Web App (PWA).
 Basierend auf der Excel-Notenverwaltung V8.0 von Andreas Vandelaar.
@@ -25,6 +25,9 @@ Basierend auf der Excel-Notenverwaltung V8.0 von Andreas Vandelaar.
 - **Punkteprotokoll mit Kriterium-Filter und Diagramm** – ein Tipp auf ein Kriterium filtert alle Vergaben dieses Kriteriums im gewählten Quartal und zeigt die Entwicklung als Liniendiagramm (Rasterlinien auf den Tipp-Stufen, Datumsachse).
 - **Unentschuldigte Fehlzeiten** – je Kurs mit Datum erfassbar; jede Fehlzeit vergibt automatisch 0 Punkte in allen fünf SoLei-Kriterien des Tages (das Quartal ergibt sich aus dem Datum). Löschen einer Fehlzeit entfernt auch die 0-Punkte-Vergaben. Im Punkteprotokoll sind Fehlzeiten gekennzeichnet und nur über die Fehlzeiten-Seite veränderbar.
 - **Farbschemata** – in den globalen Einstellungen wählbar: Petrol (Standard), Ozeanblau, Aubergine, Waldgrün, Schieferblau.
+- **Verschlüsselte Backups** – beim Speichern eines Backups kann ein Passwort vergeben werden; die Datei wird dann mit AES-256-GCM verschlüsselt (Schlüsselableitung PBKDF2/SHA-256, 310.000 Runden). Beim Einspielen fragt die App das Passwort ab. Ohne Passwort bleibt der Klartext-Export möglich. Achtung: Ein vergessenes Passwort ist nicht wiederherstellbar.
+- **Diagramm-Druck** – im Punkteprotokoll lassen sich die Liniendiagramme aller fünf Kriterien eines Quartals gesammelt drucken bzw. als PDF speichern; unentschuldigte Fehlzeiten erscheinen als rote Punkte (auch im Bildschirm-Diagramm), Fehlzeiten-Hinweise sind direkt zur Fehlzeiten-Verwaltung verlinkt.
+- **Acht Farbschemata** – zusätzlich Himmelblau, Orange und Beere; die Titelzeile der App und die Browser-Farbleiste übernehmen das gewählte Schema.
 - **Datensicherung** – alles bleibt lokal (IndexedDB). Backup-Datei speichern/einspielen, Erinnerung nach 7 Tagen, automatisches Backup in einen freigegebenen Ordner (Chrome/Edge am Computer und Android), interne tägliche Sicherungsstände der letzten 14 Tage gegen Fehlbedienung.
 - **Einstellungen** – Kriteriennamen (global), Bewertungsspiegel (15-Punkte-Schema, Standardwerte aus der Excel-Datei).
 

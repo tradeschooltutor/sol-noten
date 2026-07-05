@@ -441,3 +441,33 @@ button:focus-visible, .input:focus-visible, select:focus-visible {
   width: 26px; height: 26px; border-radius: 50%; line-height: 1;
 }
 .abs-x:active { background: rgba(180,56,47,0.15); }
+
+/* ---------- Neue Farbschemata ---------- */
+[data-theme="himmel"] { --teal: #0284c7; --teal-dark: #02669a; --teal-soft: #e3f2fb; }
+[data-theme="orange"] { --teal: #d1580a; --teal-dark: #a34408; --teal-soft: #fbeadd; }
+[data-theme="beere"]  { --teal: #b83280; --teal-dark: #8f2663; --teal-soft: #f9e7f2; }
+
+/* ---------- Farbige Titelzeile ---------- */
+.topbar {
+  background: linear-gradient(150deg, var(--teal), var(--teal-dark));
+  border-radius: 14px; padding: 10px 12px; box-shadow: var(--shadow);
+}
+.topbar-title { color: #fff; }
+.topbar .icon-btn {
+  background: rgba(255,255,255,0.14); border-color: rgba(255,255,255,0.35); color: #fff;
+}
+.topbar .icon-btn:active { background: rgba(255,255,255,0.3); }
+.topbar .btn-small.btn-plain {
+  background: rgba(255,255,255,0.14); border-color: rgba(255,255,255,0.35); color: #fff;
+}
+.topbar .logo-dot { background: rgba(255,255,255,0.22); border: 2px solid rgba(255,255,255,0.65); }
+
+/* ---------- Diagramm-Legende ---------- */
+.legend-dot {
+  display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 4px;
+}
+.legend-dot.red { background: var(--red); }
+
+@media print {
+  .print-page .chart-host svg { max-height: 42mm; }
+}

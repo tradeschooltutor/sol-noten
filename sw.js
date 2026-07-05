@@ -1,20 +1,21 @@
 /* SOL-Noten – Service Worker: macht die App vollständig offline nutzbar. */
-var CACHE = 'sol-noten-v0.6.0';
+var CACHE = 'sol-noten-v0.7.0';
 var FILES = [
   './',
   'index.html',
   'styles.css',
   'manifest.webmanifest',
   'js/calc.js',
+  'js/cryptobox.js',
   'js/importer.js',
   'js/xlsxwrite.js',
   'js/quarters.js',
   'js/store.js',
   'js/ui.js',
   'js/app.js',
-  'icons/icon-192.png',
-  'icons/icon-512.png',
-  'icons/icon-512-maskable.png'
+  'icons/icon-192-v2.png',
+  'icons/icon-512-v2.png',
+  'icons/icon-512-maskable-v2.png'
 ];
 
 self.addEventListener('install', function (e) {

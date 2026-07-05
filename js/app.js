@@ -10,7 +10,7 @@
 
   /* ================= App-Start ================= */
 
-  var APP_VERSION = '0.6.0';
+  var APP_VERSION = '0.7.0';
 
   Store.init().then(function () {
     if ('serviceWorker' in navigator) {
@@ -48,6 +48,9 @@
   var THEMES = [
     { id: 'petrol',    name: 'Petrol (Standard)', c: '#0e7c74' },
     { id: 'blau',      name: 'Ozeanblau',         c: '#1d63b8' },
+    { id: 'himmel',    name: 'Himmelblau',        c: '#0284c7' },
+    { id: 'orange',    name: 'Orange',            c: '#d1580a' },
+    { id: 'beere',     name: 'Beere',             c: '#b83280' },
     { id: 'aubergine', name: 'Aubergine',         c: '#7a3b78' },
     { id: 'wald',      name: 'Waldgrün',          c: '#3d7a3f' },
     { id: 'schiefer',  name: 'Schieferblau',      c: '#4a6274' }
@@ -55,6 +58,10 @@
   function applyTheme() {
     var t = (S() && S().settings && S().settings.theme) || 'petrol';
     document.documentElement.setAttribute('data-theme', t);
+    var th = null;
+    for (var i = 0; i < THEMES.length; i++) if (THEMES[i].id === t) th = THEMES[i];
+    var m = document.querySelector('meta[name="theme-color"]');
+    if (m && th) m.setAttribute('content', th.c);
   }
 
   function render() {
@@ -260,6 +267,35 @@
     }
   };
 
+  /* Backup speichern – mit optionalem Passwort (verschlüsselt). */
+  function exportDialog() {
+    var pw1 = h('input.input', { type: 'password', autocomplete: 'new-password', placeholder: 'Passwort (empfohlen)' });
+    var pw2 = h('input.input', { type: 'password', autocomplete: 'new-password', placeholder: 'Passwort wiederholen' });
+    var err = h('p.hint.error-text');
+    UI.modal('Backup speichern', [
+      h('p.hint', {}, 'Mit Passwort wird die Datei verschlüsselt (AES-256) – empfohlen, wenn das Backup in Cloud-Ordnern oder Mails landet. Ohne Passwort wird sie im Klartext gespeichert.'),
+      h('label.field', h('span.field-label', {}, 'Passwort'), pw1),
+      h('label.field', h('span.field-label', {}, 'Wiederholung'), pw2),
+      h('p.hint', {}, 'Wichtig: Ein vergessenes Passwort kann nicht wiederhergestellt werden – die Datei ist dann unlesbar.'),
+      err
+    ], [
+      { label: 'Abbrechen', value: false },
+      { label: 'Backup speichern', value: true, primary: true,
+        validate: function () {
+          if (pw1.value !== pw2.value) { err.textContent = 'Die Passwörter stimmen nicht überein.'; return false; }
+          if (pw1.value && pw1.value.length < 6) { err.textContent = 'Bitte mindestens 6 Zeichen verwenden.'; return false; }
+          return true;
+        } }
+    ]).then(function (ok) {
+      if (!ok) return;
+      var pw = pw1.value || null;
+      Store.exportJSON(pw).then(function () {
+        toast(pw ? 'Verschlüsseltes Backup wird gespeichert.' : 'Backup (unverschlüsselt) wird gespeichert.');
+        render();
+      });
+    });
+  }
+
   function backupBanner() {
     var days = Store.daysSinceExport();
     var st = S();
@@ -270,7 +306,7 @@
     return h('div.banner-warn', {},
       h('span', {}, never ? 'Ihre Daten wurden noch nie gesichert.'
         : 'Ihr letztes Backup ist ' + days + ' Tage alt.'),
-      h('button.btn-small.btn-primary', { onclick: function () { Store.exportJSON(); render(); } }, 'Jetzt sichern')
+      h('button.btn-small.btn-primary', { onclick: exportDialog }, 'Jetzt sichern')
     );
   }
 
@@ -1861,7 +1897,8 @@
       /* Punkte + Datumsbeschriftung (erste, letzte, dazwischen ausgedünnt) */
       var step = Math.max(1, Math.ceil(n / 8));
       points.forEach(function (pt, i) {
-        svg.push('<circle cx="' + x(i) + '" cy="' + y(pt.points) + '" r="4" fill="var(--teal)"/>');
+        svg.push('<circle cx="' + x(i) + '" cy="' + y(pt.points) + '" r="' + (pt.absence ? 5 : 4) +
+          '" fill="' + (pt.absence ? 'var(--red)' : 'var(--teal)') + '"/>');
         if (i === 0 || i === n - 1 || i % step === 0) {
           var pp = pt.date.split('-');
           svg.push('<text x="' + x(i) + '" y="' + (H - 8) + '" text-anchor="middle" font-size="9.5" fill="var(--ink-soft)">' +
@@ -1878,13 +1915,16 @@
     if (filterCrit != null) {
       var chartPoints = e.list.filter(function (x) { return x.criterion === filterCrit; })
         .sort(function (a, b) { return a.date.localeCompare(b.date) || a.createdAt.localeCompare(b.createdAt); })
-        .map(function (x) { return { date: x.date, points: x.points }; });
+        .map(function (x) { return { date: x.date, points: x.points, absence: !!x.absenceId }; });
       chartCard = h('div.card.card-tight',
         h('div.row-between',
           h('strong', {}, names[filterCrit] + ' im ' + shownQ + '. Quartal'),
           h('button.btn-small.btn-plain', { onclick: function () { setFilter(filterCrit); } }, 'Filter aufheben')),
         chartPoints.length
-          ? lineChart(chartPoints, course.maxPoints[shownQ][filterCrit])
+          ? [lineChart(chartPoints, course.maxPoints[shownQ][filterCrit]),
+             chartPoints.some(function (cp) { return cp.absence; })
+               ? h('p.hint', {}, h('span.legend-dot.red'), ' rote Punkte = unentschuldigte Fehlzeit (0 Punkte)')
+               : null]
           : h('p.hint', {}, 'In diesem Quartal wurden für dieses Kriterium noch keine Punkte vergeben.')
       );
     }
@@ -1904,7 +1944,9 @@
           h('div',
             h('strong', {}, '0 P.'), ' · ', names[entry.criterion],
             h('span.hint.block', {}, UI.fmtDate(entry.date) + ' · unentschuldigte Fehlzeit')),
-          h('span.hint', {}, 'über „Unentschuldigte Fehlzeiten“ verwalten')
+          h('button.btn-small.btn-plain', { onclick: function () {
+            go('absences', { id: course.id, quarter: shownQ });
+          } }, 'Fehlzeiten verwalten')
         );
       }
       return h('div.log-row',
@@ -1927,13 +1969,38 @@
           h('div',
             h('strong', {}, 'Unentschuldigte Fehlzeit'),
             h('span.hint.block', {}, UI.fmtDate(a.date) + ' · 0 Punkte in allen Kriterien')),
-          h('span.hint', {}, 'über „Unentschuldigte Fehlzeiten“ verwalten')
+          h('button.btn-small.btn-plain', { onclick: function () {
+            go('absences', { id: course.id, quarter: shownQ });
+          } }, 'Fehlzeiten verwalten')
         ));
       });
     }
 
+    function printCharts() {
+      var page = h('div.print-page.report',
+        h('h2', {}, 'SoLei-Punkteentwicklung'),
+        h('p.print-sub', {}, cls.name + ' · ' + course.subject + ' · ' + shownQ + '. Quartal · ' +
+          stu.lastName + ', ' + stu.firstName + ' · Stand: ' + UI.fmtDate(Store.todayISO())),
+        names.map(function (n, ci) {
+          var pts = e.list.filter(function (x) { return x.criterion === ci; })
+            .sort(function (a, b) { return a.date.localeCompare(b.date) || a.createdAt.localeCompare(b.createdAt); })
+            .map(function (x) { return { date: x.date, points: x.points, absence: !!x.absenceId }; });
+          return h('div.report-block',
+            h('h3', {}, n + (stat.averages[ci] != null ? ' · ø ' + Calc.fmt(stat.averages[ci], 1) +
+              ' von ' + Calc.fmt(course.maxPoints[shownQ][ci], 1) : '')),
+            pts.length ? lineChart(pts, course.maxPoints[shownQ][ci])
+              : h('p.hint', {}, 'Keine Punktevergaben in diesem Quartal.'));
+        }),
+        Store.absencesFor(course.id, stu.id, shownQ).length
+          ? h('p.hint', {}, h('span.legend-dot.red'), ' rote Punkte = unentschuldigte Fehlzeit (0 Punkte)')
+          : null
+      );
+      printNode(page, false);
+    }
+
     return h('div.screen',
-      header(stu.lastName + ', ' + stu.firstName, { name: 'course', params: { id: course.id } }),
+      header(stu.lastName + ', ' + stu.firstName, { name: 'course', params: { id: course.id } },
+        h('button.btn-small.btn-plain', { onclick: printCharts }, 'Diagramme drucken')),
       h('div.card.card-tight',
         h('div.row-between', qSel,
           h('div.row-gap',
@@ -2010,18 +2077,38 @@
     var fileInput = h('input', { type: 'file', accept: '.json,application/json', style: { display: 'none' } });
     fileInput.addEventListener('change', function () {
       var f = fileInput.files[0];
+      fileInput.value = '';
       if (!f) return;
       f.text().then(function (text) {
-        return UI.confirmDialog('Backup einspielen?',
-          'Achtung: Alle aktuell auf diesem Gerät gespeicherten Daten werden durch den Inhalt der Datei „' + f.name + '“ ersetzt.',
-          'Backup einspielen', true).then(function (ok) {
-            if (!ok) return;
-            Store.importJSON(text);
-            toast('Backup wurde eingespielt.');
-            go('home');
-          });
+        var parsed = Store.parseBackup(text);
+        var getData = parsed.encrypted
+          ? askPassword(f.name).then(function (pw) {
+              if (pw == null) return null;
+              return CryptoBox.decrypt(parsed.envelope, pw).then(function (plain) { return JSON.parse(plain); });
+            })
+          : Promise.resolve(parsed.data);
+        return getData.then(function (data) {
+          if (!data) return;
+          return UI.confirmDialog('Backup einspielen?',
+            'Achtung: Alle aktuell auf diesem Gerät gespeicherten Daten werden durch den Inhalt der Datei „' + f.name + '“ ersetzt.',
+            'Backup einspielen', true).then(function (ok) {
+              if (!ok) return;
+              Store.applyImport(data);
+              toast('Backup wurde eingespielt.');
+              go('home');
+            });
+        });
       }).catch(function (e) { UI.modal('Import fehlgeschlagen', h('p', {}, e.message)); });
     });
+
+    function askPassword(fileName) {
+      var pw = h('input.input', { type: 'password', autocomplete: 'current-password', placeholder: 'Passwort' });
+      return UI.modal('Verschlüsseltes Backup',
+        [h('p.hint', {}, 'Die Datei „' + fileName + '“ ist verschlüsselt. Bitte geben Sie das Passwort ein.'),
+         h('label.field', h('span.field-label', {}, 'Passwort'), pw)],
+        [{ label: 'Abbrechen', value: false }, { label: 'Entschlüsseln', value: true, primary: true }]
+      ).then(function (ok) { return ok ? pw.value : null; });
+    }
 
     var snapHost = h('div.actions-col');
     Store.listSnapshots().then(function (keys) {
@@ -2069,8 +2156,8 @@
           ? 'Letztes Backup: ' + UI.fmtDate(st.settings.lastExport.slice(0, 10))
           : 'Es wurde noch kein Backup erstellt.'),
         h('div.actions-col',
-          h('button.btn-primary.btn-block', { onclick: function () { Store.exportJSON(); render(); } },
-            'Backup-Datei jetzt speichern'),
+          h('button.btn-primary.btn-block', { onclick: exportDialog },
+            'Backup-Datei jetzt speichern (mit Passwort: verschlüsselt)'),
           h('button.btn-plain.btn-block', { onclick: function () { fileInput.click(); } },
             'Backup-Datei einspielen'),
           Store.folderBackupSupported()

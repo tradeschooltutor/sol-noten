@@ -152,29 +152,56 @@
 
   /* ---------- Export / Import (Backup-Datei) ---------- */
 
-  function exportJSON() {
-    var data = JSON.stringify(state, null, 1);
-    var name = 'SOL-Noten-Backup-' + todayISO() + '.json';
-    var blob = new Blob([data], { type: 'application/json' });
+  function downloadText(name, text) {
+    var blob = new Blob([text], { type: 'application/json' });
     var a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
     a.download = name;
     document.body.appendChild(a);
     a.click();
     setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 500);
-    state.settings.lastExport = new Date().toISOString();
-    save();
   }
 
-  function importJSON(text) {
+  /* Backup exportieren; mit Passwort verschlüsselt (AES-256-GCM), ohne Passwort im Klartext. */
+  function exportJSON(password) {
+    var done = function () {
+      state.settings.lastExport = new Date().toISOString();
+      save();
+    };
+    if (password) {
+      return CryptoBox.encrypt(JSON.stringify(state), password).then(function (env) {
+        downloadText('SOL-Noten-Backup-' + todayISO() + '.json', JSON.stringify(env));
+        done();
+      });
+    }
+    downloadText('SOL-Noten-Backup-' + todayISO() + '.json', JSON.stringify(state, null, 1));
+    done();
+    return Promise.resolve();
+  }
+
+  function parseBackup(text) {
     var data;
     try { data = JSON.parse(text); }
     catch (e) { throw new Error('Die Datei ist keine gültige Backup-Datei (JSON-Fehler).'); }
+    if (CryptoBox.isEncryptedEnvelope(data)) return { encrypted: true, envelope: data };
+    if (!data || data.app !== 'SOL-Noten' || !Array.isArray(data.courses)) {
+      throw new Error('Die Datei ist keine SOL-Noten-Backup-Datei.');
+    }
+    return { encrypted: false, data: data };
+  }
+
+  function applyImport(data) {
     if (!data || data.app !== 'SOL-Noten' || !Array.isArray(data.courses)) {
       throw new Error('Die Datei ist keine SOL-Noten-Backup-Datei.');
     }
     state = migrate(data);
     save();
+  }
+
+  function importJSON(text) { /* unverschlüsselter Direktimport (Altbestand) */
+    var p = parseBackup(text);
+    if (p.encrypted) throw new Error('Diese Backup-Datei ist verschlüsselt.');
+    applyImport(p.data);
   }
 
   /* ---------- Automatisches Backup in freigegebenen Ordner ---------- */
@@ -310,7 +337,7 @@
     yearById: yearById, classById: classById, courseById: courseById, studentById: studentById,
     entriesFor: entriesFor, addEntry: addEntry, updateEntry: updateEntry, deleteEntry: deleteEntry,
     addAbsence: addAbsence, removeAbsence: removeAbsence, absencesFor: absencesFor,
-    exportJSON: exportJSON, importJSON: importJSON,
+    exportJSON: exportJSON, importJSON: importJSON, parseBackup: parseBackup, applyImport: applyImport,
     listSnapshots: listSnapshots, restoreSnapshot: restoreSnapshot,
     folderBackupSupported: folderBackupSupported, chooseBackupFolder: chooseBackupFolder,
     removeBackupFolder: removeBackupFolder, daysSinceExport: daysSinceExport,
