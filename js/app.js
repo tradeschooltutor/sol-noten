@@ -354,6 +354,8 @@
       h('div.actions-col',
         h('button.btn-plain.btn-block', { onclick: function () { go('quarterReview', { id: course.id, quarter: q }); } },
           'Quartalsabschluss: Portfolionoten & SoLei-Noten'),
+        h('button.btn-plain.btn-block', { onclick: function () { go('obt', { id: course.id }); } },
+          'Open Book Tests'),
         h('button.btn-plain.btn-block', { onclick: function () { go('students', { classId: cls.id, courseId: course.id }); } },
           'Schülerliste bearbeiten (' + cls.students.length + ')'),
         h('button.btn-plain.btn-block', { onclick: function () { go('maxPoints', { id: course.id }); } },
@@ -621,6 +623,182 @@
               go('maxPoints', { id: course.id, intro: true });
             } }, 'Speichern und ins ' + (q + 1) + '. Quartal wechseln')
           : null
+      )
+    );
+  };
+
+  /* ================= Open Book Tests ================= */
+
+  function obtResults(course, hj, idx) {
+    if (!course.obt) course.obt = {};
+    if (!course.obt[hj]) course.obt[hj] = {};
+    if (!course.obt[hj][idx]) course.obt[hj][idx] = {};
+    return course.obt[hj][idx];
+  }
+
+  views.obt = function (p) {
+    var course = Store.courseById(p.id);
+    var cls = Store.classById(course.classId);
+    var hj = p.hj || 1;
+    var idx = p.idx || 0;
+    var n = Math.max(1, course.numOBT || 4);
+    if (idx >= n) idx = 0;
+    var pctTable = S().settings.gradingPct || Calc.DEFAULT_GRADING_PCT;
+    var students = cls.students.slice().sort(function (a, b) {
+      return (a.lastName + a.firstName).localeCompare(b.lastName + b.firstName, 'de');
+    });
+    var results = obtResults(course, hj, idx);
+
+    var hjSeg = h('div.seg', {}, [1, 2].map(function (v) {
+      return h('button.seg-btn' + (hj === v ? '.active' : ''), {
+        onclick: function () { go('obt', { id: course.id, hj: v, idx: 0 }); }
+      }, v + '. Halbjahr');
+    }));
+
+    var tabs = h('div.crit-tabs', {}, Array.from({ length: n }, function (_, i) {
+      var has = course.obt && course.obt[hj] && course.obt[hj][i] && Object.keys(course.obt[hj][i]).length > 0;
+      return h('button.crit-tab' + (i === idx ? '.active' : ''), {
+        onclick: function () { go('obt', { id: course.id, hj: hj, idx: i }); }
+      }, 'OBT ' + (i + 1) + (has ? ' ●' : ''));
+    }));
+
+    var inputs = {};
+    function parsePct(str) {
+      var s = String(str).trim().replace(',', '.').replace('%', '');
+      if (s === '') return { ok: true, value: null };
+      var v = Number(s);
+      if (isNaN(v) || v < 0 || v > 100) return { ok: false };
+      return { ok: true, value: Math.round(v * 100) / 100 };
+    }
+
+    var avgEl = h('span.hint');
+    function refreshAvg() {
+      var vals = [];
+      students.forEach(function (stu) {
+        var r = parsePct(inputs[stu.id].value);
+        if (r.ok && r.value != null) vals.push(r.value);
+      });
+      if (!vals.length) { avgEl.textContent = ''; return; }
+      var avg = vals.reduce(function (a, b) { return a + b; }, 0) / vals.length;
+      avgEl.textContent = 'Durchschnitt: ' + Calc.fmt(Math.round(avg * 10) / 10, 1) + ' % (' +
+        vals.length + ' von ' + students.length + ')';
+    }
+
+    var rows = students.map(function (stu) {
+      var pct = results[stu.id] != null ? results[stu.id] : null;
+      var inp = h('input.input.grade-input', {
+        type: 'text', inputmode: 'decimal', placeholder: '–',
+        value: pct == null ? '' : Calc.fmt(pct), 'aria-label': 'Prozent'
+      });
+      inputs[stu.id] = inp;
+      var gradeCell = h('strong.review-solei');
+      function refresh() {
+        var r = parsePct(inp.value);
+        inp.classList.toggle('input-error', !r.ok);
+        var g = (r.ok && r.value != null) ? Calc.gradeForPercent(r.value, pctTable) : null;
+        gradeCell.textContent = g ? Calc.fmt(g.g) : '–';
+        refreshAvg();
+      }
+      inp.addEventListener('input', refresh);
+      var row = h('div.review-row',
+        h('div.review-name', h('div.student-name', {}, stu.lastName + ', ' + stu.firstName)),
+        h('div.review-grades',
+          h('div.review-cell', h('span.hint', {}, 'Prozent'), inp),
+          h('div.review-cell', h('span.hint', {}, 'Note'), gradeCell)
+        )
+      );
+      refresh();
+      return row;
+    });
+    refreshAvg();
+
+    function saveAll() {
+      var bad = [];
+      var out = {};
+      students.forEach(function (stu) {
+        var r = parsePct(inputs[stu.id].value);
+        if (!r.ok) { bad.push(stu.lastName + ', ' + stu.firstName); return; }
+        if (r.value != null) out[stu.id] = r.value;
+      });
+      if (bad.length) {
+        UI.modal('Ungültiger Prozentwert',
+          h('p', {}, 'Prozentwerte müssen zwischen 0 und 100 liegen. Bitte prüfen Sie: ' + bad.join('; ') + '.'));
+        return false;
+      }
+      course.obt[hj][idx] = out;
+      Store.save();
+      toast('OBT ' + (idx + 1) + ' (' + hj + '. Halbjahr) gespeichert.');
+      return true;
+    }
+
+    /* --- Moodle-Import --- */
+    var fileInput = h('input', { type: 'file', accept: '.xlsx,.csv,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', style: { display: 'none' } });
+    fileInput.addEventListener('change', function () {
+      var f = fileInput.files[0];
+      fileInput.value = '';
+      if (!f) return;
+      var isCsv = /\.csv$/i.test(f.name);
+      var parsed = isCsv
+        ? f.text().then(function (t) { return Importer.parseCSV(t); })
+        : f.arrayBuffer().then(function (ab) { return Importer.parseXLSX(ab); });
+      parsed
+        .then(function (rows) { return Importer.extractMoodle(rows); })
+        .then(function (ex) { showImportPreview(ex); })
+        .catch(function (e) { UI.modal('Import fehlgeschlagen', h('p', {}, e.message)); });
+    });
+
+    function showImportPreview(ex) {
+      var m = Importer.matchStudents(ex.results, students);
+      var assignSelects = [];
+      var body = [
+        h('p', {}, m.matched.length + ' von ' + ex.results.length + ' Zeilen konnten der Schülerliste automatisch zugeordnet werden.' +
+          (ex.skipped ? ' ' + ex.skipped + ' Zeile(n) ohne Bewertung wurden übersprungen.' : ''))
+      ];
+      if (m.unmatched.length) {
+        body.push(h('p.hint', {}, 'Bitte ordnen Sie die übrigen Zeilen zu (oder lassen Sie sie unberücksichtigt):'));
+        m.unmatched.forEach(function (r) {
+          var sel = h('select.input');
+          sel.appendChild(h('option', { value: '' }, 'Nicht übernehmen'));
+          students.forEach(function (stu) {
+            sel.appendChild(h('option', { value: stu.id }, stu.lastName + ', ' + stu.firstName));
+          });
+          assignSelects.push({ row: r, sel: sel });
+          body.push(h('label.field',
+            h('span.field-label', {}, r.lastName + ', ' + r.firstName + ' (' + Calc.fmt(r.percent, 1) + ' %)'), sel));
+        });
+      }
+      body.push(h('p.hint', {}, 'Die Werte werden in „OBT ' + (idx + 1) + ' · ' + hj + '. Halbjahr“ eingetragen und überschreiben dort vorhandene Prozentwerte der betroffenen Schüler/innen.'));
+      UI.modal('Moodle-Import', body, [
+        { label: 'Abbrechen', value: false },
+        { label: 'Übernehmen', value: true, primary: true }
+      ]).then(function (ok) {
+        if (!ok) return;
+        var out = obtResults(course, hj, idx);
+        m.matched.forEach(function (x) { out[x.studentId] = x.percent; });
+        var manual = 0;
+        assignSelects.forEach(function (a) {
+          if (a.sel.value) { out[a.sel.value] = a.row.percent; manual++; }
+        });
+        Store.save();
+        toast((m.matched.length + manual) + ' Ergebnisse übernommen.');
+        render();
+      });
+    }
+
+    return h('div.screen',
+      header('Open Book Tests', { name: 'course', params: { id: course.id } }),
+      h('div.card.card-tight',
+        h('div.row-between', hjSeg, avgEl),
+        tabs,
+        h('p.hint', {}, 'Prozentwerte eintragen oder direkt den Moodle-/Logineo-Export einlesen (Excel- oder CSV-Datei). Die Note ergibt sich aus dem Prozent-Bewertungsspiegel.')
+      ),
+      h('div.card.card-list', {},
+        students.length ? rows : h('div.empty', h('p', {}, 'Diese Klasse hat noch keine Schüler/innen.'))),
+      h('div.actions-col',
+        h('button.btn-primary.btn-block', { onclick: saveAll }, 'Speichern'),
+        h('button.btn-plain.btn-block', { onclick: function () { fileInput.click(); } },
+          'Moodle-Export einlesen (Excel/CSV)'),
+        fileInput
       )
     );
   };
@@ -1182,10 +1360,49 @@
         )
       ),
 
+      h('div.section-head', {}, 'Bewertungsspiegel (Prozent-Schema)'),
+      h('div.card',
+        h('p.hint', {}, 'Gilt für Open Book Tests und Klausuren. Die Note gilt je vollem Prozentpunkt (abgerundet): 65,9 % → Zeile 65 %.'),
+        (function () {
+          if (!st.settings.gradingPct) st.settings.gradingPct = Calc.DEFAULT_GRADING_PCT.slice();
+          var pctInputs = [];
+          var tbl = h('table.grading-table',
+            h('tr', h('th', {}, 'Prozent'), h('th', {}, 'Note'), h('th', {}, '')));
+          for (var i = 100; i >= 0; i--) {
+            (function (p) {
+              var inp = h('input.input.input-num', { type: 'number', step: '0.1', min: 1, max: 6, value: st.settings.gradingPct[p] });
+              pctInputs[p] = inp;
+              tbl.appendChild(h('tr', h('td', {}, 'ab ' + p + ' %'), h('td', {}, inp),
+                h('td.hint', {}, Calc.labelForGrade(st.settings.gradingPct[p]))));
+            })(i);
+          }
+          var det = h('details.pct-details',
+            h('summary', {}, 'Tabelle anzeigen (0–100 %)'),
+            h('div.pct-scroll', {}, tbl));
+          return h('div.actions-col',
+            det,
+            h('button.btn-primary.btn-block', { onclick: function () {
+              for (var p = 0; p <= 100; p++) {
+                var v = Number(pctInputs[p].value);
+                if (isNaN(v) || v < 1 || v > 6) { toast('Ungültige Note bei ' + p + ' % (erlaubt: 1 bis 6).'); return; }
+                st.settings.gradingPct[p] = v;
+              }
+              Store.save();
+              toast('Prozent-Bewertungsspiegel gespeichert.');
+            } }, 'Prozent-Bewertungsspiegel speichern'),
+            h('button.btn-plain.btn-block', { onclick: function () {
+              st.settings.gradingPct = Calc.DEFAULT_GRADING_PCT.slice();
+              Store.save();
+              toast('Auf Standardwerte zurückgesetzt.');
+              render();
+            } }, 'Auf Standard zurücksetzen'));
+        })()
+      ),
+
       h('div.section-head', {}, 'Über diese App'),
       h('div.card',
         h('p', {}, 'SOL-Noten · Notenverwaltung zum selbstorganisierten Lernen'),
-        h('p.hint', {}, 'Version 0.2.1 · © 2026 Andreas Vandelaar · Alle Daten bleiben ausschließlich auf diesem Gerät.')
+        h('p.hint', {}, 'Version 0.3.0 · © 2026 Andreas Vandelaar · Alle Daten bleiben ausschließlich auf diesem Gerät.')
       )
     );
   };

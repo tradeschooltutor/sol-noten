@@ -62,6 +62,7 @@
         bundesland: null,
         criteriaNames: Calc.DEFAULT_CRITERIA.slice(),
         grading15: JSON.parse(JSON.stringify(Calc.DEFAULT_GRADING15)),
+        gradingPct: Calc.DEFAULT_GRADING_PCT.slice(),
         lastExport: null,
         autoBackupFolder: false
       },
@@ -77,11 +78,18 @@
 
   /* ---------- Laden / Speichern ---------- */
 
+  function migrate(s) {
+    if (s && s.settings && !s.settings.gradingPct) {
+      s.settings.gradingPct = Calc.DEFAULT_GRADING_PCT.slice();
+    }
+    return s;
+  }
+
   function init() {
     return openDB()
       .then(function () { return idbGet('state', 'main'); })
       .then(function (saved) {
-        state = saved || freshState();
+        state = migrate(saved) || freshState();
         return idbGet('handles', 'backupDir').catch(function () { return null; });
       })
       .then(function (h) { backupDirHandle = h || null; return state; });
@@ -161,7 +169,7 @@
     if (!data || data.app !== 'SOL-Noten' || !Array.isArray(data.courses)) {
       throw new Error('Die Datei ist keine SOL-Noten-Backup-Datei.');
     }
-    state = data;
+    state = migrate(data);
     save();
   }
 

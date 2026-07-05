@@ -314,3 +314,9 @@ button:focus-visible, .input:focus-visible, select:focus-visible {
   .review-name { min-width: 0; flex: 1; }
   .review-grades { flex: 1.2; }
 }
+
+/* ---------- Prozent-Bewertungsspiegel ---------- */
+.pct-details summary {
+  cursor: pointer; font-weight: 600; padding: 8px 0; color: var(--teal-dark);
+}
+.pct-scroll { max-height: 340px; overflow-y: auto; border: 1px solid var(--line); border-radius: 10px; padding: 4px 8px; }
