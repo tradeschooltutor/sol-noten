@@ -131,6 +131,41 @@
     return round2((slBogenGrade + portfolioGrade) / 2);
   }
 
+  /* Durchschnitt der vorhandenen Werte, auf 2 Nachkommastellen gerundet
+     (wie IFERROR(ROUND(AVERAGE(...),2),"") im Noten-Blatt). */
+  function avgRound2(values) {
+    var s = 0, n = 0;
+    (values || []).forEach(function (v) { if (v != null) { s += v; n++; } });
+    return n ? round2(s / n) : null;
+  }
+
+  /* Zeugnisnote nach dem Noten-Blatt (Spalten AC/AD/AE):
+     Ohne SoLei-Note keine Zeugnisnote; fehlende Bereiche (OBT/Klausuren)
+     werden herausgerechnet, die Gewichte der vorhandenen neu normiert.
+     weights = {sl, obt, ka} in Prozent. */
+  function weightedGrade(sl, obt, ka, weights) {
+    if (sl == null) return null;
+    var parts = [[sl, weights.sl]];
+    if (obt != null) parts.push([obt, weights.obt]);
+    if (ka != null) parts.push([ka, weights.ka]);
+    var wSum = 0, gSum = 0;
+    parts.forEach(function (p) { wSum += p[1]; gSum += p[0] * p[1]; });
+    if (wSum <= 0) return null;
+    return round2(gSum / wSum);
+  }
+
+  /* Tendenzpfeil 2. HJ gegenüber 1. HJ (Noten-Blatt Spalte AF):
+     Verschlechterung ≥0,5 → ↓, leichte Verschlechterung → ↘, gleich → →,
+     Verbesserung ≥0,5 → ↑, leichte Verbesserung → ↗. */
+  function tendency(hj1, hj2) {
+    if (hj1 == null || hj2 == null) return '';
+    if (hj2 >= hj1 + 0.5) return '↓';
+    if (hj2 > hj1) return '↘';
+    if (hj2 === hj1) return '→';
+    if (hj2 <= hj1 - 0.5) return '↑';
+    return '↗';
+  }
+
   /* Deutsche Zahlformatierung (Komma) */
   function fmt(x, digits) {
     if (x == null || x === '') return '';
@@ -178,6 +213,9 @@
     quarterStatus: quarterStatus,
     gradeFor15: gradeFor15,
     soleiGrade: soleiGrade,
+    avgRound2: avgRound2,
+    weightedGrade: weightedGrade,
+    tendency: tendency,
     validateMaxPoints: validateMaxPoints,
     fmt: fmt,
     fmtFixed: fmtFixed

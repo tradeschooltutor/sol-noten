@@ -10,7 +10,7 @@
 
   /* ================= App-Start ================= */
 
-  var APP_VERSION = '0.4.0';
+  var APP_VERSION = '0.5.0';
 
   Store.init().then(function () {
     if ('serviceWorker' in navigator) {
@@ -395,6 +395,8 @@
           'Open Book Tests'),
         h('button.btn-plain.btn-block', { onclick: function () { go('klausuren', { id: course.id }); } },
           'Klausuren'),
+        h('button.btn-plain.btn-block', { onclick: function () { go('grades', { id: course.id }); } },
+          'Notenübersicht & Notenausdruck'),
         h('button.btn-plain.btn-block', { onclick: function () { go('students', { classId: cls.id, courseId: course.id }); } },
           'Schülerliste bearbeiten (' + cls.students.length + ')'),
         h('button.btn-plain.btn-block', { onclick: function () { go('maxPoints', { id: course.id }); } },
@@ -980,6 +982,366 @@
       h('div.card.card-list', {},
         students.length ? rows : h('div.empty', h('p', {}, 'Diese Klasse hat noch keine Schüler/innen.'))),
       h('button.btn-primary.btn-block', { onclick: saveAll }, 'Speichern')
+    );
+  };
+
+  /* ================= Notenübersicht & Notenausdruck ================= */
+
+  /* Berechnet alle Noten eines Schülers – nach den Formeln des Noten-Blatts. */
+  function studentGradeRow(course, stu) {
+    var grading15 = S().settings.grading15;
+    var pctTable = S().settings.gradingPct || Calc.DEFAULT_GRADING_PCT;
+    var nObt = Math.max(1, course.numOBT || 4);
+    var nKa = Math.max(1, course.numKA || 2);
+
+    var soleiQ = [], slBogenQ = [], portfolioQ = [], sumQ = [], statQ = [];
+    for (var q = 1; q <= 4; q++) {
+      var stat = Calc.quarterStatus(Store.entriesFor(course.id, stu.id, q).byCriterion);
+      statQ.push(stat);
+      var slG = stat.rated > 0 ? Calc.gradeFor15(stat.sum, grading15).g : null;
+      var pg = portfolioGrade(course, q, stu.id);
+      slBogenQ.push(slG);
+      portfolioQ.push(pg);
+      sumQ.push(stat.rated > 0 ? stat.sum : null);
+      soleiQ.push(Calc.soleiGrade(slG, pg));
+    }
+    var slHJ1 = Calc.avgRound2([soleiQ[0], soleiQ[1]]);
+    var slHJ2 = Calc.avgRound2([soleiQ[2], soleiQ[3]]);
+    var slSJ = Calc.avgRound2(soleiQ);
+
+    function obtGrade(hj, i) {
+      var d = course.obt && course.obt[hj] && course.obt[hj][i];
+      var pct = d && d[stu.id] != null ? d[stu.id] : null;
+      if (pct == null) return null;
+      return Calc.gradeForPercent(pct, pctTable).g;
+    }
+    var obtG = { 1: [], 2: [] };
+    for (var i = 0; i < nObt; i++) { obtG[1].push(obtGrade(1, i)); obtG[2].push(obtGrade(2, i)); }
+    var obtHJ1 = Calc.avgRound2(obtG[1]);
+    var obtHJ2 = Calc.avgRound2(obtG[2]);
+    var obtSJ = Calc.avgRound2(obtG[1].concat(obtG[2]));
+
+    function kaGrade(hj, i) {
+      var d = course.ka && course.ka[hj] && course.ka[hj][i];
+      if (!d || d.maxPoints == null || d.maxPoints <= 0) return null;
+      var pts = d.points && d.points[stu.id] != null ? d.points[stu.id] : null;
+      if (pts == null) return null;
+      return Calc.gradeForPercent(pts / d.maxPoints * 100, pctTable).g;
+    }
+    var kaG = { 1: [], 2: [] };
+    for (var k = 0; k < nKa; k++) { kaG[1].push(kaGrade(1, k)); kaG[2].push(kaGrade(2, k)); }
+    var kaHJ1 = Calc.avgRound2(kaG[1]);
+    var kaHJ2 = Calc.avgRound2(kaG[2]);
+    var kaSJ = Calc.avgRound2(kaG[1].concat(kaG[2]));
+
+    var w = course.weights || { sl: 40, obt: 20, ka: 40 };
+    var zHJ1 = Calc.weightedGrade(slHJ1, obtHJ1, kaHJ1, w);
+    var zHJ2 = Calc.weightedGrade(slHJ2, obtHJ2, kaHJ2, w);
+    var zSJ = Calc.weightedGrade(slSJ, obtSJ, kaSJ, w);
+
+    var zg = (course.zeugnis && course.zeugnis[stu.id]) || {};
+
+    return {
+      stu: stu, statQ: statQ, sumQ: sumQ, slBogenQ: slBogenQ, portfolioQ: portfolioQ,
+      soleiQ: soleiQ, slHJ1: slHJ1, slHJ2: slHJ2, slSJ: slSJ,
+      obtG: obtG, obtHJ1: obtHJ1, obtHJ2: obtHJ2, obtSJ: obtSJ,
+      kaG: kaG, kaHJ1: kaHJ1, kaHJ2: kaHJ2, kaSJ: kaSJ,
+      zHJ1: zHJ1, zHJ2: zHJ2, zSJ: zSJ,
+      tendenz: Calc.tendency(zHJ1, zHJ2),
+      zeugnisHJ: zg.hj != null ? zg.hj : null,
+      zeugnisJahr: zg.jahr != null ? zg.jahr : null
+    };
+  }
+
+  function fmtG(v) { return v == null ? '' : Calc.fmt(v); }
+
+  /* Druck-/PDF-Ausgabe: Inhalt in den Druckbereich legen und Druckdialog öffnen. */
+  function printNode(node, landscape) {
+    var host = document.getElementById('print-host') || (function () {
+      var d = h('div#print-host');
+      document.body.appendChild(d);
+      return d;
+    })();
+    clear(host);
+    var style = h('style', {}, '@page { size: A4 ' + (landscape ? 'landscape' : 'portrait') + '; margin: 12mm; }');
+    host.appendChild(style);
+    host.appendChild(node);
+    window.print();
+    setTimeout(function () { clear(host); }, 500);
+  }
+
+  views.grades = function (p) {
+    var course = Store.courseById(p.id);
+    var cls = Store.classById(course.classId);
+    var year = Store.yearById(course.yearId);
+    if (!course.zeugnis) course.zeugnis = {};
+    var nObt = Math.max(1, course.numOBT || 4);
+    var nKa = Math.max(1, course.numKA || 2);
+    var students = cls.students.slice().sort(function (a, b) {
+      return (a.lastName + a.firstName).localeCompare(b.lastName + b.firstName, 'de');
+    });
+    var rowsData = students.map(function (stu) { return studentGradeRow(course, stu); });
+
+    function headCells() {
+      var cells = [h('th.sticky-col', {}, 'Name')];
+      ['1. Q', '2. Q', '3. Q', '4. Q', 'ø 1. HJ', 'ø 2. HJ', 'ø SJ'].forEach(function (t) {
+        cells.push(h('th', {}, t));
+      });
+      for (var hj = 1; hj <= 2; hj++) for (var i = 0; i < nObt; i++)
+        cells.push(h('th', {}, 'OBT' + (i + 1) + ' · ' + hj + '.HJ'));
+      ['ø 1. HJ', 'ø 2. HJ', 'ø SJ'].forEach(function (t) { cells.push(h('th', {}, t)); });
+      for (var hj2 = 1; hj2 <= 2; hj2++) for (var k = 0; k < nKa; k++)
+        cells.push(h('th', {}, 'K' + (k + 1) + ' · ' + hj2 + '.HJ'));
+      ['ø 1. HJ', 'ø 2. HJ', 'ø SJ', 'ø 1. HJ', 'ø 2. HJ', 'ø SJ', 'Tendenz', 'HJ-Zeugnis', 'Jahreszeugnis']
+        .forEach(function (t) { cells.push(h('th', {}, t)); });
+      return cells;
+    }
+
+    function groupRow() {
+      var w = course.weights || { sl: 40, obt: 20, ka: 40 };
+      return h('tr.group-row',
+        h('th.sticky-col', {}, ''),
+        h('th', { colspan: 7 }, 'Sonstige Leistungen (' + w.sl + ' %)'),
+        h('th', { colspan: nObt * 2 + 3 }, 'Open Book Tests (' + w.obt + ' %)'),
+        h('th', { colspan: nKa * 2 + 3 }, 'Klausuren (' + w.ka + ' %)'),
+        h('th', { colspan: 4 }, 'Zeugnisnote'),
+        h('th', { colspan: 2 }, 'Zeugnis (manuell)')
+      );
+    }
+
+    var zInputs = {};
+    function zeugnisInput(stu, key, val) {
+      var inp = h('input.input.z-input', {
+        type: 'text', inputmode: 'numeric', value: val == null ? '' : Calc.fmt(val), placeholder: '–'
+      });
+      zInputs[stu.id] = zInputs[stu.id] || {};
+      zInputs[stu.id][key] = inp;
+      return inp;
+    }
+
+    var body = rowsData.map(function (r) {
+      var cells = [h('td.sticky-col.name-cell', {
+        onclick: function () { go('report', { id: course.id, studentId: r.stu.id }); }
+      }, r.stu.lastName + ', ' + r.stu.firstName)];
+      r.soleiQ.forEach(function (v) { cells.push(h('td', {}, fmtG(v))); });
+      [r.slHJ1, r.slHJ2, r.slSJ].forEach(function (v) { cells.push(h('td.avg-cell', {}, fmtG(v))); });
+      [1, 2].forEach(function (hj) { r.obtG[hj].forEach(function (v) { cells.push(h('td', {}, fmtG(v))); }); });
+      [r.obtHJ1, r.obtHJ2, r.obtSJ].forEach(function (v) { cells.push(h('td.avg-cell', {}, fmtG(v))); });
+      [1, 2].forEach(function (hj) { r.kaG[hj].forEach(function (v) { cells.push(h('td', {}, fmtG(v))); }); });
+      [r.kaHJ1, r.kaHJ2, r.kaSJ].forEach(function (v) { cells.push(h('td.avg-cell', {}, fmtG(v))); });
+      [r.zHJ1, r.zHJ2, r.zSJ].forEach(function (v) { cells.push(h('td.avg-cell.z-cell', {}, fmtG(v))); });
+      cells.push(h('td.tend-cell', {}, r.tendenz));
+      cells.push(h('td', {}, zeugnisInput(r.stu, 'hj', r.zeugnisHJ)));
+      cells.push(h('td', {}, zeugnisInput(r.stu, 'jahr', r.zeugnisJahr)));
+      return h('tr', {}, cells);
+    });
+
+    var table = h('table.grades-table',
+      groupRow(),
+      h('tr', {}, headCells()),
+      body
+    );
+
+    function parseZeugnis(str) {
+      var s = String(str).trim().replace(',', '.');
+      if (s === '') return { ok: true, value: null };
+      var v = Number(s);
+      if (isNaN(v) || v < 1 || v > 6) return { ok: false };
+      return { ok: true, value: v };
+    }
+
+    function saveZeugnis() {
+      var bad = [];
+      students.forEach(function (stu) {
+        var hj = parseZeugnis(zInputs[stu.id].hj.value);
+        var jahr = parseZeugnis(zInputs[stu.id].jahr.value);
+        if (!hj.ok || !jahr.ok) { bad.push(stu.lastName + ', ' + stu.firstName); return; }
+        if (hj.value == null && jahr.value == null) { delete course.zeugnis[stu.id]; return; }
+        course.zeugnis[stu.id] = { hj: hj.value, jahr: jahr.value };
+      });
+      if (bad.length) {
+        UI.modal('Ungültige Zeugnisnote',
+          h('p', {}, 'Zeugnisnoten müssen zwischen 1 und 6 liegen. Bitte prüfen Sie: ' + bad.join('; ') + '.'));
+        return;
+      }
+      Store.save();
+      toast('Zeugnisnoten gespeichert.');
+    }
+
+    /* --- Exporte --- */
+    function exportRows() {
+      var head = ['Name', 'SoLei 1. Q', 'SoLei 2. Q', 'SoLei 3. Q', 'SoLei 4. Q',
+        'SoLei ø 1. HJ', 'SoLei ø 2. HJ', 'SoLei ø SJ'];
+      for (var hj = 1; hj <= 2; hj++) for (var i = 0; i < nObt; i++) head.push('OBT' + (i + 1) + ' ' + hj + '.HJ');
+      head.push('OBT ø 1. HJ', 'OBT ø 2. HJ', 'OBT ø SJ');
+      for (var hj2 = 1; hj2 <= 2; hj2++) for (var k = 0; k < nKa; k++) head.push('K' + (k + 1) + ' ' + hj2 + '.HJ');
+      head.push('KA ø 1. HJ', 'KA ø 2. HJ', 'KA ø SJ',
+        'Zeugnisnote ø 1. HJ', 'Zeugnisnote ø 2. HJ', 'Zeugnisnote ø SJ', 'Tendenz', 'HJ-Zeugnis', 'Jahreszeugnis');
+      var out = [
+        ['Notenübersicht', cls.name + ' · ' + course.subject + ' · ' + year.name + ' · Stand: ' + UI.fmtDate(Store.todayISO())],
+        [],
+        head
+      ];
+      rowsData.forEach(function (r) {
+        var row = [r.stu.lastName + ', ' + r.stu.firstName];
+        r.soleiQ.forEach(function (v) { row.push(v); });
+        row.push(r.slHJ1, r.slHJ2, r.slSJ);
+        [1, 2].forEach(function (hj) { r.obtG[hj].forEach(function (v) { row.push(v); }); });
+        row.push(r.obtHJ1, r.obtHJ2, r.obtSJ);
+        [1, 2].forEach(function (hj) { r.kaG[hj].forEach(function (v) { row.push(v); }); });
+        row.push(r.kaHJ1, r.kaHJ2, r.kaSJ, r.zHJ1, r.zHJ2, r.zSJ, r.tendenz || null, r.zeugnisHJ, r.zeugnisJahr);
+        out.push(row);
+      });
+      return out;
+    }
+
+    function doExcel() {
+      var name = ('Notenuebersicht_' + cls.name + '_' + course.subject + '_' + year.name)
+        .replace(/[^\wäöüÄÖÜß-]+/g, '_') + '.xlsx';
+      XlsxWrite.download(name, 'Notenübersicht', exportRows());
+      toast('Excel-Datei wird gespeichert.');
+    }
+
+    function doPrint() {
+      var pt = h('div.print-page',
+        h('h2', {}, 'Notenübersicht'),
+        h('p.print-sub', {}, cls.name + ' · ' + course.subject + ' · ' + year.name +
+          ' · Stand: ' + UI.fmtDate(Store.todayISO())),
+        table.cloneNode(true)
+      );
+      /* Eingabefelder im Druck durch Textwerte ersetzen */
+      pt.querySelectorAll('input').forEach(function (inp) {
+        inp.parentNode.replaceChild(document.createTextNode(inp.value || ''), inp);
+      });
+      printNode(pt, true);
+    }
+
+    return h('div.screen.screen-wide',
+      header(cls.name + ' · Notenübersicht', { name: 'course', params: { id: course.id } }),
+      h('p.hint', {}, 'Antippen eines Namens öffnet den Notenausdruck. Die Spalten „HJ-Zeugnis“ und „Jahreszeugnis“ sind Ihre manuelle pädagogische Entscheidung.'),
+      h('div.table-scroll', {}, table),
+      h('div.actions-col',
+        h('button.btn-primary.btn-block', { onclick: saveZeugnis }, 'Zeugnisnoten speichern'),
+        h('button.btn-plain.btn-block', { onclick: doExcel }, 'Als Excel-Datei exportieren'),
+        h('button.btn-plain.btn-block', { onclick: doPrint }, 'Drucken / als PDF speichern')
+      )
+    );
+  };
+
+  /* ---------- Notenausdruck je Schüler/in (Blatt "Notenausdruck") ---------- */
+
+  views.report = function (p) {
+    var course = Store.courseById(p.id);
+    var cls = Store.classById(course.classId);
+    var year = Store.yearById(course.yearId);
+    var names = S().settings.criteriaNames;
+    var students = cls.students.slice().sort(function (a, b) {
+      return (a.lastName + a.firstName).localeCompare(b.lastName + b.firstName, 'de');
+    });
+    var si = Math.max(0, students.findIndex(function (s) { return s.id === p.studentId; }));
+    var stu = students[si];
+    var r = studentGradeRow(course, stu);
+    var w = course.weights || { sl: 40, obt: 20, ka: 40 };
+    var nObt = Math.max(1, course.numOBT || 4);
+    var nKa = Math.max(1, course.numKA || 2);
+
+    function devClass(curr, prev) {
+      var d = development(curr, prev);
+      return d === 'up' ? '.up' : d === 'down' ? '.down' : '';
+    }
+
+    function quarterBlock(q) {
+      var stat = r.statQ[q - 1];
+      var prev = q > 1 ? r.statQ[q - 2] : null;
+      var maxes = course.maxPoints[q];
+      var headCells = [h('th', {}, '')].concat(names.map(function (n) { return h('th', {}, n); }))
+        .concat([h('th', {}, 'Summe'), h('th', {}, 'Note SL-Bogen'), h('th', {}, 'Portfolio'), h('th', {}, 'SoLei-Note')]);
+      var maxCells = [h('td.row-label', {}, 'maximal')].concat(maxes.map(function (m) {
+        return h('td', {}, Calc.fmt(m, 1));
+      })).concat([h('td', {}, '15'), h('td'), h('td'), h('td')]);
+      var valCells = [h('td.row-label', {}, 'erreicht')].concat(names.map(function (n, ci) {
+        var v = stat.averages[ci];
+        var cl = prev ? devClass(v, prev.averages[ci]) : '';
+        return h('td.val' + cl, {}, v == null ? '' : Calc.fmt(v, 1));
+      }));
+      var sumCl = prev && stat.rated > 0 && prev.rated > 0 ? devClass(stat.sum, prev.sum) : '';
+      valCells.push(h('td.val' + sumCl, {}, stat.rated > 0 ? Calc.fmt(stat.sum, 1) : ''));
+      valCells.push(h('td.val', {}, fmtG(r.slBogenQ[q - 1])));
+      valCells.push(h('td.val', {}, fmtG(r.portfolioQ[q - 1])));
+      valCells.push(h('td.val.strong', {}, fmtG(r.soleiQ[q - 1])));
+      return h('div.report-block',
+        h('h3', {}, q + '. Quartal'),
+        h('div.table-scroll', {},
+          h('table.report-table', h('tr', {}, headCells), h('tr', {}, maxCells), h('tr', {}, valCells)))
+      );
+    }
+
+    function seriesBlock(title, weight, labels, grades1, grades2, sj) {
+      var head = [h('th', {}, '')];
+      var row = [h('td.row-label', {}, 'Noten')];
+      [1, 2].forEach(function (hj) {
+        labels.forEach(function (l, i) {
+          head.push(h('th', {}, l + ' · ' + hj + '. HJ'));
+          var v = (hj === 1 ? grades1 : grades2)[i];
+          row.push(h('td.val', {}, fmtG(v)));
+        });
+      });
+      head.push(h('th', {}, 'Vorläufige Jahresnote'));
+      row.push(h('td.val.strong', {}, fmtG(sj)));
+      return h('div.report-block',
+        h('h3', {}, title + ' (Gewichtung ' + weight + ' %)'),
+        h('div.table-scroll', {},
+          h('table.report-table', h('tr', {}, head), h('tr', {}, row)))
+      );
+    }
+
+    var obtLabels = [], kaLabels = [];
+    for (var i = 0; i < nObt; i++) obtLabels.push('OBT' + (i + 1));
+    for (var k = 0; k < nKa; k++) kaLabels.push('K' + (k + 1));
+
+    var reportContent = h('div.report',
+      h('div.report-head',
+        h('h2', {}, 'Notenübersicht'),
+        h('p.print-sub', {},
+          'Klasse: ' + cls.name + ' · Fach: ' + course.subject + ' · Schuljahr: ' + year.name),
+        h('p.print-sub', {}, 'Name: ' + stu.lastName + ', ' + stu.firstName +
+          ' · Stand: ' + UI.fmtDate(Store.todayISO()))
+      ),
+      h('h3.report-section', {}, 'Sonstige Leistungen (Gewichtung ' + w.sl + ' %)'),
+      [1, 2, 3, 4].map(quarterBlock),
+      h('p.report-line', {}, 'Vorläufige Jahresnote Sonstige Leistungen: ',
+        h('strong', {}, fmtG(r.slSJ) || '–')),
+      seriesBlock('Open Book Tests', w.obt, obtLabels, r.obtG[1], r.obtG[2], r.obtSJ),
+      seriesBlock('Klausuren', w.ka, kaLabels, r.kaG[1], r.kaG[2], r.kaSJ),
+      h('div.report-block',
+        h('h3', {}, 'Vorläufige Gesamtnote (vorbehaltlich weiterer Noten und pädagogischer Entscheidungen)'),
+        h('table.report-table',
+          h('tr', {}, h('th', {}, '1. Halbjahr'), h('th', {}, '2. Halbjahr'), h('th', {}, 'Vorläufige Jahresnote'), h('th', {}, 'Tendenz')),
+          h('tr', {},
+            h('td.val', {}, fmtG(r.zHJ1)), h('td.val', {}, fmtG(r.zHJ2)),
+            h('td.val.strong', {}, fmtG(r.zSJ)), h('td.val.tend-cell', {}, r.tendenz)))
+      ),
+      (r.zeugnisHJ != null || r.zeugnisJahr != null)
+        ? h('p.report-line', {}, 'Note HJ-Zeugnis: ', h('strong', {}, fmtG(r.zeugnisHJ) || '–'),
+            '   ·   Note Jahreszeugnis: ', h('strong', {}, fmtG(r.zeugnisJahr) || '–'))
+        : null
+    );
+
+    return h('div.screen',
+      header('Notenausdruck', { name: 'grades', params: { id: course.id } }),
+      h('div.crit-nav',
+        h('button.icon-btn', { onclick: function () {
+          go('report', { id: course.id, studentId: students[(si + students.length - 1) % students.length].id });
+        } }, '‹'),
+        h('span.crit-current', {}, stu.lastName + ', ' + stu.firstName),
+        h('button.icon-btn', { onclick: function () {
+          go('report', { id: course.id, studentId: students[(si + 1) % students.length].id });
+        } }, '›')
+      ),
+      h('div.card', {}, reportContent),
+      h('button.btn-primary.btn-block', { onclick: function () {
+        printNode(reportContent.cloneNode(true), false);
+      } }, 'Drucken / als PDF speichern (für das Notengespräch)')
     );
   };
 

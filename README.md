@@ -1,4 +1,4 @@
-# SOL-Noten (Version 0.4)
+# SOL-Noten (Version 0.5)
 
 Notenverwaltung zum selbstorganisierten Lernen (SOL) als Progressive Web App (PWA).
 Basierend auf der Excel-Notenverwaltung V8.0 von Andreas Vandelaar.
@@ -20,10 +20,10 @@ Basierend auf der Excel-Notenverwaltung V8.0 von Andreas Vandelaar.
 - **Open Book Tests** – je Halbjahr die konfigurierte Anzahl OBT; Prozentwerte je Schüler/in eintragen (Note live aus dem Prozent-Bewertungsspiegel, Klassendurchschnitt sichtbar) oder den Moodle-/Logineo-Ergebnisexport direkt einlesen (Excel- oder CSV-Datei). Der Import erkennt die Kopfzeile (Nachname/Vorname/Bewertung), rechnet auch abweichende Maximalpunktzahlen („Bewertung/50,00") in Prozent um, überspringt „Gesamtdurchschnitt" und unbewertete Versuche und ordnet die Namen automatisch zu – nicht zuordenbare Zeilen werden zur manuellen Zuordnung angeboten.
 - **Klausuren** – je Halbjahr die konfigurierte Anzahl; einmal die Maximalpunktzahl der Klausur festlegen, dann je Schüler/in die erreichten Punkte eintragen. Prozent und Note (Prozent-Bewertungsspiegel) berechnet die App live; Punkte über dem Maximum werden rot markiert. Nicht geschriebene Klausuren bleiben einfach leer.
 - **Update-Anzeige** – die App prüft beim Start, ob eine neue Version veröffentlicht wurde, und zeigt dann das Banner „Eine neue Version von SOL-Noten ist geladen" mit einem Aktualisieren-Knopf. So ist immer eindeutig erkennbar, ob ein Update angekommen ist.
+- **Notenübersicht** (nach dem Excel-Blatt „Noten") – alle Schüler/innen und alle Noten des Schuljahres in einer Tabelle: SoLei-Noten der vier Quartale mit Halbjahres- und Jahresdurchschnitt, alle OBT- und Klausurnoten mit Durchschnitten, gewichtete Zeugnisnote je Halbjahr und Schuljahr (fehlende Bereiche werden automatisch neu normiert), Tendenzpfeil (↑↗→↘↓, 2. HJ gegenüber 1. HJ) sowie manuelle Spalten „HJ-Zeugnis" und „Jahreszeugnis" für die pädagogische Entscheidung. Export als echte Excel-Datei und Druck/PDF (Querformat).
+- **Notenausdruck je Schüler/in** (nach dem Excel-Blatt „Notenausdruck") – für das Notengespräch: je Quartal die Kriterien mit Maximal- und erreichten Punkten (grün/rot gegenüber dem Vorquartal), Punktesumme, Note SL-Bogen, Portfolio und SoLei-Note; alle OBT- und Klausurnoten; vorläufige Gesamtnote mit Tendenz. Blättern zwischen den Schüler/innen, Druck/PDF (Hochformat).
 - **Datensicherung** – alles bleibt lokal (IndexedDB). Backup-Datei speichern/einspielen, Erinnerung nach 7 Tagen, automatisches Backup in einen freigegebenen Ordner (Chrome/Edge am Computer und Android), interne tägliche Sicherungsstände der letzten 14 Tage gegen Fehlbedienung.
 - **Einstellungen** – Kriteriennamen (global), Bewertungsspiegel (15-Punkte-Schema, Standardwerte aus der Excel-Datei).
-
-Noch nicht enthalten (nächste Ausbaustufe): Notenübersicht mit PDF-/Excel-Export, Notenausdruck je Schüler/in.
 
 ## Veröffentlichen über GitHub Pages
 
