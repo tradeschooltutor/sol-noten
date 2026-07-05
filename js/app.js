@@ -26,7 +26,21 @@
     var appEl = document.getElementById('app');
     clear(appEl);
     var view = views[route.name];
-    if (view) appEl.appendChild(view(route.params));
+    if (!view) return;
+    try {
+      appEl.appendChild(view(route.params));
+    } catch (err) {
+      console.error('Fehler beim Seitenaufbau:', err);
+      clear(appEl);
+      appEl.appendChild(h('div.screen',
+        h('div.card',
+          h('h2', {}, 'Hier ist etwas schiefgelaufen'),
+          h('p.hint', {}, 'Beim Aufbau dieser Seite ist ein Fehler aufgetreten. Ihre Daten sind davon nicht betroffen.'),
+          h('p.hint', {}, 'Technische Angabe für die Fehlersuche: ' + (err && err.message ? err.message : err)),
+          h('button.btn-primary.btn-block', { onclick: function () { go('home'); } }, 'Zur Kursübersicht')
+        )
+      ));
+    }
   }
 
   function header(title, backTo, extra) {
@@ -675,6 +689,7 @@
     function refreshAvg() {
       var vals = [];
       students.forEach(function (stu) {
+        if (!inputs[stu.id]) return; /* Feld existiert beim Seitenaufbau ggf. noch nicht */
         var r = parsePct(inputs[stu.id].value);
         if (r.ok && r.value != null) vals.push(r.value);
       });
@@ -1402,7 +1417,7 @@
       h('div.section-head', {}, 'Über diese App'),
       h('div.card',
         h('p', {}, 'SOL-Noten · Notenverwaltung zum selbstorganisierten Lernen'),
-        h('p.hint', {}, 'Version 0.3.0 · © 2026 Andreas Vandelaar · Alle Daten bleiben ausschließlich auf diesem Gerät.')
+        h('p.hint', {}, 'Version 0.3.1 · © 2026 Andreas Vandelaar · Alle Daten bleiben ausschließlich auf diesem Gerät.')
       )
     );
   };
