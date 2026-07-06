@@ -500,3 +500,10 @@ button:focus-visible, .input:focus-visible, select:focus-visible {
 .pin-ok { background: var(--teal); border-color: var(--teal); color: #fff; font-size: 1.05rem; }
 .pin-ok:active { background: var(--teal-dark); }
 .lock-forgot { margin-top: 10px; }
+
+/* ---------- Sperrbildschirm: Tastatur-Hinweis ---------- */
+.lock-kbd-hint { text-align: center; margin-top: 6px; opacity: 0.85; }
+/* Auf Geräten ohne feine Zeigegeräte (reine Touchgeräte) ausblenden */
+@media (pointer: coarse) and (hover: none) {
+  .lock-kbd-hint { display: none; }
+}

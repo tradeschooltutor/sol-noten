@@ -10,7 +10,7 @@
 
   /* ================= App-Start ================= */
 
-  var APP_VERSION = '0.8.0';
+  var APP_VERSION = '0.8.1';
 
   Store.init().then(function () {
     if ('serviceWorker' in navigator) {
@@ -252,6 +252,38 @@
     refreshDots();
     if (Store.getLockWait() > 0) waitCountdown(); else drawPad(false);
 
+    /* Physische Tastatur mithören (PC). Auf Tablet/Smartphone gibt es keine,
+       daher keine Kollision; das On-Screen-Ziffernfeld bleibt aktiv.
+       Bewusst kein echtes Eingabefeld – so klappt keine System-Tastatur auf
+       und kein Passwort-Manager bietet das Speichern der Geräte-PIN an. */
+    function onKey(ev) {
+      if (ev.metaKey || ev.ctrlKey || ev.altKey) return;
+      if (Store.getLockWait() > 0) return;
+      if (ev.key >= '0' && ev.key <= '9') {
+        if (pin.length < 8) { pin += ev.key; refreshDots(); }
+        ev.preventDefault();
+      } else if (ev.key === 'Backspace') {
+        pin = pin.slice(0, -1); refreshDots(); ev.preventDefault();
+      } else if (ev.key === 'Enter') {
+        submit(); ev.preventDefault();
+      } else if (ev.key === 'Escape') {
+        pin = ''; refreshDots(); ev.preventDefault();
+      }
+    }
+    document.addEventListener('keydown', onKey);
+    /* Handler entfernen, sobald der Sperrbildschirm den DOM verlässt. */
+    var observer = new MutationObserver(function () {
+      if (!dots.isConnected) {
+        document.removeEventListener('keydown', onKey);
+        observer.disconnect();
+      }
+    });
+    observer.observe(document.getElementById('app'), { childList: true, subtree: true });
+
+    function hasFinePointer() {
+      return !!(window.matchMedia && window.matchMedia('(any-pointer: fine)').matches);
+    }
+
     return h('div.screen.lock-screen',
       h('div.setup-hero',
         h('div.setup-mark', { html: LOCK_SVG.replace('width="18" height="18"', 'width="30" height="30"') }),
@@ -261,6 +293,9 @@
       dots,
       msg,
       padHost,
+      hasFinePointer()
+        ? h('p.hint.lock-kbd-hint', {}, 'Am Computer können Sie die PIN auch über die Tastatur eingeben (Enter bestätigt).')
+        : null,
       h('button.btn-plain.btn-small.lock-forgot', { onclick: forgotPin }, 'PIN vergessen?')
     );
   };
