@@ -10,7 +10,7 @@
 
   /* ================= App-Start ================= */
 
-  var APP_VERSION = '0.7.0';
+  var APP_VERSION = '0.8.0';
 
   Store.init().then(function () {
     if ('serviceWorker' in navigator) {
@@ -28,11 +28,48 @@
         });
       }).catch(function () {});
     }
-    if (!S().settings.bundesland || S().schoolYears.length === 0) go('setup');
+    startAutolockWatch();
+    if (Store.isLocked()) go('lock');
+    else if (!S().settings.bundesland || S().schoolYears.length === 0) go('setup');
     else go('home');
   }).catch(function (e) {
     document.body.textContent = 'Die App konnte nicht starten: ' + e.message;
   });
+
+  function afterUnlock() {
+    if (!S().settings.bundesland || S().schoolYears.length === 0) go('setup');
+    else go('home');
+  }
+
+  function doLock() {
+    if (!Store.isEncrypted() || Store.isLocked()) return;
+    Store.lock();
+    go('lock');
+  }
+
+  /* Automatische Sperre: bei Inaktivität bzw. beim Verlassen der App ("sofort") */
+  var lastActivity = Date.now();
+  var hiddenAt = null;
+  function startAutolockWatch() {
+    ['pointerdown', 'keydown', 'touchstart'].forEach(function (ev) {
+      document.addEventListener(ev, function () { lastActivity = Date.now(); }, { passive: true });
+    });
+    document.addEventListener('visibilitychange', function () {
+      var m = Store.getAutolock();
+      if (!Store.isEncrypted() || m === null || m === undefined) return;
+      if (document.hidden) {
+        hiddenAt = Date.now();
+        if (m === 0) doLock(); /* sofort */
+      } else if (hiddenAt && m > 0 && Date.now() - hiddenAt >= m * 60000) {
+        doLock();
+      }
+    });
+    setInterval(function () {
+      var m = Store.getAutolock();
+      if (!Store.isEncrypted() || Store.isLocked() || m === null || m === undefined || m === 0) return;
+      if (Date.now() - lastActivity >= m * 60000) doLock();
+    }, 20000);
+  }
 
   function showUpdateBanner() {
     if (document.getElementById('update-banner')) return;
@@ -87,6 +124,7 @@
   }
 
   var HOME_SVG = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l9-8 9 8"/><path d="M5 10v10h5v-6h4v6h5V10"/></svg>';
+  var LOCK_SVG = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>';
 
   function header(title, backTo, extra) {
     var right = [];
@@ -99,6 +137,11 @@
         onclick: function () { go('home'); }, 'aria-label': 'Zur Kursübersicht', html: HOME_SVG
       }));
     }
+    if (Store.isEncrypted() && !Store.isLocked()) {
+      right.push(h('button.icon-btn', {
+        onclick: doLock, 'aria-label': 'App sperren', html: LOCK_SVG
+      }));
+    }
     return h('header.topbar', {},
       backTo
         ? h('button.icon-btn', { onclick: function () { go(backTo.name, backTo.params); }, 'aria-label': 'Zurück' }, '‹')
@@ -109,6 +152,119 @@
   }
 
   var views = {};
+
+  /* ================= Sperrbildschirm ================= */
+
+  views.lock = function () {
+    var pin = '';
+    var dots = h('div.pin-dots');
+    var msg = h('p.hint.lock-msg');
+    var padHost = h('div.pin-pad');
+    var busy = false;
+
+    function refreshDots() {
+      UI.clear(dots);
+      for (var i = 0; i < Math.max(pin.length, 4); i++) {
+        dots.appendChild(h('span.pin-dot' + (i < pin.length ? '.filled' : '')));
+      }
+    }
+
+    function waitCountdown() {
+      var w = Store.getLockWait();
+      if (w <= 0) { msg.textContent = ''; drawPad(false); return; }
+      drawPad(true);
+      msg.textContent = 'Zu viele Fehlversuche – bitte ' + w + ' Sekunden warten.';
+      var iv = setInterval(function () {
+        if (!msg.isConnected) { clearInterval(iv); return; }
+        var rest = Store.getLockWait();
+        if (rest <= 0) {
+          clearInterval(iv);
+          msg.textContent = '';
+          drawPad(false);
+        } else {
+          msg.textContent = 'Zu viele Fehlversuche – bitte ' + rest + ' Sekunden warten.';
+        }
+      }, 1000);
+    }
+
+    function submit() {
+      if (busy || pin.length < 4) return;
+      busy = true;
+      Store.unlock(pin).then(function () {
+        busy = false;
+        afterUnlock();
+      }).catch(function (err) {
+        busy = false;
+        pin = '';
+        refreshDots();
+        if (err.waitSeconds > 0) waitCountdown();
+        else {
+          msg.textContent = 'Falsche PIN.' + (err.attempts >= 3 ? ' (' + err.attempts + ' Fehlversuche)' : '');
+        }
+      });
+    }
+
+    function drawPad(disabled) {
+      UI.clear(padHost);
+      var keys = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '⌫', '0', 'OK'];
+      keys.forEach(function (k) {
+        var cls = k === 'OK' ? '.pin-key.pin-ok' : '.pin-key';
+        padHost.appendChild(h('button' + cls, {
+          disabled: disabled ? true : null,
+          onclick: function () {
+            if (k === '⌫') { pin = pin.slice(0, -1); }
+            else if (k === 'OK') { submit(); return; }
+            else if (pin.length < 8) { pin += k; }
+            refreshDots();
+          }
+        }, k));
+      });
+    }
+
+    function forgotPin() {
+      UI.modal('PIN vergessen?',
+        h('div', {},
+          h('p', {}, 'Ohne PIN können die verschlüsselten Daten auf diesem Gerät nicht wiederhergestellt werden – es gibt bewusst keine Hintertür.'),
+          h('p', {}, 'Der Weg zurück: App zurücksetzen und anschließend Ihre Backup-Datei einspielen (Passwort der Backup-Datei bzw. bei automatischen Ordner-Backups die damalige PIN erforderlich).'),
+          h('p.error-text', {}, 'Das Zurücksetzen löscht alle Daten auf diesem Gerät unwiderruflich.')
+        ), [
+          { label: 'Abbrechen', value: false },
+          { label: 'App zurücksetzen …', value: true, danger: true }
+        ]).then(function (ok) {
+          if (!ok) return;
+          var confirmInput = h('input.input', { type: 'text', placeholder: 'LÖSCHEN' });
+          UI.modal('Wirklich alle Daten löschen?',
+            [h('p', {}, 'Bitte tippen Sie zur Bestätigung das Wort LÖSCHEN ein.'), confirmInput],
+            [
+              { label: 'Abbrechen', value: false },
+              { label: 'Endgültig löschen', value: true, danger: true,
+                validate: function () { return confirmInput.value.trim() === 'LÖSCHEN'; } }
+            ]).then(function (yes) {
+              if (!yes) return;
+              Store.factoryReset().then(function () {
+                toast('App wurde zurückgesetzt.');
+                go('setup');
+              });
+            });
+        });
+    }
+
+    refreshDots();
+    if (Store.getLockWait() > 0) waitCountdown(); else drawPad(false);
+
+    return h('div.screen.lock-screen',
+      h('div.setup-hero',
+        h('div.setup-mark', { html: LOCK_SVG.replace('width="18" height="18"', 'width="30" height="30"') }),
+        h('h1', {}, 'SOL-Noten'),
+        h('p', {}, 'Bitte PIN eingeben')
+      ),
+      dots,
+      msg,
+      padHost,
+      h('button.btn-plain.btn-small.lock-forgot', { onclick: forgotPin }, 'PIN vergessen?')
+    );
+  };
+
 
   /* ================= Einrichtung ================= */
 
@@ -268,7 +424,7 @@
   };
 
   /* Backup speichern – mit optionalem Passwort (verschlüsselt). */
-  function exportDialog() {
+  function exportDialog(onDone) {
     var pw1 = h('input.input', { type: 'password', autocomplete: 'new-password', placeholder: 'Passwort (empfohlen)' });
     var pw2 = h('input.input', { type: 'password', autocomplete: 'new-password', placeholder: 'Passwort wiederholen' });
     var err = h('p.hint.error-text');
@@ -292,6 +448,7 @@
       Store.exportJSON(pw).then(function () {
         toast(pw ? 'Verschlüsseltes Backup wird gespeichert.' : 'Backup (unverschlüsselt) wird gespeichert.');
         render();
+        if (typeof onDone === 'function') onDone();
       });
     });
   }
@@ -306,7 +463,7 @@
     return h('div.banner-warn', {},
       h('span', {}, never ? 'Ihre Daten wurden noch nie gesichert.'
         : 'Ihr letztes Backup ist ' + days + ' Tage alt.'),
-      h('button.btn-small.btn-primary', { onclick: exportDialog }, 'Jetzt sichern')
+      h('button.btn-small.btn-primary', { onclick: function () { exportDialog(); } }, 'Jetzt sichern')
     );
   }
 
@@ -1977,7 +2134,7 @@
     }
 
     function printCharts() {
-      var page = h('div.print-page.report',
+      var page = h('div.print-page.charts-print',
         h('h2', {}, 'SoLei-Punkteentwicklung'),
         h('p.print-sub', {}, cls.name + ' · ' + course.subject + ' · ' + shownQ + '. Quartal · ' +
           stu.lastName + ', ' + stu.firstName + ' · Stand: ' + UI.fmtDate(Store.todayISO())),
@@ -2081,12 +2238,24 @@
       if (!f) return;
       f.text().then(function (text) {
         var parsed = Store.parseBackup(text);
-        var getData = parsed.encrypted
-          ? askPassword(f.name).then(function (pw) {
-              if (pw == null) return null;
-              return CryptoBox.decrypt(parsed.envelope, pw).then(function (plain) { return JSON.parse(plain); });
-            })
-          : Promise.resolve(parsed.data);
+        var getData;
+        if (parsed.keyEnvelope) {
+          getData = askPassword(f.name, true).then(function (pin) {
+            if (pin == null) return null;
+            return CryptoBox.unwrapMaster(pin, parsed.envelope.wrapped)
+              .then(function (raw) { return CryptoBox.importAesKey(raw); })
+              .then(function (key) { return CryptoBox.decryptWithKey(key, parsed.envelope); })
+              .then(function (plain) { return JSON.parse(plain); })
+              .catch(function () { throw new Error('Falsche PIN oder beschädigte Datei.'); });
+          });
+        } else if (parsed.encrypted) {
+          getData = askPassword(f.name, false).then(function (pw) {
+            if (pw == null) return null;
+            return CryptoBox.decrypt(parsed.envelope, pw).then(function (plain) { return JSON.parse(plain); });
+          });
+        } else {
+          getData = Promise.resolve(parsed.data);
+        }
         return getData.then(function (data) {
           if (!data) return;
           return UI.confirmDialog('Backup einspielen?',
@@ -2101,11 +2270,16 @@
       }).catch(function (e) { UI.modal('Import fehlgeschlagen', h('p', {}, e.message)); });
     });
 
-    function askPassword(fileName) {
-      var pw = h('input.input', { type: 'password', autocomplete: 'current-password', placeholder: 'Passwort' });
+    function askPassword(fileName, isPin) {
+      var label = isPin ? 'PIN' : 'Passwort';
+      var pw = h('input.input', { type: 'password',
+        inputmode: isPin ? 'numeric' : null,
+        autocomplete: 'current-password', placeholder: label });
       return UI.modal('Verschlüsseltes Backup',
-        [h('p.hint', {}, 'Die Datei „' + fileName + '“ ist verschlüsselt. Bitte geben Sie das Passwort ein.'),
-         h('label.field', h('span.field-label', {}, 'Passwort'), pw)],
+        [h('p.hint', {}, isPin
+          ? 'Die Datei „' + fileName + '“ ist ein automatisches Backup und mit einer PIN verschlüsselt. Bitte geben Sie die PIN ein, die beim Erstellen aktiv war.'
+          : 'Die Datei „' + fileName + '“ ist verschlüsselt. Bitte geben Sie das Passwort ein.'),
+         h('label.field', h('span.field-label', {}, label), pw)],
         [{ label: 'Abbrechen', value: false }, { label: 'Entschlüsseln', value: true, primary: true }]
       ).then(function (ok) { return ok ? pw.value : null; });
     }
@@ -2150,13 +2324,16 @@
         }))
       ),
 
+      h('div.section-head', {}, 'PIN-Sperre & Verschlüsselung'),
+      h('div.card', {}, securitySection()),
+
       h('div.section-head', {}, 'Datensicherung'),
       h('div.card',
         h('p.hint', {}, st.settings.lastExport
           ? 'Letztes Backup: ' + UI.fmtDate(st.settings.lastExport.slice(0, 10))
           : 'Es wurde noch kein Backup erstellt.'),
         h('div.actions-col',
-          h('button.btn-primary.btn-block', { onclick: exportDialog },
+          h('button.btn-primary.btn-block', { onclick: function () { exportDialog(); } },
             'Backup-Datei jetzt speichern (mit Passwort: verschlüsselt)'),
           h('button.btn-plain.btn-block', { onclick: function () { fileInput.click(); } },
             'Backup-Datei einspielen'),
@@ -2255,6 +2432,122 @@
       )
     );
   };
+
+  /* ---------- PIN-Sperre & Verschlüsselung (Einstellungen) ---------- */
+
+  function pinInputPair(labels) {
+    var p1 = h('input.input', { type: 'password', inputmode: 'numeric', autocomplete: 'new-password', placeholder: '4–8 Ziffern' });
+    var p2 = h('input.input', { type: 'password', inputmode: 'numeric', autocomplete: 'new-password', placeholder: 'Wiederholung' });
+    var err = h('p.hint.error-text');
+    function validate() {
+      if (!/^\d{4,8}$/.test(p1.value)) { err.textContent = 'Die PIN muss aus 4 bis 8 Ziffern bestehen.'; return false; }
+      if (p1.value !== p2.value) { err.textContent = 'Die PINs stimmen nicht überein.'; return false; }
+      return true;
+    }
+    return { nodes: [
+      h('label.field', h('span.field-label', {}, labels[0]), p1),
+      h('label.field', h('span.field-label', {}, labels[1]), p2),
+      err
+    ], value: function () { return p1.value; }, validate: validate };
+  }
+
+  function enableEncryptionFlow() {
+    UI.modal('PIN-Sperre einrichten – Schritt 1 von 2',
+      h('div', {},
+        h('p', {}, 'Bevor die Verschlüsselung aktiviert wird, verlangt die App ein frisches Backup. Denn es gilt: Ohne PIN gibt es keinen Zugriff auf die Daten – der einzige Rettungsweg ist Ihre Backup-Datei.'),
+        h('p.hint', {}, 'Bitte notieren Sie PIN und Backup-Passwort an einem sicheren Ort, z. B. in einem Passwort-Manager.')
+      ), [
+        { label: 'Abbrechen', value: false },
+        { label: 'Backup jetzt speichern', value: true, primary: true }
+      ]).then(function (ok) {
+        if (!ok) return;
+        exportDialog(function () { setTimeout(pinStep, 300); });
+      });
+
+    function pinStep() {
+      var pins = pinInputPair(['Neue PIN', 'PIN wiederholen']);
+      UI.modal('PIN-Sperre einrichten – Schritt 2 von 2',
+        [h('p.hint', {}, 'Die Datenbank wird mit einem Hauptschlüssel verschlüsselt (AES-256), den Ihre PIN entsperrt. Die App fragt die PIN künftig beim Start ab.')].concat(pins.nodes),
+        [
+          { label: 'Abbrechen', value: false },
+          { label: 'Verschlüsselung aktivieren', value: true, primary: true, validate: pins.validate }
+        ]).then(function (ok) {
+          if (!ok) return;
+          Store.enableEncryption(pins.value()).then(function () {
+            toast('Verschlüsselung ist aktiv. Die App fragt die PIN künftig beim Start ab.');
+            render();
+          }).catch(function (e) {
+            UI.modal('Aktivierung fehlgeschlagen', h('p', {}, e.message));
+          });
+        });
+    }
+  }
+
+  function changePinFlow() {
+    var oldPin = h('input.input', { type: 'password', inputmode: 'numeric', autocomplete: 'current-password', placeholder: 'Aktuelle PIN' });
+    var pins = pinInputPair(['Neue PIN', 'Neue PIN wiederholen']);
+    UI.modal('PIN ändern',
+      [h('label.field', h('span.field-label', {}, 'Aktuelle PIN'), oldPin)].concat(pins.nodes),
+      [
+        { label: 'Abbrechen', value: false },
+        { label: 'PIN ändern', value: true, primary: true, validate: pins.validate }
+      ]).then(function (ok) {
+        if (!ok) return;
+        Store.changePin(oldPin.value, pins.value()).then(function () {
+          toast('PIN wurde geändert.');
+        }).catch(function () {
+          UI.modal('PIN ändern fehlgeschlagen', h('p', {}, 'Die aktuelle PIN ist nicht korrekt.'));
+        });
+      });
+  }
+
+  function disableEncryptionFlow() {
+    var pin = h('input.input', { type: 'password', inputmode: 'numeric', placeholder: 'PIN' });
+    UI.modal('Verschlüsselung deaktivieren',
+      [h('p', {}, 'Die Daten werden wieder unverschlüsselt auf dem Gerät gespeichert und die PIN-Abfrage entfällt.'),
+       h('label.field', h('span.field-label', {}, 'PIN zur Bestätigung'), pin)],
+      [
+        { label: 'Abbrechen', value: false },
+        { label: 'Deaktivieren', value: true, danger: true }
+      ]).then(function (ok) {
+        if (!ok) return;
+        Store.disableEncryption(pin.value).then(function () {
+          toast('Verschlüsselung wurde deaktiviert.');
+          render();
+        }).catch(function () {
+          UI.modal('Deaktivieren fehlgeschlagen', h('p', {}, 'Die PIN ist nicht korrekt.'));
+        });
+      });
+  }
+
+  function securitySection() {
+    if (!CryptoBox.supported()) {
+      return h('p.hint', {}, 'Dieser Browser unterstützt die nötige Verschlüsselungstechnik nicht.');
+    }
+    if (!Store.isEncrypted()) {
+      return h('div.actions-col',
+        h('p.hint', {}, 'Schützt die Daten auf diesem Gerät: Die Datenbank wird verschlüsselt (AES-256) und die App beim Start mit einer PIN entsperrt. Wichtig: Bei vergessener PIN sind die Gerätedaten nur über ein Backup wiederherstellbar – die Einrichtung verlangt deshalb zuerst ein frisches Backup.'),
+        h('button.btn-primary.btn-block', { onclick: enableEncryptionFlow }, 'PIN-Sperre einrichten')
+      );
+    }
+    var lockSel = h('select.input');
+    [[null, 'Aus'], [0, 'Sofort beim Verlassen'], [1, 'Nach 1 Minute'], [5, 'Nach 5 Minuten'], [15, 'Nach 15 Minuten']]
+      .forEach(function (o) {
+        lockSel.appendChild(h('option', { value: o[0] === null ? 'aus' : o[0], selected: Store.getAutolock() === o[0] }, o[1]));
+      });
+    lockSel.addEventListener('change', function () {
+      var v = lockSel.value === 'aus' ? null : Number(lockSel.value);
+      Store.setAutolock(v);
+      toast('Automatische Sperre: ' + lockSel.options[lockSel.selectedIndex].text + '.');
+    });
+    return h('div.actions-col',
+      h('p.hint', {}, 'Verschlüsselung ist aktiv (AES-256). Automatische Ordner-Backups werden mit dem Hauptschlüssel verschlüsselt und lassen sich mit Ihrer PIN wiederherstellen; manuelle Backups behalten ihr eigenes Passwort.'),
+      h('label.field', h('span.field-label', {}, 'Automatische Sperre bei Inaktivität'), lockSel),
+      h('button.btn-plain.btn-block', { onclick: doLock }, 'Jetzt sperren'),
+      h('button.btn-plain.btn-block', { onclick: changePinFlow }, 'PIN ändern'),
+      h('button.btn-plain.btn-block.danger-text', { onclick: disableEncryptionFlow }, 'Verschlüsselung deaktivieren')
+    );
+  }
 
   Store.onChange(function () { /* Persistenz läuft im Hintergrund */ });
 })();

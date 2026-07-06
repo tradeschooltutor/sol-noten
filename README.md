@@ -1,4 +1,4 @@
-# SOL-Noten (Version 0.7)
+# SOL-Noten (Version 0.8)
 
 Notenverwaltung zum selbstorganisierten Lernen (SOL) als Progressive Web App (PWA).
 Basierend auf der Excel-Notenverwaltung V8.0 von Andreas Vandelaar.
@@ -28,6 +28,7 @@ Basierend auf der Excel-Notenverwaltung V8.0 von Andreas Vandelaar.
 - **Verschlüsselte Backups** – beim Speichern eines Backups kann ein Passwort vergeben werden; die Datei wird dann mit AES-256-GCM verschlüsselt (Schlüsselableitung PBKDF2/SHA-256, 310.000 Runden). Beim Einspielen fragt die App das Passwort ab. Ohne Passwort bleibt der Klartext-Export möglich. Achtung: Ein vergessenes Passwort ist nicht wiederherstellbar.
 - **Diagramm-Druck** – im Punkteprotokoll lassen sich die Liniendiagramme aller fünf Kriterien eines Quartals gesammelt drucken bzw. als PDF speichern; unentschuldigte Fehlzeiten erscheinen als rote Punkte (auch im Bildschirm-Diagramm), Fehlzeiten-Hinweise sind direkt zur Fehlzeiten-Verwaltung verlinkt.
 - **Acht Farbschemata** – zusätzlich Himmelblau, Orange und Beere; die Titelzeile der App und die Browser-Farbleiste übernehmen das gewählte Schema.
+- **PIN-Sperre & Datenbank-Verschlüsselung (Opt-in)** – in den globalen Einstellungen aktivierbar. Die Datenbank (inkl. der internen Sicherungsstände) wird mit einem zufälligen 256-Bit-Hauptschlüssel verschlüsselt (AES-256-GCM); die PIN (4–8 Ziffern) umhüllt nur diesen Hauptschlüssel (PBKDF2, 310.000 Runden). Beim Start erscheint ein Ziffernfeld; Schloss-Symbol zum manuellen Sperren; automatische Sperre bei Inaktivität (Aus/sofort/1/5/15 Min., Standard 5). Nach 5 Fehlversuchen Wartezeit 30 s mit Verdopplung je weiterem Fehlversuch, keine Datenlöschung. Die Einrichtung erzwingt zuerst ein frisches Backup; PIN ändern und Deaktivieren jederzeit möglich. „PIN vergessen" führt ausschließlich über App-Reset + Backup (bewusst keine Hintertür, keine E-Mail-/Sicherheitsfragen-Wiederherstellung). Automatische Ordner-Backups werden bei aktiver Verschlüsselung mit dem Hauptschlüssel verschlüsselt und beim Einspielen per PIN entsperrt; manuelle Backups behalten ihr eigenes Passwort.
 - **Datensicherung** – alles bleibt lokal (IndexedDB). Backup-Datei speichern/einspielen, Erinnerung nach 7 Tagen, automatisches Backup in einen freigegebenen Ordner (Chrome/Edge am Computer und Android), interne tägliche Sicherungsstände der letzten 14 Tage gegen Fehlbedienung.
 - **Einstellungen** – Kriteriennamen (global), Bewertungsspiegel (15-Punkte-Schema, Standardwerte aus der Excel-Datei).
 

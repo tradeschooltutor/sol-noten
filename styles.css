@@ -469,5 +469,34 @@ button:focus-visible, .input:focus-visible, select:focus-visible {
 .legend-dot.red { background: var(--red); }
 
 @media print {
-  .print-page .chart-host svg { max-height: 42mm; }
+  /* Diagramm-Druck: alle 5 Kriterien zuverlässig auf EINER A4-Seite */
+  .charts-print h2 { font-size: 13pt; margin: 0 0 1mm; }
+  .charts-print .print-sub { font-size: 9pt; margin: 0 0 3mm; }
+  .charts-print .report-block { page-break-inside: avoid; margin: 0 0 2.5mm; }
+  .charts-print .report-block h3 { font-size: 9pt; margin: 0 0 1mm; }
+  .charts-print .chart-host svg { height: 30mm; width: 100%; display: block; }
+  .charts-print .hint { font-size: 8pt; margin: 0; }
 }
+
+/* ---------- Sperrbildschirm ---------- */
+.lock-screen { align-items: center; max-width: 340px; margin: 0 auto; }
+.pin-dots { display: flex; gap: 12px; justify-content: center; min-height: 18px; }
+.pin-dot {
+  width: 14px; height: 14px; border-radius: 50%;
+  border: 2px solid var(--teal); background: transparent;
+}
+.pin-dot.filled { background: var(--teal); }
+.lock-msg { min-height: 1.2em; text-align: center; }
+.pin-pad {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;
+  width: 100%; max-width: 280px;
+}
+.pin-key {
+  height: 64px; border-radius: 16px; border: 1px solid var(--line);
+  background: var(--card); font-size: 1.4rem; font-weight: 650; color: var(--ink);
+}
+.pin-key:active { background: var(--teal-soft); }
+.pin-key:disabled { opacity: 0.4; }
+.pin-ok { background: var(--teal); border-color: var(--teal); color: #fff; font-size: 1.05rem; }
+.pin-ok:active { background: var(--teal-dark); }
+.lock-forgot { margin-top: 10px; }

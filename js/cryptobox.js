@@ -73,5 +73,64 @@
     return !!(obj && obj.app === 'SOL-Noten' && obj.encrypted === true && obj.data && obj.iv && obj.kdf);
   }
 
-  return { supported: supported, encrypt: encrypt, decrypt: decrypt, isEncryptedEnvelope: isEncryptedEnvelope };
+  /* ---------- Hauptschlüssel-Verwaltung (für die lokale Datenbank) ---------- */
+
+  function randomBytes(n) { return crypto.getRandomValues(new Uint8Array(n)); }
+
+  function generateMasterRaw() { return randomBytes(32); } /* 256 Bit */
+
+  function importAesKey(rawBytes) {
+    return subtle.importKey('raw', rawBytes, 'AES-GCM', false, ['encrypt', 'decrypt']);
+  }
+
+  /* Text mit einem AES-Schlüssel verschlüsseln -> {iv, data} (Base64) */
+  function encryptWithKey(key, plainText) {
+    var iv = randomBytes(12);
+    return subtle.encrypt({ name: 'AES-GCM', iv: iv }, key, new TextEncoder().encode(plainText))
+      .then(function (cipher) { return { iv: b64(iv), data: b64(cipher) }; });
+  }
+
+  function decryptWithKey(key, box) {
+    return subtle.decrypt({ name: 'AES-GCM', iv: unb64(box.iv) }, key, unb64(box.data))
+      .then(function (plain) { return new TextDecoder().decode(plain); })
+      .catch(function () { throw new Error('Entschlüsselung fehlgeschlagen.'); });
+  }
+
+  /* Hauptschlüssel mit der PIN umhüllen -> {kdf, iv, data} */
+  function wrapMaster(pin, rawKeyBytes) {
+    var salt = randomBytes(16);
+    var iv = randomBytes(12);
+    return deriveKey(pin, salt, ITERATIONS).then(function (pinKey) {
+      return subtle.encrypt({ name: 'AES-GCM', iv: iv }, pinKey, rawKeyBytes);
+    }).then(function (cipher) {
+      return {
+        kdf: { name: 'PBKDF2-SHA256', iterations: ITERATIONS, salt: b64(salt) },
+        iv: b64(iv),
+        data: b64(cipher)
+      };
+    });
+  }
+
+  /* Hauptschlüssel mit der PIN entpacken -> Uint8Array (wirft bei falscher PIN) */
+  function unwrapMaster(pin, wrapped) {
+    return deriveKey(pin, unb64(wrapped.kdf.salt), wrapped.kdf.iterations || ITERATIONS)
+      .then(function (pinKey) {
+        return subtle.decrypt({ name: 'AES-GCM', iv: unb64(wrapped.iv) }, pinKey, unb64(wrapped.data));
+      })
+      .then(function (raw) { return new Uint8Array(raw); })
+      .catch(function () { throw new Error('Falsche PIN.'); });
+  }
+
+  function isKeyEnvelope(obj) { /* Auto-Backup, verschlüsselt mit dem Hauptschlüssel */
+    return !!(obj && obj.app === 'SOL-Noten' && obj.encrypted === true &&
+      obj.mode === 'pin-master' && obj.wrapped && obj.iv && obj.data);
+  }
+
+  return {
+    supported: supported, encrypt: encrypt, decrypt: decrypt,
+    isEncryptedEnvelope: isEncryptedEnvelope, isKeyEnvelope: isKeyEnvelope,
+    generateMasterRaw: generateMasterRaw, importAesKey: importAesKey,
+    encryptWithKey: encryptWithKey, decryptWithKey: decryptWithKey,
+    wrapMaster: wrapMaster, unwrapMaster: unwrapMaster
+  };
 });

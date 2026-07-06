@@ -12,6 +12,9 @@
   var saveTimer = null;
   var listeners = [];
   var backupDirHandle = null;
+  var security = null;      /* {enabled, wrapped, fail:{count,lockUntil}, autolockMinutes, pinLength} */
+  var masterRaw = null;     /* Uint8Array – nur im Arbeitsspeicher der entsperrten App */
+  var masterKey = null;     /* CryptoKey */
 
   function openDB() {
     return new Promise(function (resolve, reject) {
@@ -91,12 +94,175 @@
 
   function init() {
     return openDB()
-      .then(function () { return idbGet('state', 'main'); })
-      .then(function (saved) {
-        state = migrate(saved) || freshState();
+      .then(function () { return idbGet('handles', 'security').catch(function () { return null; }); })
+      .then(function (sec) {
+        security = sec || null;
         return idbGet('handles', 'backupDir').catch(function () { return null; });
       })
-      .then(function (h) { backupDirHandle = h || null; return state; });
+      .then(function (h) {
+        backupDirHandle = h || null;
+        if (security && security.enabled) {
+          return { locked: true }; /* Daten bleiben verschlüsselt, bis die PIN eingegeben ist */
+        }
+        return idbGet('state', 'main').then(function (saved) {
+          state = migrate(saved) || freshState();
+          return state;
+        });
+      });
+  }
+
+  function saveSecurity() {
+    return idb('handles', 'readwrite', function (st) {
+      if (security) st.put(security, 'security');
+      else st.delete('security');
+    });
+  }
+
+  function isEncrypted() { return !!(security && security.enabled); }
+  function isLocked() { return isEncrypted() && !masterKey; }
+
+  /* Verbleibende Wartezeit (Sekunden) nach zu vielen Fehlversuchen */
+  function getLockWait() {
+    if (!security || !security.fail) return 0;
+    var rest = Math.ceil((security.fail.lockUntil - Date.now()) / 1000);
+    return rest > 0 ? rest : 0;
+  }
+  function failedAttempts() { return (security && security.fail && security.fail.count) || 0; }
+
+  /* App entsperren: PIN prüft sich selbst über das Entpacken des Hauptschlüssels. */
+  function unlock(pin) {
+    if (!isEncrypted()) return Promise.reject(new Error('Keine Verschlüsselung aktiv.'));
+    var wait = getLockWait();
+    if (wait > 0) {
+      var e1 = new Error('Zu viele Fehlversuche. Bitte warten.');
+      e1.waitSeconds = wait;
+      return Promise.reject(e1);
+    }
+    return CryptoBox.unwrapMaster(pin, security.wrapped).then(function (raw) {
+      masterRaw = raw;
+      return CryptoBox.importAesKey(raw);
+    }).then(function (key) {
+      masterKey = key;
+      security.fail = { count: 0, lockUntil: 0 };
+      return saveSecurity();
+    }).then(function () {
+      return idbGet('state', 'main');
+    }).then(function (saved) {
+      if (saved && saved.enc) {
+        return CryptoBox.decryptWithKey(masterKey, saved).then(function (plain) {
+          state = migrate(JSON.parse(plain));
+          return state;
+        });
+      }
+      state = migrate(saved) || freshState();
+      return state;
+    }).catch(function (err) {
+      if (/Falsche PIN/.test(err.message || '')) {
+        masterRaw = null; masterKey = null;
+        security.fail = security.fail || { count: 0, lockUntil: 0 };
+        security.fail.count++;
+        if (security.fail.count >= 5) {
+          security.fail.lockUntil = Date.now() + 30000 * Math.pow(2, security.fail.count - 5);
+        }
+        return saveSecurity().then(function () {
+          var e = new Error('Falsche PIN.');
+          e.waitSeconds = getLockWait();
+          e.attempts = security.fail.count;
+          throw e;
+        });
+      }
+      throw err;
+    });
+  }
+
+  function lock() {
+    masterRaw = null; masterKey = null; state = null;
+  }
+
+  /* Verschlüsselung aktivieren: Hauptschlüssel erzeugen, mit PIN umhüllen,
+     Datenbank und Sicherungsstände verschlüsselt neu schreiben. */
+  function enableEncryption(pin) {
+    masterRaw = CryptoBox.generateMasterRaw();
+    return CryptoBox.wrapMaster(pin, masterRaw).then(function (wrapped) {
+      security = {
+        enabled: true, wrapped: wrapped, pinLength: pin.length,
+        fail: { count: 0, lockUntil: 0 }, autolockMinutes: 5,
+        createdAt: new Date().toISOString()
+      };
+      return CryptoBox.importAesKey(masterRaw);
+    }).then(function (key) {
+      masterKey = key;
+      return saveSecurity();
+    }).then(function () { return persist(); })
+      .then(function () { return reencryptSnapshots(true); });
+  }
+
+  /* Verschlüsselung deaktivieren (PIN erforderlich). */
+  function disableEncryption(pin) {
+    return CryptoBox.unwrapMaster(pin, security.wrapped).then(function () {
+      return reencryptSnapshots(false);
+    }).then(function () {
+      security = null; masterRaw = null; masterKey = null;
+      return saveSecurity();
+    }).then(function () { return persist(); });
+  }
+
+  function changePin(oldPin, newPin) {
+    return CryptoBox.unwrapMaster(oldPin, security.wrapped).then(function (raw) {
+      return CryptoBox.wrapMaster(newPin, raw);
+    }).then(function (wrapped) {
+      security.wrapped = wrapped;
+      security.pinLength = newPin.length;
+      return saveSecurity();
+    });
+  }
+
+  function setAutolock(minutesOrNull) {
+    if (security) { security.autolockMinutes = minutesOrNull; saveSecurity(); }
+  }
+  function getAutolock() { return security ? security.autolockMinutes : null; }
+
+  /* Sicherungsstände ver- bzw. entschlüsseln */
+  function reencryptSnapshots(encrypt) {
+    return new Promise(function (resolve) {
+      var tx = db.transaction('snapshots', 'readonly');
+      var req = tx.objectStore('snapshots').getAllKeys();
+      req.onsuccess = function () { resolve(req.result || []); };
+      req.onerror = function () { resolve([]); };
+    }).then(function (keys) {
+      var chain = Promise.resolve();
+      keys.forEach(function (k) {
+        chain = chain.then(function () { return idbGet('snapshots', k); }).then(function (snap) {
+          if (!snap) return;
+          if (encrypt && !snap.enc) {
+            return CryptoBox.encryptWithKey(masterKey, JSON.stringify(snap)).then(function (box) {
+              box.enc = true;
+              return idb('snapshots', 'readwrite', function (st) { st.put(box, k); });
+            });
+          }
+          if (!encrypt && snap.enc) {
+            return CryptoBox.decryptWithKey(masterKey, snap).then(function (plain) {
+              return idb('snapshots', 'readwrite', function (st) { st.put(JSON.parse(plain), k); });
+            });
+          }
+        });
+      });
+      return chain;
+    });
+  }
+
+  /* Kompletter Neustart (PIN vergessen): löscht alle Daten unwiderruflich. */
+  function factoryReset() {
+    security = null; masterRaw = null; masterKey = null;
+    state = freshState();
+    return Promise.all([
+      idb('state', 'readwrite', function (st) { st.clear(); }),
+      idb('snapshots', 'readwrite', function (st) { st.clear(); }),
+      idb('handles', 'readwrite', function (st) { st.clear(); })
+    ]).then(function () {
+      backupDirHandle = null;
+      return idb('state', 'readwrite', function (st) { st.put(state, 'main'); });
+    });
   }
 
   function notify() { listeners.forEach(function (fn) { fn(state); }); }
@@ -110,7 +276,17 @@
 
   function persist() {
     saveTimer = null;
-    return idb('state', 'readwrite', function (st) { return st.put(state, 'main'); })
+    if (!state) return Promise.resolve();
+    var write;
+    if (isEncrypted() && masterKey) {
+      write = CryptoBox.encryptWithKey(masterKey, JSON.stringify(state)).then(function (box) {
+        box.enc = true;
+        return idb('state', 'readwrite', function (st) { return st.put(box, 'main'); });
+      });
+    } else {
+      write = idb('state', 'readwrite', function (st) { return st.put(state, 'main'); });
+    }
+    return write
       .then(dailySnapshot)
       .then(autoBackupToFolder)
       .catch(function (e) { console.error('Speichern fehlgeschlagen:', e); });
@@ -119,9 +295,18 @@
   /* Ein interner Sicherungsstand pro Tag, die letzten 14 werden behalten. */
   function dailySnapshot() {
     var key = todayISO();
-    return idb('snapshots', 'readwrite', function (st) {
-      st.put(JSON.parse(JSON.stringify(state)), key);
-    }).then(function () {
+    var put;
+    if (isEncrypted() && masterKey) {
+      put = CryptoBox.encryptWithKey(masterKey, JSON.stringify(state)).then(function (box) {
+        box.enc = true;
+        return idb('snapshots', 'readwrite', function (st) { st.put(box, key); });
+      });
+    } else {
+      put = idb('snapshots', 'readwrite', function (st) {
+        st.put(JSON.parse(JSON.stringify(state)), key);
+      });
+    }
+    return put.then(function () {
       return new Promise(function (resolve) {
         var tx = db.transaction('snapshots', 'readwrite');
         var st = tx.objectStore('snapshots');
@@ -145,9 +330,13 @@
   function restoreSnapshot(key) {
     return idbGet('snapshots', key).then(function (snap) {
       if (!snap) throw new Error('Sicherungsstand nicht gefunden.');
-      state = snap;
-      return idb('state', 'readwrite', function (st) { return st.put(state, 'main'); });
-    }).then(notify);
+      if (snap.enc) {
+        return CryptoBox.decryptWithKey(masterKey, snap).then(function (plain) {
+          state = migrate(JSON.parse(plain));
+        });
+      }
+      state = migrate(snap);
+    }).then(function () { return persist(); }).then(notify);
   }
 
   /* ---------- Export / Import (Backup-Datei) ---------- */
@@ -183,6 +372,7 @@
     var data;
     try { data = JSON.parse(text); }
     catch (e) { throw new Error('Die Datei ist keine gültige Backup-Datei (JSON-Fehler).'); }
+    if (CryptoBox.isKeyEnvelope(data)) return { encrypted: true, keyEnvelope: true, envelope: data };
     if (CryptoBox.isEncryptedEnvelope(data)) return { encrypted: true, envelope: data };
     if (!data || data.app !== 'SOL-Noten' || !Array.isArray(data.courses)) {
       throw new Error('Die Datei ist keine SOL-Noten-Backup-Datei.');
@@ -238,14 +428,26 @@
       })
       .then(function (p) {
         if (p !== 'granted') return;
-        return backupDirHandle.getFileHandle('SOL-Noten-Backup-' + todayISO() + '.json', { create: true })
-          .then(function (fh) { return fh.createWritable(); })
-          .then(function (w) {
-            return w.write(JSON.stringify(state)).then(function () { return w.close(); });
-          })
-          .then(function () {
-            state.settings.lastExport = new Date().toISOString();
+        var content;
+        if (isEncrypted() && masterKey) {
+          content = CryptoBox.encryptWithKey(masterKey, JSON.stringify(state)).then(function (box) {
+            return JSON.stringify({
+              app: 'SOL-Noten', encrypted: true, v: 2, mode: 'pin-master',
+              wrapped: security.wrapped, iv: box.iv, data: box.data
+            });
           });
+        } else {
+          content = Promise.resolve(JSON.stringify(state));
+        }
+        return content.then(function (text) {
+          return backupDirHandle.getFileHandle('SOL-Noten-Backup-' + todayISO() + '.json', { create: true })
+            .then(function (fh) { return fh.createWritable(); })
+            .then(function (w) {
+              return w.write(text).then(function () { return w.close(); });
+            });
+        }).then(function () {
+          state.settings.lastExport = new Date().toISOString();
+        });
       })
       .catch(function (e) { console.warn('Auto-Backup nicht möglich:', e); });
   }
@@ -339,6 +541,10 @@
     addAbsence: addAbsence, removeAbsence: removeAbsence, absencesFor: absencesFor,
     exportJSON: exportJSON, importJSON: importJSON, parseBackup: parseBackup, applyImport: applyImport,
     listSnapshots: listSnapshots, restoreSnapshot: restoreSnapshot,
+    isEncrypted: isEncrypted, isLocked: isLocked, unlock: unlock, lock: lock,
+    enableEncryption: enableEncryption, disableEncryption: disableEncryption,
+    changePin: changePin, setAutolock: setAutolock, getAutolock: getAutolock,
+    getLockWait: getLockWait, failedAttempts: failedAttempts, factoryReset: factoryReset,
     folderBackupSupported: folderBackupSupported, chooseBackupFolder: chooseBackupFolder,
     removeBackupFolder: removeBackupFolder, daysSinceExport: daysSinceExport,
     hasBackupFolder: function () { return !!backupDirHandle; }
