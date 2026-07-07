@@ -10,7 +10,7 @@
 
   /* ================= App-Start ================= */
 
-  var APP_VERSION = '0.9.0';
+  var APP_VERSION = '0.10.0';
 
   Store.init().then(function () {
     if ('serviceWorker' in navigator) {
@@ -167,6 +167,9 @@
     var msg = h('p.hint.lock-msg');
     var padHost = h('div.pin-pad');
     var busy = false;
+    var bioTries = 0;
+    var bioActive = Store.biometricsEnabled();
+    var showPinPad = !bioActive; /* bei aktiver Biometrie zunächst Biometrie-Ansicht */
 
     function refreshDots() {
       UI.clear(dots);
@@ -255,16 +258,79 @@
         });
     }
 
-    refreshDots();
+    function hasFinePointer() {
+      return !!(window.matchMedia && window.matchMedia('(any-pointer: fine)').matches);
+    }
+
+    /* Biometrische Entsperrung anbieten – bis zu 3 Versuche, dann PIN. */
+    function tryBiometric() {
+      if (!bioActive || busy) return;
+      busy = true;
+      msg.textContent = 'Biometrische Prüfung …';
+      Store.unlockBiometric().then(function () {
+        busy = false;
+        afterUnlock();
+      }).catch(function () {
+        busy = false;
+        bioTries++;
+        if (bioTries >= 3) {
+          bioActive = false;
+          showPinPad = true;
+          msg.textContent = 'Biometrie nicht erfolgreich. Bitte PIN eingeben.';
+          renderLock();
+        } else {
+          msg.textContent = 'Biometrie nicht erkannt (' + bioTries + '/3). Erneut versuchen oder PIN verwenden.';
+          renderLock();
+        }
+      });
+    }
+
+    var container = h('div.screen.lock-screen');
+    function renderLock() {
+      UI.clear(container);
+      container.appendChild(h('div.setup-hero',
+        h('div.setup-mark', { html: LOCK_SVG.replace('width="18" height="18"', 'width="30" height="30"') }),
+        h('h1', {}, 'SOL-Noten'),
+        h('p', {}, bioActive && !showPinPad ? 'Bitte biometrisch entsperren' : 'Bitte PIN eingeben')
+      ));
+      container.appendChild(dots);
+      container.appendChild(msg);
+
+      if (bioActive && !showPinPad) {
+        container.appendChild(h('button.btn-primary.btn-block.bio-btn', { onclick: tryBiometric },
+          'Mit Fingerabdruck / Gesicht entsperren'));
+        container.appendChild(h('button.btn-plain.btn-small.lock-alt', {
+          onclick: function () { showPinPad = true; renderLock(); }
+        }, 'Stattdessen PIN eingeben'));
+      } else {
+        refreshDots();
+        container.appendChild(padHost);
+        if (Store.biometricsEnabled()) {
+          container.appendChild(h('button.btn-plain.btn-small.lock-alt', {
+            onclick: function () { bioActive = true; showPinPad = false; bioTries = 0; msg.textContent = ''; renderLock(); tryBiometric(); }
+          }, 'Biometrie verwenden'));
+        }
+        if (hasFinePointer()) {
+          container.appendChild(h('p.hint.lock-kbd-hint', {}, 'Am Computer können Sie die PIN auch über die Tastatur eingeben (Enter bestätigt).'));
+        }
+      }
+      container.appendChild(h('button.btn-plain.btn-small.lock-forgot', { onclick: forgotPin }, 'PIN vergessen?'));
+    }
+
+    if (Store.getLockWait() > 0) { showPinPad = true; bioActive = false; }
+    renderLock();
     if (Store.getLockWait() > 0) waitCountdown(); else drawPad(false);
 
-    /* Physische Tastatur mithören (PC). Auf Tablet/Smartphone gibt es keine,
-       daher keine Kollision; das On-Screen-Ziffernfeld bleibt aktiv.
-       Bewusst kein echtes Eingabefeld – so klappt keine System-Tastatur auf
-       und kein Passwort-Manager bietet das Speichern der Geräte-PIN an. */
+    /* Biometrie beim Öffnen automatisch anstoßen (nur wenn keine Wartesperre aktiv). */
+    if (bioActive && Store.getLockWait() <= 0) {
+      setTimeout(tryBiometric, 300);
+    }
+
+    /* Physische Tastatur mithören (PC). */
     function onKey(ev) {
       if (ev.metaKey || ev.ctrlKey || ev.altKey) return;
       if (Store.getLockWait() > 0) return;
+      if (bioActive && !showPinPad) return;
       if (ev.key >= '0' && ev.key <= '9') {
         if (pin.length < 8) { pin += ev.key; refreshDots(); }
         ev.preventDefault();
@@ -277,7 +343,6 @@
       }
     }
     document.addEventListener('keydown', onKey);
-    /* Handler entfernen, sobald der Sperrbildschirm den DOM verlässt. */
     var observer = new MutationObserver(function () {
       if (!dots.isConnected) {
         document.removeEventListener('keydown', onKey);
@@ -286,24 +351,7 @@
     });
     observer.observe(document.getElementById('app'), { childList: true, subtree: true });
 
-    function hasFinePointer() {
-      return !!(window.matchMedia && window.matchMedia('(any-pointer: fine)').matches);
-    }
-
-    return h('div.screen.lock-screen',
-      h('div.setup-hero',
-        h('div.setup-mark', { html: LOCK_SVG.replace('width="18" height="18"', 'width="30" height="30"') }),
-        h('h1', {}, 'SOL-Noten'),
-        h('p', {}, 'Bitte PIN eingeben')
-      ),
-      dots,
-      msg,
-      padHost,
-      hasFinePointer()
-        ? h('p.hint.lock-kbd-hint', {}, 'Am Computer können Sie die PIN auch über die Tastatur eingeben (Enter bestätigt).')
-        : null,
-      h('button.btn-plain.btn-small.lock-forgot', { onclick: forgotPin }, 'PIN vergessen?')
-    );
+    return container;
   };
 
 
@@ -2635,6 +2683,47 @@
       });
   }
 
+  function biometricRow() {
+    var host = h('div.bio-row');
+    function draw(available) {
+      UI.clear(host);
+      if (!available) {
+        host.appendChild(h('p.hint', {}, 'Biometrische Entsperrung (Fingerabdruck/Gesicht) wird von diesem Gerät oder Browser nicht angeboten.'));
+        return;
+      }
+      if (Store.biometricsEnabled()) {
+        host.appendChild(h('div.row-between',
+          h('span', {}, 'Biometrische Entsperrung ist aktiv.'),
+          h('button.btn-small.btn-plain.danger-text', { onclick: function () {
+            Store.disableBiometrics().then(function () { toast('Biometrie deaktiviert.'); draw(true); });
+          } }, 'Deaktivieren')));
+      } else {
+        host.appendChild(h('div.actions-col',
+          h('p.hint', {}, 'Bequemer entsperren: Statt der PIN können Sie Fingerabdruck oder Gesichtserkennung dieses Geräts nutzen. Die PIN bleibt weiterhin gültig. Sicherheit und Verschlüsselung bleiben unverändert – die Biometrie ist nur ein bequemer Zugang.'),
+          h('button.btn-plain.btn-block', { onclick: setupBio }, 'Mit Fingerabdruck / Gesicht entsperren einrichten')));
+      }
+    }
+    function setupBio() {
+      var pin = h('input.input', { type: 'password', inputmode: 'numeric', placeholder: 'PIN' });
+      UI.modal('Biometrie einrichten',
+        [h('p.hint', {}, 'Bitte bestätigen Sie einmal Ihre PIN. Danach richtet das Gerät die biometrische Entsperrung ein.'),
+         h('label.field', h('span.field-label', {}, 'PIN'), pin)],
+        [{ label: 'Abbrechen', value: false }, { label: 'Weiter', value: true, primary: true }]
+      ).then(function (ok) {
+        if (!ok) return;
+        Store.enableBiometrics(pin.value).then(function () {
+          toast('Biometrische Entsperrung ist aktiv.');
+          draw(true);
+        }).catch(function (e) {
+          UI.modal('Einrichtung nicht möglich', h('p', {},
+            /Falsche PIN/.test(e.message) ? 'Die PIN ist nicht korrekt.' : e.message));
+        });
+      });
+    }
+    CryptoBox.platformAuthenticatorAvailable().then(draw);
+    return host;
+  }
+
   function securitySection() {
     if (!CryptoBox.supported()) {
       return h('p.hint', {}, 'Dieser Browser unterstützt die nötige Verschlüsselungstechnik nicht.');
@@ -2657,6 +2746,7 @@
     });
     return h('div.actions-col',
       h('p.hint', {}, 'Verschlüsselung ist aktiv (AES-256). Automatische Ordner-Backups werden mit dem Hauptschlüssel verschlüsselt und lassen sich mit Ihrer PIN wiederherstellen; manuelle Backups behalten ihr eigenes Passwort.'),
+      biometricRow(),
       h('label.field', h('span.field-label', {}, 'Automatische Sperre bei Inaktivität'), lockSel),
       h('button.btn-plain.btn-block', { onclick: doLock }, 'Jetzt sperren'),
       h('button.btn-plain.btn-block', { onclick: changePinFlow }, 'PIN ändern'),

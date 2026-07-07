@@ -511,3 +511,8 @@ button:focus-visible, .input:focus-visible, select:focus-visible {
 /* ---------- Zustimmungs-Checkbox (Disclaimer) ---------- */
 .check-row { display: flex; align-items: flex-start; gap: 10px; cursor: pointer; padding: 4px 0; }
 .check-row input[type="checkbox"] { width: 20px; height: 20px; margin-top: 2px; flex-shrink: 0; }
+
+/* ---------- Biometrie ---------- */
+.bio-row { padding: 4px 0; }
+.bio-btn { margin-top: 6px; }
+.lock-alt { margin-top: 10px; }

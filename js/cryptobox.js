@@ -126,11 +126,99 @@
       obj.mode === 'pin-master' && obj.wrapped && obj.iv && obj.data);
   }
 
+  /* ---------- Biometrie (WebAuthn) ---------- *
+   * Prinzip: Wir erzeugen ein Passkey-Credential mit dem "prf"-Zusatz. Daraus
+   * leitet das Gerät nach erfolgreicher biometrischer Prüfung ein stabiles
+   * Geheimnis ab (für alle Anwesenheitsprüfungen gleich), mit dem wir den
+   * Hauptschlüssel ein zweites Mal verpacken. Das Geheimnis verlässt den
+   * sicheren Gerätespeicher nie; die App erhält es nur bei Anwesenheit. */
+
+  function biometricsSupported() {
+    return !!(window.PublicKeyCredential && navigator.credentials &&
+      typeof navigator.credentials.create === 'function');
+  }
+
+  function platformAuthenticatorAvailable() {
+    if (!biometricsSupported() || !window.PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable)
+      return Promise.resolve(false);
+    return window.PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable()
+      .catch(function () { return false; });
+  }
+
+  var PRF_SALT = new TextEncoder().encode('sol-noten-prf-v1');
+
+  /* Neues biometrisches Credential anlegen. Rückgabe: {credentialId (b64)} */
+  function bioRegister() {
+    var userId = crypto.getRandomValues(new Uint8Array(16));
+    var challenge = crypto.getRandomValues(new Uint8Array(32));
+    return navigator.credentials.create({
+      publicKey: {
+        challenge: challenge,
+        rp: { name: 'SOL-Noten' },
+        user: { id: userId, name: 'SOL-Noten', displayName: 'SOL-Noten' },
+        pubKeyCredParams: [{ type: 'public-key', alg: -7 }, { type: 'public-key', alg: -257 }],
+        authenticatorSelection: {
+          authenticatorAttachment: 'platform',
+          userVerification: 'required',
+          residentKey: 'required'
+        },
+        timeout: 60000,
+        extensions: { prf: {} }
+      }
+    }).then(function (cred) {
+      if (!cred) throw new Error('Es wurde kein biometrischer Schlüssel erstellt.');
+      var ext = cred.getClientExtensionResults ? cred.getClientExtensionResults() : {};
+      if (!ext || !ext.prf || !ext.prf.enabled) {
+        throw new Error('Dieses Gerät unterstützt die biometrische Schlüsselableitung (PRF) nicht.');
+      }
+      return { credentialId: b64(new Uint8Array(cred.rawId)) };
+    });
+  }
+
+  /* PRF-Geheimnis über eine biometrische Prüfung abrufen. Rückgabe: CryptoKey */
+  function bioGetSecretKey(credentialIdB64) {
+    var challenge = crypto.getRandomValues(new Uint8Array(32));
+    return navigator.credentials.get({
+      publicKey: {
+        challenge: challenge,
+        allowCredentials: [{ type: 'public-key', id: unb64(credentialIdB64) }],
+        userVerification: 'required',
+        timeout: 60000,
+        extensions: { prf: { eval: { first: PRF_SALT } } }
+      }
+    }).then(function (assertion) {
+      if (!assertion) throw new Error('Biometrische Prüfung abgebrochen.');
+      var ext = assertion.getClientExtensionResults ? assertion.getClientExtensionResults() : {};
+      if (!ext || !ext.prf || !ext.prf.results || !ext.prf.results.first) {
+        throw new Error('Die biometrische Schlüsselableitung ist auf diesem Gerät nicht verfügbar.');
+      }
+      return subtle.importKey('raw', ext.prf.results.first, 'AES-GCM', false, ['encrypt', 'decrypt']);
+    });
+  }
+
+  /* Hauptschlüssel mit dem biometrischen Geheimnis verpacken -> {iv, data} */
+  function bioWrapMaster(secretKey, rawKeyBytes) {
+    var iv = crypto.getRandomValues(new Uint8Array(12));
+    return subtle.encrypt({ name: 'AES-GCM', iv: iv }, secretKey, rawKeyBytes).then(function (cipher) {
+      return { iv: b64(iv), data: b64(cipher) };
+    });
+  }
+
+  function bioUnwrapMaster(secretKey, box) {
+    return subtle.decrypt({ name: 'AES-GCM', iv: unb64(box.iv) }, secretKey, unb64(box.data))
+      .then(function (raw) { return new Uint8Array(raw); })
+      .catch(function () { throw new Error('Biometrische Entsperrung fehlgeschlagen.'); });
+  }
+
   return {
     supported: supported, encrypt: encrypt, decrypt: decrypt,
     isEncryptedEnvelope: isEncryptedEnvelope, isKeyEnvelope: isKeyEnvelope,
     generateMasterRaw: generateMasterRaw, importAesKey: importAesKey,
     encryptWithKey: encryptWithKey, decryptWithKey: decryptWithKey,
-    wrapMaster: wrapMaster, unwrapMaster: unwrapMaster
+    wrapMaster: wrapMaster, unwrapMaster: unwrapMaster,
+    biometricsSupported: biometricsSupported,
+    platformAuthenticatorAvailable: platformAuthenticatorAvailable,
+    bioRegister: bioRegister, bioGetSecretKey: bioGetSecretKey,
+    bioWrapMaster: bioWrapMaster, bioUnwrapMaster: bioUnwrapMaster
   };
 });

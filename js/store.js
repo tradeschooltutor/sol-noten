@@ -179,6 +179,60 @@
     masterRaw = null; masterKey = null; state = null;
   }
 
+  /* ---------- Biometrie ---------- */
+
+  function biometricsEnabled() { return !!(security && security.bio && security.bio.credentialId); }
+
+  /* Biometrie einrichten – die PIN entpackt den Hauptschlüssel, ohne den
+     laufenden App-Zustand zu verändern (kein Neuladen, keine Fehlersperre). */
+  function enableBiometrics(pin) {
+    if (!isEncrypted()) return Promise.reject(new Error('Verschlüsselung ist nicht aktiv.'));
+    var ensureMaster = masterRaw
+      ? Promise.resolve(masterRaw)
+      : CryptoBox.unwrapMaster(pin, security.wrapped);
+    return ensureMaster.then(function (raw) {
+      masterRaw = raw;
+      return CryptoBox.bioRegister();
+    }).then(function (reg) {
+      return CryptoBox.bioGetSecretKey(reg.credentialId).then(function (secretKey) {
+        return CryptoBox.bioWrapMaster(secretKey, masterRaw).then(function (box) {
+          security.bio = { credentialId: reg.credentialId, iv: box.iv, data: box.data };
+          return saveSecurity();
+        });
+      });
+    });
+  }
+
+  function disableBiometrics() {
+    if (security) { delete security.bio; return saveSecurity(); }
+    return Promise.resolve();
+  }
+
+  /* Entsperren per Biometrie: PRF-Geheimnis abrufen, Hauptschlüssel entpacken,
+     Datenbank laden – analog zu unlock(pin), aber ohne PIN. */
+  function unlockBiometric() {
+    if (!biometricsEnabled()) return Promise.reject(new Error('Biometrie ist nicht eingerichtet.'));
+    var bio = security.bio;
+    return CryptoBox.bioGetSecretKey(bio.credentialId).then(function (secretKey) {
+      return CryptoBox.bioUnwrapMaster(secretKey, { iv: bio.iv, data: bio.data });
+    }).then(function (raw) {
+      masterRaw = raw;
+      return CryptoBox.importAesKey(raw);
+    }).then(function (key) {
+      masterKey = key;
+      return idbGet('state', 'main');
+    }).then(function (saved) {
+      if (saved && saved.enc) {
+        return CryptoBox.decryptWithKey(masterKey, saved).then(function (plain) {
+          state = migrate(JSON.parse(plain));
+          return state;
+        });
+      }
+      state = migrate(saved) || freshState();
+      return state;
+    });
+  }
+
   /* Verschlüsselung aktivieren: Hauptschlüssel erzeugen, mit PIN umhüllen,
      Datenbank und Sicherungsstände verschlüsselt neu schreiben. */
   function enableEncryption(pin) {
@@ -544,6 +598,8 @@
     isEncrypted: isEncrypted, isLocked: isLocked, unlock: unlock, lock: lock,
     enableEncryption: enableEncryption, disableEncryption: disableEncryption,
     changePin: changePin, setAutolock: setAutolock, getAutolock: getAutolock,
+    biometricsEnabled: biometricsEnabled, enableBiometrics: enableBiometrics,
+    disableBiometrics: disableBiometrics, unlockBiometric: unlockBiometric,
     getLockWait: getLockWait, failedAttempts: failedAttempts, factoryReset: factoryReset,
     folderBackupSupported: folderBackupSupported, chooseBackupFolder: chooseBackupFolder,
     removeBackupFolder: removeBackupFolder, daysSinceExport: daysSinceExport,
