@@ -507,3 +507,7 @@ button:focus-visible, .input:focus-visible, select:focus-visible {
 @media (pointer: coarse) and (hover: none) {
   .lock-kbd-hint { display: none; }
 }
+
+/* ---------- Zustimmungs-Checkbox (Disclaimer) ---------- */
+.check-row { display: flex; align-items: flex-start; gap: 10px; cursor: pointer; padding: 4px 0; }
+.check-row input[type="checkbox"] { width: 20px; height: 20px; margin-top: 2px; flex-shrink: 0; }

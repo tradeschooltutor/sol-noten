@@ -51,7 +51,8 @@
   }
 
   /* ---------- Modale ---------- */
-  function modal(title, bodyNodes, buttons) {
+  function modal(title, bodyNodes, buttons, opts) {
+    opts = opts || {};
     return new Promise(function (resolve) {
       var host = document.getElementById('modal-host');
       function close(val) { clear(host); resolve(val); }
@@ -68,7 +69,9 @@
           })
         )
       );
-      var back = h('div.modal-backdrop', { onclick: function (e) { if (e.target === back) close(null); } }, box);
+      var back = h('div.modal-backdrop', {
+        onclick: function (e) { if (e.target === back && !opts.mandatory) close(null); }
+      }, box);
       host.appendChild(back);
     });
   }

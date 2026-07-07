@@ -10,7 +10,7 @@
 
   /* ================= App-Start ================= */
 
-  var APP_VERSION = '0.8.1';
+  var APP_VERSION = '0.9.0';
 
   Store.init().then(function () {
     if ('serviceWorker' in navigator) {
@@ -31,6 +31,12 @@
     startAutolockWatch();
     if (Store.isLocked()) go('lock');
     else if (!S().settings.bundesland || S().schoolYears.length === 0) go('setup');
+    else if (!Store.isEncrypted() && CryptoBox.supported()) {
+      /* Grundeinrichtung vorhanden, aber PIN-Schritt (z. B. durch Neuladen) übersprungen:
+         Pflicht-PIN nachholen, damit die Daten verschlüsselt werden. */
+      go('home');
+      requirePinSetup(function () { render(); });
+    }
     else go('home');
   }).catch(function (e) {
     document.body.textContent = 'Die App konnte nicht starten: ' + e.message;
@@ -345,8 +351,15 @@
           startDate: start, holidays: holidays, quarters: quarters, holidaySource: source
         });
         Store.save();
-        go('home');
+        finishSetup();
       }
+    }
+
+    /* Abschluss der Ersteinrichtung: Disclaimer -> Pflicht-PIN -> Startseite */
+    function finishSetup() {
+      showDisclaimer(function () {
+        requirePinSetup(function () { go('home'); });
+      });
     }
 
     return h('div.screen',
@@ -2463,12 +2476,79 @@
       h('div.section-head', {}, 'Über diese App'),
       h('div.card',
         h('p', {}, 'SOL-Noten · Notenverwaltung zum selbstorganisierten Lernen'),
-        h('p.hint', {}, 'Version ' + APP_VERSION + ' · © 2026 Andreas Vandelaar · Alle Daten bleiben ausschließlich auf diesem Gerät.')
+        h('p.hint', {}, 'Version ' + APP_VERSION + ' · © 2026 Andreas Vandelaar · Alle Daten bleiben ausschließlich auf diesem Gerät.'),
+        h('details.pct-details',
+          h('summary', {}, 'Haftungshinweis anzeigen'),
+          h('p.hint', {}, DISCLAIMER_TEXT),
+          st.settings.disclaimerAcceptedAt
+            ? h('p.hint', {}, 'Bestätigt am ' + UI.fmtDate(st.settings.disclaimerAcceptedAt.slice(0, 10)) + '.')
+            : null)
       )
     );
   };
 
   /* ---------- PIN-Sperre & Verschlüsselung (Einstellungen) ---------- */
+
+  var DISCLAIMER_TEXT =
+    'Die App wurde mit größter Sorgfalt und nach bestem Wissen erstellt. ' +
+    'Für Fehlerfreiheit, ununterbrochene Verfügbarkeit oder den Erhalt der gespeicherten Daten wird keine Gewähr übernommen. ' +
+    'Die Nutzung erfolgt auf eigene Verantwortung. Für die regelmäßige Sicherung der Daten (Backup) ist die nutzende Person selbst verantwortlich. ' +
+    'Eine Haftung für Datenverlust oder mittelbare Schäden ist ausgeschlossen, soweit gesetzlich zulässig.';
+
+  /* Disclaimer am Ende der Ersteinrichtung – muss aktiv bestätigt werden. */
+  function showDisclaimer(onAccept) {
+    var check = h('input', { type: 'checkbox' });
+    var checkErr = h('p.hint.error-text');
+    UI.modal('Wichtiger Hinweis', [
+      h('p', {}, DISCLAIMER_TEXT),
+      h('label.check-row', {}, check, h('span', {}, 'Ich habe den Hinweis gelesen und bin einverstanden.')),
+      checkErr
+    ], [
+      { label: 'Einverstanden', value: true, primary: true, validate: function () {
+          if (!check.checked) { checkErr.textContent = 'Bitte bestätigen Sie den Hinweis, um fortzufahren.'; return false; }
+          return true;
+        } }
+    ], { mandatory: true }).then(function () {
+      S().settings.disclaimerAcceptedAt = new Date().toISOString();
+      Store.save();
+      if (onAccept) onAccept();
+    });
+  }
+
+  /* Pflicht-PIN in der Ersteinrichtung: erklärt die Verschlüsselung, keine
+     Abbruchmöglichkeit; Backup wird nur empfohlen (Datenbank noch leer). */
+  function requirePinSetup(onDone) {
+    if (Store.isEncrypted()) { if (onDone) onDone(); return; }
+    if (!CryptoBox.supported()) {
+      UI.modal('Hinweis zur Verschlüsselung',
+        h('p', {}, 'Dieser Browser unterstützt die nötige Verschlüsselungstechnik leider nicht. ' +
+          'Die App funktioniert, die Daten können auf diesem Gerät aber nicht verschlüsselt werden. ' +
+          'Bitte verwenden Sie nach Möglichkeit einen aktuellen Browser.'))
+        .then(function () { if (onDone) onDone(); });
+      return;
+    }
+    var pins = pinInputPair(['PIN festlegen', 'PIN wiederholen']);
+    UI.modal('PIN festlegen', [
+      h('p', {}, 'Zum Schutz der Schülerdaten verschlüsselt SOL-Noten alle Daten auf diesem Gerät. ' +
+        'Dazu legen Sie jetzt eine PIN fest. Nach Eingabe der PIN werden alle Daten durch die App verschlüsselt.'),
+      h('p.hint', {}, 'Die App fragt die PIN künftig beim Start ab. Wichtig: Bei Verlust der PIN sind die Daten nur über ein Backup wiederherstellbar – es gibt bewusst keine Hintertür.')
+    ].concat(pins.nodes), [
+      { label: 'PIN festlegen und verschlüsseln', value: true, primary: true, validate: pins.validate }
+    ], { mandatory: true }).then(function () {
+      Store.enableEncryption(pins.value()).then(function () {
+        UI.modal('Verschlüsselung aktiv', [
+          h('p', {}, 'Alle Daten auf diesem Gerät sind jetzt verschlüsselt.'),
+          h('p.hint', {}, 'Empfehlung: Sobald Sie Schüler und Noten erfasst haben, sichern Sie Ihre Daten über „Einstellungen → Backup-Datei jetzt speichern“. Bewahren Sie PIN und Backup an einem sicheren Ort auf (z. B. in einem Passwort-Manager).')
+        ], [{ label: 'Verstanden', value: true, primary: true }]).then(function () {
+          if (onDone) onDone();
+        });
+      }).catch(function (e) {
+        UI.modal('Aktivierung fehlgeschlagen', h('p', {}, e.message)).then(function () {
+          if (onDone) onDone();
+        });
+      });
+    });
+  }
 
   function pinInputPair(labels) {
     var p1 = h('input.input', { type: 'password', inputmode: 'numeric', autocomplete: 'new-password', placeholder: '4–8 Ziffern' });
