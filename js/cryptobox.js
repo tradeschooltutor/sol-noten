@@ -160,7 +160,7 @@
         authenticatorSelection: {
           authenticatorAttachment: 'platform',
           userVerification: 'required',
-          residentKey: 'required'
+          residentKey: 'preferred'  /* Android verträgt 'required' oft nicht */
         },
         timeout: 60000,
         extensions: { prf: {} }
@@ -169,10 +169,33 @@
       if (!cred) throw new Error('Es wurde kein biometrischer Schlüssel erstellt.');
       var ext = cred.getClientExtensionResults ? cred.getClientExtensionResults() : {};
       if (!ext || !ext.prf || !ext.prf.enabled) {
-        throw new Error('Dieses Gerät unterstützt die biometrische Schlüsselableitung (PRF) nicht.');
+        var e = new Error('PRF_UNSUPPORTED');
+        e.code = 'prf';
+        throw e;
       }
       return { credentialId: b64(new Uint8Array(cred.rawId)) };
+    }).catch(function (err) {
+      throw translateWebAuthnError(err);
     });
+  }
+
+  /* Wandelt technische WebAuthn-/Systemfehler in verständliche Hinweise um. */
+  function translateWebAuthnError(err) {
+    if (err && err.code === 'prf') {
+      return new Error('Dieses Gerät unterstützt die für die Verschlüsselung nötige Zusatzfunktion (PRF) nicht. Die biometrische Entsperrung ist hier leider nicht möglich; die PIN-Sperre bleibt selbstverständlich nutzbar.');
+    }
+    var name = err && err.name;
+    if (name === 'NotAllowedError') {
+      return new Error('Die biometrische Einrichtung wurde abgebrochen oder das Zeitlimit war überschritten. Bitte versuchen Sie es erneut.');
+    }
+    if (name === 'InvalidStateError') {
+      return new Error('Für dieses Gerät ist bereits ein biometrischer Schlüssel hinterlegt.');
+    }
+    if (name === 'NotSupportedError' || name === 'ConstraintError' ||
+        (err && /credential manager/i.test(err.message || ''))) {
+      return new Error('Die biometrische Entsperrung konnte nicht eingerichtet werden. Bitte prüfen Sie auf dem Gerät: eine Displaysperre (PIN/Muster/Fingerabdruck) muss aktiv sein, und in den Google-Einstellungen sollten Passkeys erlaubt sein. Die PIN-Sperre der App funktioniert unabhängig davon.');
+    }
+    return err instanceof Error ? err : new Error(String(err));
   }
 
   /* PRF-Geheimnis über eine biometrische Prüfung abrufen. Rückgabe: CryptoKey */
@@ -193,6 +216,9 @@
         throw new Error('Die biometrische Schlüsselableitung ist auf diesem Gerät nicht verfügbar.');
       }
       return subtle.importKey('raw', ext.prf.results.first, 'AES-GCM', false, ['encrypt', 'decrypt']);
+    }).catch(function (err) {
+      if (err && /nicht verfügbar|abgebrochen/i.test(err.message || '')) throw err;
+      throw translateWebAuthnError(err);
     });
   }
 

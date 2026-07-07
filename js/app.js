@@ -10,7 +10,7 @@
 
   /* ================= App-Start ================= */
 
-  var APP_VERSION = '0.10.0';
+  var APP_VERSION = '0.10.1';
 
   Store.init().then(function () {
     if ('serviceWorker' in navigator) {
