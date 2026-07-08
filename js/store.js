@@ -6,7 +6,7 @@
 (function (root) {
   'use strict';
 
-  var DB_NAME = 'sol-noten', DB_VERSION = 1;
+  var DB_NAME = 'sol-noten', DB_VERSION = 2;
   var db = null;
   var state = null;
   var saveTimer = null;
@@ -24,6 +24,7 @@
         if (!d.objectStoreNames.contains('state')) d.createObjectStore('state');
         if (!d.objectStoreNames.contains('snapshots')) d.createObjectStore('snapshots');
         if (!d.objectStoreNames.contains('handles')) d.createObjectStore('handles');
+        if (!d.objectStoreNames.contains('photos')) d.createObjectStore('photos');
       };
       req.onsuccess = function () { db = req.result; resolve(db); };
       req.onerror = function () { reject(req.error); };
@@ -68,6 +69,7 @@
         gradingPct: Calc.DEFAULT_GRADING_PCT.slice(),
         theme: 'petrol',
         lastExport: null,
+        lastPhotoExport: null,
         autoBackupFolder: false
       },
       absences: [],      /* {id, courseId, studentId, date, quarter} */
@@ -248,13 +250,16 @@
       masterKey = key;
       return saveSecurity();
     }).then(function () { return persist(); })
-      .then(function () { return reencryptSnapshots(true); });
+      .then(function () { return reencryptSnapshots(true); })
+      .then(function () { return reencryptPhotos(true); });
   }
 
   /* Verschlüsselung deaktivieren (PIN erforderlich). */
   function disableEncryption(pin) {
     return CryptoBox.unwrapMaster(pin, security.wrapped).then(function () {
       return reencryptSnapshots(false);
+    }).then(function () {
+      return reencryptPhotos(false);
     }).then(function () {
       security = null; masterRaw = null; masterKey = null;
       return saveSecurity();
@@ -312,7 +317,8 @@
     return Promise.all([
       idb('state', 'readwrite', function (st) { st.clear(); }),
       idb('snapshots', 'readwrite', function (st) { st.clear(); }),
-      idb('handles', 'readwrite', function (st) { st.clear(); })
+      idb('handles', 'readwrite', function (st) { st.clear(); }),
+      idb('photos', 'readwrite', function (st) { st.clear(); })
     ]).then(function () {
       backupDirHandle = null;
       return idb('state', 'readwrite', function (st) { st.put(state, 'main'); });
@@ -391,6 +397,131 @@
       }
       state = migrate(snap);
     }).then(function () { return persist(); }).then(notify);
+  }
+
+  /* ---------- Fotos (eigener Speicherbereich, verschlüsselt mit Hauptschlüssel) ---------- */
+
+  /* Ein Foto (Data-URL-String) zu einem Schüler speichern. */
+  function savePhoto(studentId, dataUrl) {
+    var write;
+    if (isEncrypted() && masterKey) {
+      write = CryptoBox.encryptWithKey(masterKey, dataUrl).then(function (box) {
+        box.enc = true;
+        return idb('photos', 'readwrite', function (st) { st.put(box, studentId); });
+      });
+    } else {
+      write = idb('photos', 'readwrite', function (st) { st.put({ raw: dataUrl }, studentId); });
+    }
+    return write;
+  }
+
+  /* Foto laden -> Data-URL oder null. */
+  function getPhoto(studentId) {
+    return idbGet('photos', studentId).then(function (rec) {
+      if (!rec) return null;
+      if (rec.enc) {
+        if (!masterKey) return null;
+        return CryptoBox.decryptWithKey(masterKey, rec).catch(function () { return null; });
+      }
+      return rec.raw || null;
+    });
+  }
+
+  function deletePhoto(studentId) {
+    return idb('photos', 'readwrite', function (st) { st.delete(studentId); });
+  }
+
+  function photoKeys() {
+    return new Promise(function (resolve) {
+      var tx = db.transaction('photos', 'readonly');
+      var req = tx.objectStore('photos').getAllKeys();
+      req.onsuccess = function () { resolve(req.result || []); };
+      req.onerror = function () { resolve([]); };
+    });
+  }
+
+  function hasPhoto(studentId) {
+    return idbGet('photos', studentId).then(function (r) { return !!r; });
+  }
+
+  /* Alle Fotos als eine Sicherungsdatei exportieren (Data-URLs im Klartext-JSON;
+     wird beim verschlüsselten Manuellexport zusätzlich passwortgeschützt). */
+  function exportPhotos(password) {
+    return photoKeys().then(function (keys) {
+      var chain = Promise.resolve();
+      var out = {};
+      keys.forEach(function (k) {
+        chain = chain.then(function () { return getPhoto(k); }).then(function (url) {
+          if (url) out[k] = url;
+        });
+      });
+      return chain.then(function () {
+        var payload = { app: 'SOL-Noten', kind: 'photos', v: 1, photos: out,
+          count: Object.keys(out).length, exportedAt: new Date().toISOString() };
+        var finish = function (text, suffix) {
+          downloadText('SOL-Noten-Fotos-' + todayISO() + suffix + '.json', text);
+          state.settings.lastPhotoExport = new Date().toISOString();
+          save();
+        };
+        if (password) {
+          return CryptoBox.encrypt(JSON.stringify(payload), password).then(function (env) {
+            env.kind = 'photos';
+            finish(JSON.stringify(env), '-verschluesselt');
+          });
+        }
+        finish(JSON.stringify(payload, null, 0), '');
+      });
+    });
+  }
+
+  function parsePhotoBackup(text) {
+    var data;
+    try { data = JSON.parse(text); }
+    catch (e) { throw new Error('Die Datei ist keine gültige Foto-Sicherung (JSON-Fehler).'); }
+    if (CryptoBox.isEncryptedEnvelope(data)) return { encrypted: true, envelope: data };
+    if (!data || data.app !== 'SOL-Noten' || data.kind !== 'photos' || !data.photos) {
+      throw new Error('Die Datei ist keine SOL-Noten-Foto-Sicherung.');
+    }
+    return { encrypted: false, data: data };
+  }
+
+  /* Fotos aus einer (bereits entschlüsselten) Sicherung übernehmen. */
+  function applyPhotoImport(data) {
+    var entries = Object.keys(data.photos || {});
+    var chain = Promise.resolve();
+    entries.forEach(function (studentId) {
+      chain = chain.then(function () { return savePhoto(studentId, data.photos[studentId]); });
+    });
+    return chain.then(function () { return entries.length; });
+  }
+
+  function daysSincePhotoExport() {
+    if (!state.settings.lastPhotoExport) return null;
+    return Math.floor((Date.now() - new Date(state.settings.lastPhotoExport).getTime()) / 86400000);
+  }
+
+  /* Bei Aktivierung/Deaktivierung der Verschlüsselung auch die Fotos umschlüsseln. */
+  function reencryptPhotos(encrypt) {
+    return photoKeys().then(function (keys) {
+      var chain = Promise.resolve();
+      keys.forEach(function (k) {
+        chain = chain.then(function () { return idbGet('photos', k); }).then(function (rec) {
+          if (!rec) return;
+          if (encrypt && !rec.enc) {
+            return CryptoBox.encryptWithKey(masterKey, rec.raw).then(function (box) {
+              box.enc = true;
+              return idb('photos', 'readwrite', function (st) { st.put(box, k); });
+            });
+          }
+          if (!encrypt && rec.enc) {
+            return CryptoBox.decryptWithKey(masterKey, rec).then(function (url) {
+              return idb('photos', 'readwrite', function (st) { st.put({ raw: url }, k); });
+            });
+          }
+        });
+      });
+      return chain;
+    });
   }
 
   /* ---------- Export / Import (Backup-Datei) ---------- */
@@ -595,6 +726,10 @@
     addAbsence: addAbsence, removeAbsence: removeAbsence, absencesFor: absencesFor,
     exportJSON: exportJSON, importJSON: importJSON, parseBackup: parseBackup, applyImport: applyImport,
     listSnapshots: listSnapshots, restoreSnapshot: restoreSnapshot,
+    savePhoto: savePhoto, getPhoto: getPhoto, deletePhoto: deletePhoto,
+    hasPhoto: hasPhoto, photoKeys: photoKeys,
+    exportPhotos: exportPhotos, parsePhotoBackup: parsePhotoBackup, applyPhotoImport: applyPhotoImport,
+    daysSincePhotoExport: daysSincePhotoExport,
     isEncrypted: isEncrypted, isLocked: isLocked, unlock: unlock, lock: lock,
     enableEncryption: enableEncryption, disableEncryption: disableEncryption,
     changePin: changePin, setAutolock: setAutolock, getAutolock: getAutolock,

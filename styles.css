@@ -516,3 +516,54 @@ button:focus-visible, .input:focus-visible, select:focus-visible {
 .bio-row { padding: 4px 0; }
 .bio-btn { margin-top: 6px; }
 .lock-alt { margin-top: 10px; }
+
+/* Mehrzeilige Hinweise mit erhaltenen Umbrüchen */
+.prewrap { white-space: pre-wrap; }
+
+/* ---------- Tabs (Sitzplan) ---------- */
+.tabbar { display: flex; gap: 6px; }
+.tab {
+  flex: 1; border: 1px solid var(--line); background: var(--card);
+  border-radius: 11px; padding: 10px; font-weight: 600; color: var(--ink-soft); min-height: 44px;
+}
+.tab.active { background: var(--ink); border-color: var(--ink); color: #fff; }
+
+/* ---------- Fotos ---------- */
+.photo-row { display: flex; align-items: center; gap: 12px; padding: 10px 14px; border-bottom: 1px solid var(--line); }
+.photo-row:last-child { border-bottom: none; }
+.photo-info { flex: 1; min-width: 0; }
+.photo-actions { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+.photo-avatar {
+  position: relative; width: 52px; height: 52px; border-radius: 12px; overflow: hidden;
+  background: var(--teal-soft); flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+}
+.photo-avatar.small { width: 40px; height: 40px; border-radius: 9px; }
+.photo-fallback { font-weight: 750; color: var(--teal-dark); font-size: 1rem; }
+.photo-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; background: transparent; }
+.photo-img:not([src]) { display: none; }
+
+/* ---------- Sitzplan-Raster ---------- */
+.seat-grid {
+  display: grid; gap: 8px; margin: 8px 0;
+  background: var(--card); border-radius: var(--radius); padding: 10px; box-shadow: var(--shadow);
+}
+.seat-cell {
+  aspect-ratio: 1; border: 2px dashed var(--line); border-radius: 10px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
+  padding: 4px; min-height: 60px; cursor: pointer; overflow: hidden;
+}
+.seat-cell.filled { border-style: solid; border-color: var(--teal-soft); background: #fafbfb; }
+.seat-cell.targetable:not(.filled) { border-color: var(--teal); background: var(--teal-soft); }
+.seat-cell.selected { outline: 3px solid var(--teal); outline-offset: 1px; }
+.seat-name { font-size: 0.7rem; font-weight: 600; text-align: center; line-height: 1.1;
+  overflow: hidden; text-overflow: ellipsis; max-width: 100%; white-space: nowrap; }
+.seat-hint { background: var(--teal-soft); color: var(--teal-dark); padding: 8px 12px; border-radius: 10px; }
+.btn-inline { background: none; border: none; color: var(--teal-dark); font-weight: 650; text-decoration: underline; padding: 0; }
+.seat-pool { display: flex; flex-wrap: wrap; gap: 8px; }
+.pool-chip {
+  display: inline-flex; align-items: center; gap: 8px;
+  border: 1px solid var(--line); background: var(--card); border-radius: 999px;
+  padding: 5px 14px 5px 5px; min-height: 44px; font-size: 0.9rem;
+}
+.pool-chip.selected { border-color: var(--teal); background: var(--teal-soft); font-weight: 650; }

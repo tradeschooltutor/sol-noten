@@ -193,7 +193,11 @@
     }
     if (name === 'NotSupportedError' || name === 'ConstraintError' ||
         (err && /credential manager/i.test(err.message || ''))) {
-      return new Error('Die biometrische Entsperrung konnte nicht eingerichtet werden. Bitte prüfen Sie auf dem Gerät: eine Displaysperre (PIN/Muster/Fingerabdruck) muss aktiv sein, und in den Google-Einstellungen sollten Passkeys erlaubt sein. Die PIN-Sperre der App funktioniert unabhängig davon.');
+      return new Error(
+        'Die biometrische Entsperrung konnte nicht eingerichtet werden. Auf Ihrem Gerät muss Folgendes aktiviert sein:\n' +
+        '1. Displaysperre (z. B. Fingerabdruck, Gesichtserkennung, PIN oder Muster)\n' +
+        '2. Passwort-Manager (meist unter Einstellungen → Passwörter, Passkeys & Konten)\n\n' +
+        'Die PIN-Sperre der App funktioniert unabhängig davon.');
     }
     return err instanceof Error ? err : new Error(String(err));
   }

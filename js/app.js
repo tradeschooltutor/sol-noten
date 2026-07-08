@@ -10,7 +10,7 @@
 
   /* ================= App-Start ================= */
 
-  var APP_VERSION = '0.10.1';
+  var APP_VERSION = '0.11.0';
 
   Store.init().then(function () {
     if ('serviceWorker' in navigator) {
@@ -158,6 +158,304 @@
   }
 
   var views = {};
+
+  /* ================= Sitzplan mit Fotos ================= */
+
+  var photoCache = {}; /* studentId -> dataUrl (nur im Speicher, für schnelle Anzeige) */
+
+  function loadPhotoInto(studentId, imgEl) {
+    if (photoCache[studentId] !== undefined) {
+      if (photoCache[studentId]) imgEl.src = photoCache[studentId];
+      return;
+    }
+    Store.getPhoto(studentId).then(function (url) {
+      photoCache[studentId] = url || null;
+      if (url && imgEl.isConnected) imgEl.src = url;
+    });
+  }
+
+  function initials(stu) {
+    return ((stu.firstName || ' ')[0] + (stu.lastName || ' ')[0]).toUpperCase();
+  }
+
+  function photoTile(stu, opts) {
+    opts = opts || {};
+    var img = h('img.photo-img', { alt: '' });
+    var tile = h('div.photo-avatar' + (opts.small ? '.small' : ''),
+      h('span.photo-fallback', {}, initials(stu)), img);
+    loadPhotoInto(stu.id, img);
+    return tile;
+  }
+
+  views.seating = function (p) {
+    var course = Store.courseById(p.id);
+    var cls = Store.classById(course.classId);
+    var st = S();
+
+    /* Einmaliger Datenschutzhinweis beim ersten Öffnen */
+    if (!st.settings.seatingConsentAt) {
+      var consentCheck = h('input', { type: 'checkbox' });
+      var consentErr = h('p.hint.error-text');
+      return h('div.screen',
+        header('Sitzplan mit Fotos', { name: 'course', params: { id: course.id } }),
+        h('div.card',
+          h('h3', {}, 'Hinweis zu Schülerfotos'),
+          h('p', {}, 'Fotos von Schülerinnen und Schülern sind besonders schützenswerte personenbezogene Daten. ' +
+            'Nehmen Sie Fotos nur mit Einwilligung der Schüler bzw. der Erziehungsberechtigten auf.'),
+          h('p', {}, 'Die Fotos werden ausschließlich lokal und verschlüsselt auf diesem Gerät gespeichert. ' +
+            'Sie verlassen das Gerät nicht und sind nicht Teil des normalen Noten-Backups – für die Fotos gibt es eine eigene Sicherung.'),
+          h('label.check-row', {}, consentCheck,
+            h('span', {}, 'Ich habe den Hinweis gelesen und beachte die Einwilligungspflicht.')),
+          consentErr,
+          h('button.btn-primary.btn-block', { onclick: function () {
+            if (!consentCheck.checked) {
+              consentErr.textContent = 'Bitte bestätigen Sie den Hinweis, um fortzufahren.';
+              return;
+            }
+            st.settings.seatingConsentAt = new Date().toISOString();
+            Store.save();
+            render();
+          } }, 'Verstanden – Sitzplan öffnen')
+        )
+      );
+    }
+
+    if (!course.seating) course.seating = { cols: 6, positions: {} }; /* positions: studentId -> {r,c} */
+    var students = cls.students.slice().sort(function (a, b) {
+      return (a.lastName + a.firstName).localeCompare(b.lastName + b.firstName, 'de');
+    });
+
+    return h('div.screen',
+      header(cls.name + ' · Sitzplan', { name: 'course', params: { id: course.id } }),
+      h('div.tabbar',
+        h('button.tab' + (p.tab !== 'photos' ? '.active' : ''), {
+          onclick: function () { go('seating', { id: course.id, tab: 'plan' }); } }, 'Sitzplan'),
+        h('button.tab' + (p.tab === 'photos' ? '.active' : ''), {
+          onclick: function () { go('seating', { id: course.id, tab: 'photos' }); } }, 'Fotos verwalten')
+      ),
+      p.tab === 'photos' ? photoManager() : seatingGrid()
+    );
+
+    /* ---- Fotoverwaltung ---- */
+    function photoManager() {
+      var rows = students.map(function (stu) {
+        var fileInput = h('input', { type: 'file', accept: 'image/*', style: { display: 'none' } });
+        fileInput.addEventListener('change', function () {
+          var f = fileInput.files[0]; fileInput.value = '';
+          if (!f) return;
+          Photo.processFile(f).then(function (dataUrl) {
+            return Store.savePhoto(stu.id, dataUrl).then(function () {
+              photoCache[stu.id] = dataUrl;
+              toast('Foto gespeichert.');
+              render();
+            });
+          }).catch(function (e) { UI.modal('Foto konnte nicht verarbeitet werden', h('p', {}, e.message)); });
+        });
+        var cameraInput = h('input', { type: 'file', accept: 'image/*', capture: 'user', style: { display: 'none' } });
+        cameraInput.addEventListener('change', function () {
+          var f = cameraInput.files[0]; cameraInput.value = '';
+          if (!f) return;
+          Photo.processFile(f).then(function (dataUrl) {
+            return Store.savePhoto(stu.id, dataUrl).then(function () {
+              photoCache[stu.id] = dataUrl; toast('Foto gespeichert.'); render();
+            });
+          }).catch(function (e) { UI.modal('Foto konnte nicht verarbeitet werden', h('p', {}, e.message)); });
+        });
+
+        var hasImg = photoCache[stu.id];
+        return h('div.photo-row',
+          photoTile(stu),
+          h('div.photo-info', h('div.student-name', {}, stu.lastName + ', ' + stu.firstName)),
+          h('div.photo-actions',
+            h('button.btn-small.btn-plain', { onclick: function () { cameraInput.click(); } }, 'Kamera'),
+            h('button.btn-small.btn-plain', { onclick: function () { fileInput.click(); } }, 'Galerie'),
+            hasImg ? h('button.btn-small.btn-plain.danger-text', { onclick: function () {
+              UI.confirmDialog('Foto entfernen?', stu.lastName + ', ' + stu.firstName + ' – Foto löschen?', 'Löschen', true)
+                .then(function (ok) {
+                  if (!ok) return;
+                  Store.deletePhoto(stu.id).then(function () {
+                    photoCache[stu.id] = null; toast('Foto entfernt.'); render();
+                  });
+                });
+            } }, 'Entfernen') : null,
+            fileInput, cameraInput
+          )
+        );
+      });
+      return h('div',
+        h('p.hint', {}, 'Fotos werden auf 200 × 200 Pixel verkleinert und verschlüsselt gespeichert. Ein Foto gilt für alle Kurse dieser Klasse.'),
+        h('div.card.card-list', {}, rows.length ? rows : h('div.empty', h('p', {}, 'Diese Klasse hat noch keine Schüler/innen.'))),
+        h('div.section-head', {}, 'Foto-Sicherung'),
+        photoBackupCard()
+      );
+    }
+
+    /* ---- Sitzplan-Raster ---- */
+    function seatingGrid() {
+      var cols = course.seating.cols;
+      var positions = course.seating.positions;
+      var placed = {};
+      Object.keys(positions).forEach(function (sid) { placed[sid] = positions[sid]; });
+      var unplaced = students.filter(function (s) { return !placed[s.id]; });
+
+      var maxRow = 0;
+      Object.keys(placed).forEach(function (sid) { if (placed[sid].r > maxRow) maxRow = placed[sid].r; });
+      var rows = Math.max(4, maxRow + 2);
+
+      var colSel = h('select.input', { style: { maxWidth: '7rem' } });
+      [3, 4, 5, 6, 7, 8, 9, 10].forEach(function (n) {
+        colSel.appendChild(h('option', { value: n, selected: n === cols }, n + ' Spalten'));
+      });
+      colSel.addEventListener('change', function () {
+        course.seating.cols = Number(colSel.value); Store.save(); render();
+      });
+
+      var byPos = {};
+      Object.keys(placed).forEach(function (sid) { byPos[placed[sid].r + '_' + placed[sid].c] = sid; });
+
+      var grid = h('div.seat-grid', { style: { gridTemplateColumns: 'repeat(' + cols + ', 1fr)' } });
+      for (var r = 0; r < rows; r++) {
+        for (var c = 0; c < cols; c++) {
+          (function (r, c) {
+            var sid = byPos[r + '_' + c];
+            var cell = h('div.seat-cell' + (sid ? '.filled' : '') + (selectedSeatStudent ? '.targetable' : ''), {
+              onclick: function () {
+                if (selectedSeatStudent) {
+                  course.seating.positions[selectedSeatStudent] = { r: r, c: c };
+                  selectedSeatStudent = null; Store.save(); render();
+                } else if (sid) {
+                  selectedSeatStudent = sid; render();
+                }
+              }
+            });
+            if (sid) {
+              var stu = cls.students.find(function (x) { return x.id === sid; });
+              if (stu) {
+                cell.appendChild(photoTile(stu, { small: true }));
+                cell.appendChild(h('span.seat-name', {}, stu.lastName));
+                if (selectedSeatStudent === sid) cell.classList.add('selected');
+              }
+            }
+            grid.appendChild(cell);
+          })(r, c);
+        }
+      }
+
+      return h('div',
+        h('div.row-between',
+          h('label.hint', {}, 'Raster: ', colSel),
+          h('div.row-gap',
+            h('button.btn-small.btn-plain', { onclick: autoArrange }, 'Automatisch anordnen'),
+            h('button.btn-small.btn-plain', { onclick: clearPlan }, 'Plan leeren'))
+        ),
+        selectedSeatStudent
+          ? h('p.hint.seat-hint', {}, 'Tippen Sie auf einen freien Platz, um ' +
+              nameOf(selectedSeatStudent) + ' zu setzen – oder ' ,
+              h('button.btn-inline', { onclick: function () { selectedSeatStudent = null; render(); } }, 'abbrechen'), '.')
+          : h('p.hint', {}, 'Tippen Sie unten eine Person an und dann auf einen Platz. Eine gesetzte Person kann durch Antippen wieder ausgewählt und verschoben werden.'),
+        grid,
+        h('div.section-head', {}, 'Noch nicht platziert (' + unplaced.length + ')'),
+        h('div.seat-pool', {}, unplaced.length
+          ? unplaced.map(function (stu) {
+              return h('button.pool-chip' + (selectedSeatStudent === stu.id ? '.selected' : ''), {
+                onclick: function () {
+                  selectedSeatStudent = (selectedSeatStudent === stu.id ? null : stu.id); render();
+                }
+              }, photoTile(stu, { small: true }), h('span', {}, stu.lastName));
+            })
+          : h('span.hint', {}, 'Alle Schüler/innen sind platziert.'))
+      );
+
+      function nameOf(sid) {
+        var s = cls.students.find(function (x) { return x.id === sid; });
+        return s ? s.lastName + ', ' + s.firstName : '';
+      }
+      function autoArrange() {
+        var pos = {};
+        students.forEach(function (stu, i) {
+          pos[stu.id] = { r: Math.floor(i / cols), c: i % cols };
+        });
+        course.seating.positions = pos; selectedSeatStudent = null; Store.save(); render();
+      }
+      function clearPlan() {
+        UI.confirmDialog('Sitzplan leeren?', 'Alle Platzierungen dieses Kurses werden entfernt (Fotos bleiben erhalten).', 'Leeren', true)
+          .then(function (ok) { if (!ok) return; course.seating.positions = {}; selectedSeatStudent = null; Store.save(); render(); });
+      }
+    }
+  };
+
+  var selectedSeatStudent = null;
+
+  function photoBackupCard() {
+    var days = Store.daysSincePhotoExport();
+    var fileInput = h('input', { type: 'file', accept: '.json,application/json', style: { display: 'none' } });
+    fileInput.addEventListener('change', function () {
+      var f = fileInput.files[0]; fileInput.value = '';
+      if (!f) return;
+      f.text().then(function (text) {
+        var parsed = Store.parsePhotoBackup(text);
+        var getData = parsed.encrypted
+          ? askBackupPassword(f.name).then(function (pw) {
+              if (pw == null) return null;
+              return CryptoBox.decrypt(parsed.envelope, pw).then(function (plain) { return JSON.parse(plain); });
+            })
+          : Promise.resolve(parsed.data);
+        return getData.then(function (data) {
+          if (!data) return;
+          return Store.applyPhotoImport(data).then(function (n) {
+            photoCache = {};
+            toast(n + ' Fotos eingespielt.');
+            render();
+          });
+        });
+      }).catch(function (e) { UI.modal('Import fehlgeschlagen', h('p', {}, e.message)); });
+    });
+
+    return h('div.card',
+      h('p.hint', {}, S().settings.lastPhotoExport
+        ? 'Letzte Foto-Sicherung: ' + UI.fmtDate(S().settings.lastPhotoExport.slice(0, 10)) +
+          (days > 30 ? ' (vor ' + days + ' Tagen)' : '')
+        : 'Die Fotos wurden noch nie gesichert. Fotos sind nicht Teil des normalen Noten-Backups.'),
+      h('div.actions-col',
+        h('button.btn-primary.btn-block', { onclick: function () { photoExportDialog(); } }, 'Fotos jetzt sichern'),
+        h('button.btn-plain.btn-block', { onclick: function () { fileInput.click(); } }, 'Foto-Sicherung einspielen'),
+        fileInput)
+    );
+
+    function askBackupPassword(fileName) {
+      var pw = h('input.input', { type: 'password', placeholder: 'Passwort' });
+      return UI.modal('Verschlüsselte Foto-Sicherung',
+        [h('p.hint', {}, 'Die Datei „' + fileName + '“ ist verschlüsselt. Bitte Passwort eingeben.'),
+         h('label.field', h('span.field-label', {}, 'Passwort'), pw)],
+        [{ label: 'Abbrechen', value: false }, { label: 'Entschlüsseln', value: true, primary: true }]
+      ).then(function (ok) { return ok ? pw.value : null; });
+    }
+  }
+
+  function photoExportDialog() {
+    var pw1 = h('input.input', { type: 'password', autocomplete: 'new-password', placeholder: 'Passwort (empfohlen)' });
+    var pw2 = h('input.input', { type: 'password', autocomplete: 'new-password', placeholder: 'Wiederholung' });
+    var err = h('p.hint.error-text');
+    UI.modal('Fotos sichern', [
+      h('p.hint', {}, 'Alle Fotos werden in eine einzelne Sicherungsdatei geschrieben. Mit Passwort wird sie verschlüsselt (empfohlen, da Fotos besonders schützenswert sind).'),
+      h('label.field', h('span.field-label', {}, 'Passwort'), pw1),
+      h('label.field', h('span.field-label', {}, 'Wiederholung'), pw2),
+      err
+    ], [
+      { label: 'Abbrechen', value: false },
+      { label: 'Sicherung speichern', value: true, primary: true, validate: function () {
+          if (pw1.value !== pw2.value) { err.textContent = 'Die Passwörter stimmen nicht überein.'; return false; }
+          if (pw1.value && pw1.value.length < 6) { err.textContent = 'Bitte mindestens 6 Zeichen verwenden.'; return false; }
+          return true;
+        } }
+    ]).then(function (ok) {
+      if (!ok) return;
+      Store.exportPhotos(pw1.value || null).then(function () {
+        toast(pw1.value ? 'Verschlüsselte Foto-Sicherung wird gespeichert.' : 'Foto-Sicherung wird gespeichert.');
+        render();
+      });
+    });
+  }
 
   /* ================= Sperrbildschirm ================= */
 
@@ -709,6 +1007,8 @@
           'Klausuren'),
         h('button.btn-plain.btn-block', { onclick: function () { go('grades', { id: course.id }); } },
           'Notenübersicht & Notenausdruck'),
+        h('button.btn-plain.btn-block', { onclick: function () { go('seating', { id: course.id }); } },
+          'Sitzplan mit Fotos'),
         h('button.btn-plain.btn-block', { onclick: function () { go('absences', { id: course.id }); } },
           'Unentschuldigte Fehlzeiten'),
         h('button.btn-plain.btn-block', { onclick: function () { go('students', { classId: cls.id, courseId: course.id }); } },
@@ -1851,6 +2151,12 @@
           var st = S();
           st.soleiEntries = st.soleiEntries.filter(function (e) { return e.studentId !== stu.id; });
           st.absences = (st.absences || []).filter(function (a) { return a.studentId !== stu.id; });
+          /* Sitzplatz-Positionen in allen Kursen dieser Klasse entfernen */
+          st.courses.forEach(function (co) {
+            if (co.seating && co.seating.positions) delete co.seating.positions[stu.id];
+          });
+          Store.deletePhoto(stu.id);
+          delete photoCache[stu.id];
           Store.save();
           render();
         });
@@ -2715,7 +3021,7 @@
           toast('Biometrische Entsperrung ist aktiv.');
           draw(true);
         }).catch(function (e) {
-          UI.modal('Einrichtung nicht möglich', h('p', {},
+          UI.modal('Einrichtung nicht möglich', h('p.prewrap', {},
             /Falsche PIN/.test(e.message) ? 'Die PIN ist nicht korrekt.' : e.message));
         });
       });
