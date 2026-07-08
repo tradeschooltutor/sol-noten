@@ -208,7 +208,8 @@ button { font: inherit; cursor: pointer; }
   padding: 10px 14px; border-bottom: 1px solid var(--line);
 }
 .tap-row:last-child { border-bottom: none; }
-.tap-info { min-width: 0; }
+.tap-info { min-width: 0; flex: 1; }
+.tap-row > .photo-avatar { flex-shrink: 0; }
 .tap-substats { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 2px; }
 .tap-btns { display: flex; gap: 7px; flex-shrink: 0; }
 .tap-btn {
@@ -550,14 +551,17 @@ button:focus-visible, .input:focus-visible, select:focus-visible {
 }
 .seat-cell {
   aspect-ratio: 1; border: 2px dashed var(--line); border-radius: 10px;
-  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
-  padding: 4px; min-height: 60px; cursor: pointer; overflow: hidden;
+  display: flex; flex-direction: column; align-items: stretch; justify-content: flex-start;
+  padding: 0; min-height: 84px; cursor: pointer; overflow: hidden;
 }
 .seat-cell.filled { border-style: solid; border-color: var(--teal-soft); background: #fafbfb; }
 .seat-cell.targetable:not(.filled) { border-color: var(--teal); background: var(--teal-soft); }
 .seat-cell.selected { outline: 3px solid var(--teal); outline-offset: 1px; }
-.seat-name { font-size: 0.7rem; font-weight: 600; text-align: center; line-height: 1.1;
-  overflow: hidden; text-overflow: ellipsis; max-width: 100%; white-space: nowrap; }
+.photo-avatar.seat { width: 100%; height: auto; flex: 1; border-radius: 0; min-height: 0; }
+.photo-avatar.seat .photo-fallback { font-size: 1.6rem; }
+.seat-name { font-size: 0.72rem; font-weight: 600; text-align: center; line-height: 1.15;
+  overflow: hidden; text-overflow: ellipsis; max-width: 100%; white-space: nowrap;
+  padding: 3px 2px; background: rgba(255,255,255,0.85); }
 .seat-hint { background: var(--teal-soft); color: var(--teal-dark); padding: 8px 12px; border-radius: 10px; }
 .btn-inline { background: none; border: none; color: var(--teal-dark); font-weight: 650; text-decoration: underline; padding: 0; }
 .seat-pool { display: flex; flex-wrap: wrap; gap: 8px; }
@@ -567,3 +571,17 @@ button:focus-visible, .input:focus-visible, select:focus-visible {
   padding: 5px 14px 5px 5px; min-height: 44px; font-size: 0.9rem;
 }
 .pool-chip.selected { border-color: var(--teal); background: var(--teal-soft); font-weight: 650; }
+
+/* ---------- Foto in der SoLei-Erfassung ---------- */
+.tap-row > .photo-avatar.small { margin-right: 10px; }
+
+/* ---------- Lehrerpult ---------- */
+.teacher-desk {
+  margin: 8px auto 4px; max-width: 55%; text-align: center;
+  background: var(--ink); color: #fff; border-radius: 10px;
+  padding: 8px 16px; font-size: 0.82rem; font-weight: 650; letter-spacing: 0.03em;
+}
+
+/* ---------- Schüler-Modus: Foto im Kopf ---------- */
+.student-head { display: flex; align-items: center; gap: 10px; justify-content: center; flex: 1; min-width: 0; }
+.student-head .crit-current { text-align: left; }

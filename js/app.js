@@ -10,7 +10,7 @@
 
   /* ================= App-Start ================= */
 
-  var APP_VERSION = '0.11.0';
+  var APP_VERSION = '0.11.3';
 
   Store.init().then(function () {
     if ('serviceWorker' in navigator) {
@@ -181,7 +181,8 @@
   function photoTile(stu, opts) {
     opts = opts || {};
     var img = h('img.photo-img', { alt: '' });
-    var tile = h('div.photo-avatar' + (opts.small ? '.small' : ''),
+    var cls = 'div.photo-avatar' + (opts.small ? '.small' : '') + (opts.seat ? '.seat' : '');
+    var tile = h(cls,
       h('span.photo-fallback', {}, initials(stu)), img);
     loadPhotoInto(stu.id, img);
     return tile;
@@ -285,8 +286,9 @@
       return h('div',
         h('p.hint', {}, 'Fotos werden auf 200 × 200 Pixel verkleinert und verschlüsselt gespeichert. Ein Foto gilt für alle Kurse dieser Klasse.'),
         h('div.card.card-list', {}, rows.length ? rows : h('div.empty', h('p', {}, 'Diese Klasse hat noch keine Schüler/innen.'))),
-        h('div.section-head', {}, 'Foto-Sicherung'),
-        photoBackupCard()
+        h('p.hint', {}, 'Die Sicherung aller Fotos (klassenübergreifend) finden Sie zentral unter ',
+          h('button.btn-inline', { onclick: function () { go('settings', { back: { name: 'seating', params: { id: course.id, tab: 'photos' } } }); } }, 'Einstellungen → Foto-Sicherung'),
+          '.')
       );
     }
 
@@ -314,7 +316,10 @@
       Object.keys(placed).forEach(function (sid) { byPos[placed[sid].r + '_' + placed[sid].c] = sid; });
 
       var grid = h('div.seat-grid', { style: { gridTemplateColumns: 'repeat(' + cols + ', 1fr)' } });
-      for (var r = 0; r < rows; r++) {
+      /* Von oben nach unten rendern, aber hohe Reihennummern zuerst:
+         Reihe 0 (vorne, am Pult) landet dadurch ganz unten. Neue Reihen
+         entstehen oben, weil rows mit steigender maxRow wächst. */
+      for (var r = rows - 1; r >= 0; r--) {
         for (var c = 0; c < cols; c++) {
           (function (r, c) {
             var sid = byPos[r + '_' + c];
@@ -331,7 +336,7 @@
             if (sid) {
               var stu = cls.students.find(function (x) { return x.id === sid; });
               if (stu) {
-                cell.appendChild(photoTile(stu, { small: true }));
+                cell.appendChild(photoTile(stu, { seat: true }));
                 cell.appendChild(h('span.seat-name', {}, stu.lastName));
                 if (selectedSeatStudent === sid) cell.classList.add('selected');
               }
@@ -340,6 +345,8 @@
           })(r, c);
         }
       }
+
+      var teacherDesk = h('div.teacher-desk', h('span', {}, 'Lehrerpult'));
 
       return h('div',
         h('div.row-between',
@@ -354,6 +361,7 @@
               h('button.btn-inline', { onclick: function () { selectedSeatStudent = null; render(); } }, 'abbrechen'), '.')
           : h('p.hint', {}, 'Tippen Sie unten eine Person an und dann auf einen Platz. Eine gesetzte Person kann durch Antippen wieder ausgewählt und verschoben werden.'),
         grid,
+        teacherDesk,
         h('div.section-head', {}, 'Noch nicht platziert (' + unplaced.length + ')'),
         h('div.seat-pool', {}, unplaced.length
           ? unplaced.map(function (stu) {
@@ -433,25 +441,26 @@
   }
 
   function photoExportDialog() {
-    var pw1 = h('input.input', { type: 'password', autocomplete: 'new-password', placeholder: 'Passwort (empfohlen)' });
+    var pw1 = h('input.input', { type: 'password', autocomplete: 'new-password', placeholder: 'Passwort' });
     var pw2 = h('input.input', { type: 'password', autocomplete: 'new-password', placeholder: 'Wiederholung' });
     var err = h('p.hint.error-text');
     UI.modal('Fotos sichern', [
-      h('p.hint', {}, 'Alle Fotos werden in eine einzelne Sicherungsdatei geschrieben. Mit Passwort wird sie verschlüsselt (empfohlen, da Fotos besonders schützenswert sind).'),
+      h('p.hint', {}, 'Alle Fotos werden in eine einzelne, mit Passwort verschlüsselte Sicherungsdatei geschrieben. Da Schülerfotos besonders schützenswert sind, ist ein Passwort verpflichtend.'),
       h('label.field', h('span.field-label', {}, 'Passwort'), pw1),
       h('label.field', h('span.field-label', {}, 'Wiederholung'), pw2),
+      h('p.hint', {}, 'Wichtig: Ein vergessenes Passwort kann nicht wiederhergestellt werden – die Sicherungsdatei ist dann unlesbar. Bewahren Sie das Passwort sicher auf (z. B. in einem Passwort-Manager).'),
       err
     ], [
       { label: 'Abbrechen', value: false },
       { label: 'Sicherung speichern', value: true, primary: true, validate: function () {
+          if (pw1.value.length < 6) { err.textContent = 'Bitte ein Passwort mit mindestens 6 Zeichen vergeben.'; return false; }
           if (pw1.value !== pw2.value) { err.textContent = 'Die Passwörter stimmen nicht überein.'; return false; }
-          if (pw1.value && pw1.value.length < 6) { err.textContent = 'Bitte mindestens 6 Zeichen verwenden.'; return false; }
           return true;
         } }
     ]).then(function (ok) {
       if (!ok) return;
-      Store.exportPhotos(pw1.value || null).then(function () {
-        toast(pw1.value ? 'Verschlüsselte Foto-Sicherung wird gespeichert.' : 'Foto-Sicherung wird gespeichert.');
+      Store.exportPhotos(pw1.value).then(function () {
+        toast('Verschlüsselte Foto-Sicherung wird gespeichert.');
         render();
       });
     });
@@ -2289,6 +2298,7 @@
         var lastToday = todays.length ? todays[todays.length - 1] : null;
 
         return h('div.tap-row',
+          photoTile(stu, { small: true }),
           h('div.tap-info',
             h('div.student-name', {}, stu.lastName + ', ' + stu.firstName),
             h('div.tap-substats',
@@ -2347,9 +2357,12 @@
       return h('div.capture-body',
         h('div.crit-nav',
           h('button.icon-btn', { onclick: function () { captureState.studentIdx = (si + students.length - 1) % students.length; render(); } }, '‹'),
-          h('span.crit-current', {}, stu.lastName + ', ' + stu.firstName,
-            h('span.hint.block', {},
-              Calc.fmt(stat.sum, 1) + ' / 15' + (stat.rated > 0 ? ' · Note ' + Calc.fmt(grade.g) : ''))),
+          h('div.student-head',
+            photoTile(stu, { small: true }),
+            h('span.crit-current', {}, stu.lastName + ', ' + stu.firstName,
+              h('span.hint.block', {},
+                Calc.fmt(stat.sum, 1) + ' / 15' + (stat.rated > 0 ? ' · Note ' + Calc.fmt(grade.g) : '')))
+          ),
           h('button.icon-btn', { onclick: function () { captureState.studentIdx = (si + 1) % students.length; render(); } }, '›')
         ),
         h('div.card.card-list', {}, rows)
@@ -2754,6 +2767,9 @@
         fileInput,
         snapHost
       ),
+
+      h('div.section-head', {}, 'Foto-Sicherung (alle Klassen)'),
+      h('div.card', {}, photoBackupCard()),
 
       h('div.section-head', {}, 'SoLei-Kriterien (gilt für alle Kurse)'),
       h('div.card',

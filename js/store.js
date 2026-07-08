@@ -458,18 +458,18 @@
       return chain.then(function () {
         var payload = { app: 'SOL-Noten', kind: 'photos', v: 1, photos: out,
           count: Object.keys(out).length, exportedAt: new Date().toISOString() };
-        var finish = function (text, suffix) {
-          downloadText('SOL-Noten-Fotos-' + todayISO() + suffix + '.json', text);
+        var finish = function (text) {
+          downloadText('SOL-Noten-Fotos-' + todayISO() + '.json', text);
           state.settings.lastPhotoExport = new Date().toISOString();
           save();
         };
         if (password) {
           return CryptoBox.encrypt(JSON.stringify(payload), password).then(function (env) {
             env.kind = 'photos';
-            finish(JSON.stringify(env), '-verschluesselt');
+            finish(JSON.stringify(env));
           });
         }
-        finish(JSON.stringify(payload, null, 0), '');
+        finish(JSON.stringify(payload, null, 0));
       });
     });
   }
