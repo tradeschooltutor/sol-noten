@@ -10,7 +10,7 @@
 
   /* ================= App-Start ================= */
 
-  var APP_VERSION = '0.12.0';
+  var APP_VERSION = '0.12.1';
 
   Store.init().then(function () {
     if ('serviceWorker' in navigator) {
@@ -974,8 +974,39 @@
       go('course', { id: course.id });
     }
 
+    function delCourseFromSettings() {
+      var cls = Store.classById(course.classId);
+      UI.confirmDialog('Kurs löschen?',
+        'Der Kurs „' + cls.name + ' · ' + course.subject + '“ und alle darin vergebenen Punkte werden gelöscht. ' +
+        'Die Klasse und ihre Schülerliste bleiben erhalten.', 'Kurs löschen', true)
+        .then(function (ok) {
+          if (!ok) return;
+          var st2 = S();
+          st2.courses = st2.courses.filter(function (c) { return c.id !== course.id; });
+          st2.soleiEntries = st2.soleiEntries.filter(function (e) { return e.courseId !== course.id; });
+          st2.absences = (st2.absences || []).filter(function (a) { return a.courseId !== course.id; });
+          Store.save();
+          go('home');
+        });
+    }
+
+    var managementSection = course
+      ? [
+          h('div.section-head', {}, 'Weitere Kurs-Verwaltung'),
+          h('div.actions-col',
+            h('button.btn-plain.btn-block', { onclick: function () { go('students', { classId: course.classId, courseId: course.id }); } },
+              'Schülerliste bearbeiten (' + (Store.classById(course.classId).students.length) + ')'),
+            h('button.btn-plain.btn-block', { onclick: function () { go('maxPoints', { id: course.id }); } },
+              'Maximalpunkte der Kriterien (' + course.currentQuarter + '. Quartal)'),
+            h('button.btn-plain.btn-block', { onclick: function () { go('quarterDates', { id: course.id }); } },
+              'Quartalszeiträume dieses Kurses'),
+            h('button.btn-plain.btn-block.danger-text', { onclick: delCourseFromSettings }, 'Kurs löschen')
+          )
+        ]
+      : null;
+
     return h('div.screen',
-      header(course ? 'Kurs bearbeiten' : 'Kurs anlegen', p.id ? { name: 'course', params: { id: p.id } } : { name: 'home' }),
+      header(course ? 'Kurs-Einstellungen' : 'Kurs anlegen', p.id ? { name: 'course', params: { id: p.id } } : { name: 'home' }),
       h('div.card',
         h('label.field', h('span.field-label', {}, 'Klasse'), classSel, newClassInput,
           h('p.hint', {}, 'Die Schülerliste gehört zur Klasse und wird von allen Kursen dieser Klasse gemeinsam genutzt.')),
@@ -986,7 +1017,7 @@
         ),
         h('div.field',
           h('span.field-label', {}, 'Gewichtung der Zeugnisnote (%)'),
-          h('div.field-row',
+          h('div.field-row.weight-row',
             h('label.field', h('span.hint', {}, 'Sonstige Leistungen'), wSl),
             h('label.field', h('span.hint', {}, 'Open Book Tests'), wObt),
             h('label.field', h('span.hint', {}, 'Klausuren'), wKa)
@@ -994,7 +1025,8 @@
         ),
         status,
         h('button.btn-primary.btn-block', { onclick: saveCourse }, course ? 'Änderungen speichern' : 'Kurs anlegen')
-      )
+      ),
+      managementSection
     );
   };
 
@@ -1042,49 +1074,29 @@
         h('button.btn-primary.btn-block.btn-big', { onclick: function () { go('capture', { id: course.id }); } },
           'SoLei-Punkte vergeben')
       ),
+      h('div.course-grid',
+        h('button.btn-primary.grid-btn', { onclick: function () { go('seating', { id: course.id }); } },
+          'Sitzplan mit Fotos'),
+        h('button.btn-primary.grid-btn', { onclick: function () { go('obt', { id: course.id }); } },
+          'Open Book Tests'),
+        h('button.btn-primary.grid-btn', { onclick: function () { go('klausuren', { id: course.id }); } },
+          'Klausuren'),
+        h('button.btn-primary.grid-btn', { onclick: function () { go('absences', { id: course.id }); } },
+          'Unentschuldigte Fehlzeiten'),
+        h('button.btn-primary.grid-btn', { onclick: function () { go('quarterReview', { id: course.id, quarter: q }); } },
+          'Quartalsabschluss: SoLei-Noten & Portfolio-Noten'),
+        h('button.btn-primary.grid-btn', { onclick: function () { go('editCourse', { id: course.id }); } },
+          'Kurs-Einstellungen')
+      ),
+      h('div.actions-col',
+        h('button.btn-plain.btn-block', { onclick: function () { go('grades', { id: course.id }); } },
+          'Notenübersicht & Notenausdruck')
+      ),
       h('div.section-head', {}, 'Punktestand im ' + q + '. Quartal'),
       cls.students.length === 0
         ? h('div.empty', h('p', {}, 'Diese Klasse hat noch keine Schüler/innen.'))
-        : h('div.card.card-list', {}, studentRows),
-      h('div.actions-col',
-        h('button.btn-plain.btn-block', { onclick: function () { go('quarterReview', { id: course.id, quarter: q }); } },
-          'Quartalsabschluss: Portfolionoten & SoLei-Noten'),
-        h('button.btn-plain.btn-block', { onclick: function () { go('obt', { id: course.id }); } },
-          'Open Book Tests'),
-        h('button.btn-plain.btn-block', { onclick: function () { go('klausuren', { id: course.id }); } },
-          'Klausuren'),
-        h('button.btn-plain.btn-block', { onclick: function () { go('grades', { id: course.id }); } },
-          'Notenübersicht & Notenausdruck'),
-        h('button.btn-plain.btn-block', { onclick: function () { go('seating', { id: course.id }); } },
-          'Sitzplan mit Fotos'),
-        h('button.btn-plain.btn-block', { onclick: function () { go('absences', { id: course.id }); } },
-          'Unentschuldigte Fehlzeiten'),
-        h('button.btn-plain.btn-block', { onclick: function () { go('students', { classId: cls.id, courseId: course.id }); } },
-          'Schülerliste bearbeiten (' + cls.students.length + ')'),
-        h('button.btn-plain.btn-block', { onclick: function () { go('maxPoints', { id: course.id }); } },
-          'Maximalpunkte der Kriterien (' + q + '. Quartal)'),
-        h('button.btn-plain.btn-block', { onclick: function () { go('quarterDates', { id: course.id }); } },
-          'Quartalszeiträume dieses Kurses'),
-        h('button.btn-plain.btn-block', { onclick: function () { go('editCourse', { id: course.id }); } },
-          'Kurs-Einstellungen'),
-        h('button.btn-plain.btn-block.danger-text', { onclick: delCourse }, 'Kurs löschen')
-      )
+        : h('div.card.card-list', {}, studentRows)
     );
-
-    function delCourse() {
-      UI.confirmDialog('Kurs löschen?',
-        'Der Kurs „' + cls.name + ' · ' + course.subject + '“ und alle darin vergebenen Punkte werden gelöscht. ' +
-        'Die Klasse und ihre Schülerliste bleiben erhalten.', 'Kurs löschen', true)
-        .then(function (ok) {
-          if (!ok) return;
-          var st = S();
-          st.courses = st.courses.filter(function (c) { return c.id !== course.id; });
-          st.soleiEntries = st.soleiEntries.filter(function (e) { return e.courseId !== course.id; });
-          st.absences = (st.absences || []).filter(function (a) { return a.courseId !== course.id; });
-          Store.save();
-          go('home');
-        });
-    }
   };
 
   function quarterHint(course, quarters) {
@@ -2762,7 +2774,7 @@
       header('Globale Einstellungen für alle Kurse', back, h('span')),
 
       h('div.banner-info', {},
-        h('span', {}, 'Maximalpunkte der Kriterien, Quartalszeiträume, Gewichtung sowie die Anzahl der Klausuren und Open Book Tests stellen Sie je Kurs ein: Kurs auf dem Startbildschirm antippen, dann finden Sie diese Punkte unterhalb der Schülerliste.')),
+        h('span', {}, 'Maximalpunkte der Kriterien, Quartalszeiträume, Gewichtung sowie die Anzahl der Klausuren und Open Book Tests stellen Sie je Kurs ein: Kurs auf dem Startbildschirm antippen, dann „Kurs-Einstellungen“.')),
 
       h('div.section-head', {}, 'Farbschema'),
       h('div.card',

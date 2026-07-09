@@ -83,7 +83,15 @@ body {
 /* ---------- Formulare ---------- */
 .field { display: flex; flex-direction: column; gap: 5px; flex: 1; }
 .field-label { font-size: 0.85rem; font-weight: 600; color: var(--ink-soft); }
-.field-row { display: flex; gap: 10px; }
+.field-row { display: flex; gap: 10px; align-items: end; }
+.field-row .field { justify-content: flex-end; }
+/* Gewichtungszeile: Label-Bereich einheitlich hoch, damit die drei Eingabefelder
+   trotz unterschiedlich langer Beschriftungen auf einer Ebene liegen. */
+.weight-row .field .hint {
+  min-height: 2.4em; display: flex; align-items: flex-end;
+}
+.weight-row .field { flex: 1; }
+.weight-row .input-num { max-width: none; width: 100%; }
 .input {
   font: inherit; padding: 11px 12px; border-radius: 10px;
   border: 1px solid var(--line); background: #fbfcfc; color: var(--ink);
@@ -600,3 +608,13 @@ button:focus-visible, .input:focus-visible, select:focus-visible {
 
 /* Kachelname (eine Zeile, Vorname + ggf. gekürzter Nachname) */
 .seat-name { font-size: 0.7rem; }
+
+/* ---------- Kurs-Dashboard: Buttonraster (2 pro Reihe) ---------- */
+.course-grid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 4px 0 8px;
+}
+.grid-btn {
+  min-height: 64px; border-radius: 12px; padding: 12px 14px;
+  display: flex; align-items: center; justify-content: center; text-align: center;
+  font-size: 0.95rem; line-height: 1.2;
+}
