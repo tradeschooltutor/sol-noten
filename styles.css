@@ -485,7 +485,8 @@ button:focus-visible, .input:focus-visible, select:focus-visible {
 .about-box .beta-tag {
   background: var(--teal-soft); color: var(--teal-dark); border-color: var(--teal);
 }
-.about-box { margin-top: 8px; }
+.about-box { margin-top: 18px; }
+.about-box .section-head { margin-bottom: 8px; }
 .about-box a { color: var(--teal-dark); font-weight: 600; }
 
 /* ---------- Diagramm-Legende ---------- */

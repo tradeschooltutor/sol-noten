@@ -10,7 +10,7 @@
 
   /* ================= App-Start ================= */
 
-  var APP_VERSION = '0.12.3';
+  var APP_VERSION = '0.12.4';
 
   Store.init().then(function () {
     if ('serviceWorker' in navigator) {
@@ -140,7 +140,7 @@
       h('div.section-head', {}, 'Über diese App'),
       h('div.card',
         h('p', {}, 'SOL-Noten ', h('span.beta-tag', {}, 'Beta')),
-        h('p.hint', {}, 'Betaversion zu Testzwecken, Nutzung auf eigenes Risiko. Fehlermeldungen bitte an ',
+        h('p.hint', {}, 'Betaversion zu Testzwecken, Nutzung auf eigenes Risiko. Fehlermeldungen und Featurewünsche bitte an ',
           h('a', { href: 'mailto:vandelaar@live.de' }, 'vandelaar@live.de'), '.'),
         h('p.hint', {}, 'Version ' + APP_VERSION + ' · © 2026 Andreas Vandelaar · Alle Daten bleiben ausschließlich auf diesem Gerät.'),
         h('details.pct-details',
@@ -464,6 +464,7 @@
   };
 
   var selectedSeatStudent = null;
+  var lockKeyHandler = null;
 
   function photoBackupCard() {
     var days = Store.daysSincePhotoExport();
@@ -704,8 +705,11 @@
       setTimeout(tryBiometric, 300);
     }
 
-    /* Physische Tastatur mithören (PC). */
+    /* Physische Tastatur mithören (PC). Der Handler bleibt registriert, solange
+       die Route 'lock' aktiv ist, und entfernt sich selbst, sobald die App die
+       Sperrseite verlässt – unabhängig von DOM-Mutationen. */
     function onKey(ev) {
+      if (route.name !== 'lock') { document.removeEventListener('keydown', onKey); return; }
       if (ev.metaKey || ev.ctrlKey || ev.altKey) return;
       if (Store.getLockWait() > 0) return;
       if (bioActive && !showPinPad) return;
@@ -720,14 +724,10 @@
         pin = ''; refreshDots(); ev.preventDefault();
       }
     }
+    /* Doppelregistrierung vermeiden, falls der Sperrbildschirm mehrfach aufgebaut wird. */
+    document.removeEventListener('keydown', lockKeyHandler);
+    lockKeyHandler = onKey;
     document.addEventListener('keydown', onKey);
-    var observer = new MutationObserver(function () {
-      if (!dots.isConnected) {
-        document.removeEventListener('keydown', onKey);
-        observer.disconnect();
-      }
-    });
-    observer.observe(document.getElementById('app'), { childList: true, subtree: true });
 
     return container;
   };
