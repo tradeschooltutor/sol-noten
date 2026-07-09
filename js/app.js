@@ -10,7 +10,7 @@
 
   /* ================= App-Start ================= */
 
-  var APP_VERSION = '0.12.1';
+  var APP_VERSION = '0.12.2';
 
   Store.init().then(function () {
     if ('serviceWorker' in navigator) {
@@ -1070,11 +1070,11 @@
         h('div.row-between',
           h('span.quarter-chip.big', {}, q + '. Quartal'),
           h('span.hint', {}, UI.fmtDate(quarters[q - 1].start) + ' – ' + UI.fmtDate(quarters[q - 1].end))
-        ),
-        h('button.btn-primary.btn-block.btn-big', { onclick: function () { go('capture', { id: course.id }); } },
-          'SoLei-Punkte vergeben')
+        )
       ),
-      h('div.course-grid',
+      h('div.course-actions-grid',
+        h('button.btn-primary.grid-btn', { onclick: function () { go('capture', { id: course.id }); } },
+          'SoLei-Punkte vergeben'),
         h('button.btn-primary.grid-btn', { onclick: function () { go('seating', { id: course.id }); } },
           'Sitzplan mit Fotos'),
         h('button.btn-primary.grid-btn', { onclick: function () { go('obt', { id: course.id }); } },
@@ -1085,12 +1085,10 @@
           'Unentschuldigte Fehlzeiten'),
         h('button.btn-primary.grid-btn', { onclick: function () { go('quarterReview', { id: course.id, quarter: q }); } },
           'Quartalsabschluss: SoLei-Noten & Portfolio-Noten'),
+        h('button.btn-primary.grid-btn', { onclick: function () { go('grades', { id: course.id }); } },
+          'Notenübersicht & Notenausdruck'),
         h('button.btn-primary.grid-btn', { onclick: function () { go('editCourse', { id: course.id }); } },
           'Kurs-Einstellungen')
-      ),
-      h('div.actions-col',
-        h('button.btn-plain.btn-block', { onclick: function () { go('grades', { id: course.id }); } },
-          'Notenübersicht & Notenausdruck')
       ),
       h('div.section-head', {}, 'Punktestand im ' + q + '. Quartal'),
       cls.students.length === 0

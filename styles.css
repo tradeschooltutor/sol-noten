@@ -610,7 +610,7 @@ button:focus-visible, .input:focus-visible, select:focus-visible {
 .seat-name { font-size: 0.7rem; }
 
 /* ---------- Kurs-Dashboard: Buttonraster (2 pro Reihe) ---------- */
-.course-grid {
+.course-actions-grid {
   display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 4px 0 8px;
 }
 .grid-btn {
