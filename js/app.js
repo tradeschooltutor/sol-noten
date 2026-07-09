@@ -10,7 +10,7 @@
 
   /* ================= App-Start ================= */
 
-  var APP_VERSION = '0.12.4';
+  var APP_VERSION = '0.12.5';
 
   Store.init().then(function () {
     if ('serviceWorker' in navigator) {
@@ -142,7 +142,8 @@
         h('p', {}, 'SOL-Noten ', h('span.beta-tag', {}, 'Beta')),
         h('p.hint', {}, 'Betaversion zu Testzwecken, Nutzung auf eigenes Risiko. Fehlermeldungen und Featurewünsche bitte an ',
           h('a', { href: 'mailto:vandelaar@live.de' }, 'vandelaar@live.de'), '.'),
-        h('p.hint', {}, 'Version ' + APP_VERSION + ' · © 2026 Andreas Vandelaar · Alle Daten bleiben ausschließlich auf diesem Gerät.'),
+        h('p.hint', {}, 'Version ' + APP_VERSION + ' · © 2026 Andreas Vandelaar'),
+        h('p.hint', {}, 'Alle Daten sind verschlüsselt und bleiben ausschließlich auf diesem Gerät. Sie können die Daten durch verschlüsselte Backups auf andere Geräte übertragen.'),
         h('details.pct-details',
           h('summary', {}, 'Haftungshinweis anzeigen'),
           h('p.hint', {}, DISCLAIMER_TEXT),
