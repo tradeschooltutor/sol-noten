@@ -10,7 +10,7 @@
 
   /* ================= App-Start ================= */
 
-  var APP_VERSION = '0.12.2';
+  var APP_VERSION = '0.12.3';
 
   Store.init().then(function () {
     if ('serviceWorker' in navigator) {
@@ -114,7 +114,12 @@
     var view = views[route.name];
     if (!view) return;
     try {
-      appEl.appendChild(view(route.params));
+      var screen = view(route.params);
+      appEl.appendChild(screen);
+      /* „Über diese App“ unten auf jeder Seite – außer auf dem Sperrbildschirm. */
+      if (route.name !== 'lock' && screen && screen.classList && screen.classList.contains('screen')) {
+        screen.appendChild(aboutBox());
+      }
     } catch (err) {
       console.error('Fehler beim Seitenaufbau:', err);
       clear(appEl);
@@ -127,6 +132,25 @@
         )
       ));
     }
+  }
+
+  /* Wiederverwendbarer „Über diese App“-Kasten. */
+  function aboutBox() {
+    return h('div.about-box',
+      h('div.section-head', {}, 'Über diese App'),
+      h('div.card',
+        h('p', {}, 'SOL-Noten ', h('span.beta-tag', {}, 'Beta')),
+        h('p.hint', {}, 'Betaversion zu Testzwecken, Nutzung auf eigenes Risiko. Fehlermeldungen bitte an ',
+          h('a', { href: 'mailto:vandelaar@live.de' }, 'vandelaar@live.de'), '.'),
+        h('p.hint', {}, 'Version ' + APP_VERSION + ' · © 2026 Andreas Vandelaar · Alle Daten bleiben ausschließlich auf diesem Gerät.'),
+        h('details.pct-details',
+          h('summary', {}, 'Haftungshinweis anzeigen'),
+          h('p.hint', {}, DISCLAIMER_TEXT),
+          (S().settings.disclaimerAcceptedAt
+            ? h('p.hint', {}, 'Bestätigt am ' + UI.fmtDate(S().settings.disclaimerAcceptedAt.slice(0, 10)) + '.')
+            : null))
+      )
+    );
   }
 
   var HOME_SVG = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l9-8 9 8"/><path d="M5 10v10h5v-6h4v6h5V10"/></svg>';
@@ -151,11 +175,19 @@
     return h('header.topbar', {},
       backTo
         ? h('button.icon-btn', { onclick: function () { go(backTo.name, backTo.params); }, 'aria-label': 'Zurück' }, '‹')
-        : h('span.logo-dot', {}, ''),
-      h('h1.topbar-title', {}, title),
+        : h('span.logo-dot', { html: LOGO_SVG }),
+      backTo
+        ? h('h1.topbar-title', {}, title)
+        : h('h1.topbar-title', {}, title, h('span.beta-tag', {}, 'Beta')),
       right
     );
   }
+
+  var LOGO_SVG = '<svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">' +
+    '<text x="24" y="27" text-anchor="middle" font-family="Arial, sans-serif" font-weight="700" font-size="24" fill="currentColor">15</text>' +
+    '<circle cx="15" cy="37" r="3" fill="currentColor"/>' +
+    '<circle cx="24" cy="37" r="3" fill="currentColor"/>' +
+    '<circle cx="33" cy="37" r="3" fill="currentColor"/></svg>';
 
   var views = {};
 
@@ -2894,18 +2926,6 @@
               render();
             } }, 'Auf Standard zurücksetzen'));
         })()
-      ),
-
-      h('div.section-head', {}, 'Über diese App'),
-      h('div.card',
-        h('p', {}, 'SOL-Noten · Notenverwaltung zum selbstorganisierten Lernen'),
-        h('p.hint', {}, 'Version ' + APP_VERSION + ' · © 2026 Andreas Vandelaar · Alle Daten bleiben ausschließlich auf diesem Gerät.'),
-        h('details.pct-details',
-          h('summary', {}, 'Haftungshinweis anzeigen'),
-          h('p.hint', {}, DISCLAIMER_TEXT),
-          st.settings.disclaimerAcceptedAt
-            ? h('p.hint', {}, 'Bestätigt am ' + UI.fmtDate(st.settings.disclaimerAcceptedAt.slice(0, 10)) + '.')
-            : null)
       )
     );
   };

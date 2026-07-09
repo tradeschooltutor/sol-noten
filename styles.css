@@ -48,7 +48,9 @@ body {
   width: 34px; height: 34px; border-radius: 10px;
   background: linear-gradient(150deg, var(--teal), var(--teal-dark));
   flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
 }
+.logo-dot svg { width: 26px; height: 26px; display: block; }
 .icon-btn {
   width: 42px; height: 42px; border-radius: 12px;
   border: 1px solid var(--line); background: var(--card);
@@ -469,7 +471,22 @@ button:focus-visible, .input:focus-visible, select:focus-visible {
 .topbar .btn-small.btn-plain {
   background: rgba(255,255,255,0.14); border-color: rgba(255,255,255,0.35); color: #fff;
 }
-.topbar .logo-dot { background: rgba(255,255,255,0.22); border: 2px solid rgba(255,255,255,0.65); }
+.topbar .logo-dot { background: rgba(255,255,255,0.22); border: 2px solid rgba(255,255,255,0.65); color: #fff; }
+.topbar .logo-dot svg { color: #fff; }
+
+/* ---------- Beta-Kennzeichnung ---------- */
+.beta-tag {
+  display: inline-block; margin-left: 8px; padding: 1px 8px;
+  border-radius: 999px; font-size: 0.62em; font-weight: 700; letter-spacing: 0.04em;
+  text-transform: uppercase; vertical-align: middle;
+  background: rgba(255,255,255,0.25); color: #fff; border: 1px solid rgba(255,255,255,0.5);
+}
+/* Beta-Tag außerhalb der Titelzeile (z. B. im Über-Kasten) im Schema-Ton */
+.about-box .beta-tag {
+  background: var(--teal-soft); color: var(--teal-dark); border-color: var(--teal);
+}
+.about-box { margin-top: 8px; }
+.about-box a { color: var(--teal-dark); font-weight: 600; }
 
 /* ---------- Diagramm-Legende ---------- */
 .legend-dot {
