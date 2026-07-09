@@ -10,7 +10,7 @@
 
   /* ================= App-Start ================= */
 
-  var APP_VERSION = '0.11.3';
+  var APP_VERSION = '0.12.0';
 
   Store.init().then(function () {
     if ('serviceWorker' in navigator) {
@@ -294,6 +294,7 @@
 
     /* ---- Sitzplan-Raster ---- */
     function seatingGrid() {
+      var editMode = p.mode === 'edit';
       var cols = course.seating.cols;
       var positions = course.seating.positions;
       var placed = {};
@@ -315,21 +316,23 @@
       var byPos = {};
       Object.keys(placed).forEach(function (sid) { byPos[placed[sid].r + '_' + placed[sid].c] = sid; });
 
-      var grid = h('div.seat-grid', { style: { gridTemplateColumns: 'repeat(' + cols + ', 1fr)' } });
-      /* Von oben nach unten rendern, aber hohe Reihennummern zuerst:
-         Reihe 0 (vorne, am Pult) landet dadurch ganz unten. Neue Reihen
-         entstehen oben, weil rows mit steigender maxRow wächst. */
+      var grid = h('div.seat-grid' + (editMode ? '.edit' : ''), { style: { gridTemplateColumns: 'repeat(' + cols + ', 1fr)' } });
       for (var r = rows - 1; r >= 0; r--) {
         for (var c = 0; c < cols; c++) {
           (function (r, c) {
             var sid = byPos[r + '_' + c];
-            var cell = h('div.seat-cell' + (sid ? '.filled' : '') + (selectedSeatStudent ? '.targetable' : ''), {
+            var cell = h('div.seat-cell' + (sid ? '.filled' : '') + (editMode && selectedSeatStudent ? '.targetable' : ''), {
               onclick: function () {
-                if (selectedSeatStudent) {
-                  course.seating.positions[selectedSeatStudent] = { r: r, c: c };
-                  selectedSeatStudent = null; Store.save(); render();
+                if (editMode) {
+                  if (selectedSeatStudent) {
+                    course.seating.positions[selectedSeatStudent] = { r: r, c: c };
+                    selectedSeatStudent = null; Store.save(); render();
+                  } else if (sid) {
+                    selectedSeatStudent = sid; render();
+                  }
                 } else if (sid) {
-                  selectedSeatStudent = sid; render();
+                  /* Noten-geben-Modus: Person in der SoLei-Vergabe öffnen */
+                  openStudentGrading(sid);
                 }
               }
             });
@@ -337,8 +340,8 @@
               var stu = cls.students.find(function (x) { return x.id === sid; });
               if (stu) {
                 cell.appendChild(photoTile(stu, { seat: true }));
-                cell.appendChild(h('span.seat-name', {}, stu.lastName));
-                if (selectedSeatStudent === sid) cell.classList.add('selected');
+                cell.appendChild(seatLabel(stu));
+                if (editMode && selectedSeatStudent === sid) cell.classList.add('selected');
               }
             }
             grid.appendChild(cell);
@@ -348,7 +351,29 @@
 
       var teacherDesk = h('div.teacher-desk', h('span', {}, 'Lehrerpult'));
 
+      var modeToggle = h('div.seat-modebar',
+        h('button.seat-mode-btn' + (!editMode ? '.active' : ''), {
+          onclick: function () { if (editMode) { selectedSeatStudent = null; go('seating', { id: course.id, tab: 'plan', mode: 'grade' }); } }
+        }, 'Noten geben'),
+        h('button.seat-mode-btn' + (editMode ? '.active' : ''), {
+          onclick: function () { if (!editMode) go('seating', { id: course.id, tab: 'plan', mode: 'edit' }); }
+        }, 'Sitzplan bearbeiten')
+      );
+
+      if (!editMode) {
+        return h('div',
+          modeToggle,
+          h('p.hint', {}, 'Tippen Sie auf eine Person, um ihre SoLei-Punkte zu vergeben (aktuelles Quartal, heutiges Datum).'),
+          grid,
+          teacherDesk,
+          unplaced.length
+            ? h('p.hint', {}, unplaced.length + ' Schüler/innen sind noch nicht platziert. Zum Setzen in den Modus „Sitzplan bearbeiten“ wechseln.')
+            : null
+        );
+      }
+
       return h('div',
+        modeToggle,
         h('div.row-between',
           h('label.hint', {}, 'Raster: ', colSel),
           h('div.row-gap',
@@ -359,7 +384,7 @@
           ? h('p.hint.seat-hint', {}, 'Tippen Sie auf einen freien Platz, um ' +
               nameOf(selectedSeatStudent) + ' zu setzen – oder ' ,
               h('button.btn-inline', { onclick: function () { selectedSeatStudent = null; render(); } }, 'abbrechen'), '.')
-          : h('p.hint', {}, 'Tippen Sie unten eine Person an und dann auf einen Platz. Eine gesetzte Person kann durch Antippen wieder ausgewählt und verschoben werden.'),
+          : h('p.hint', {}, 'Bearbeiten-Modus: Tippen Sie eine Person an und dann auf einen Platz. Eine gesetzte Person kann durch Antippen wieder ausgewählt und verschoben werden.'),
         grid,
         teacherDesk,
         h('div.section-head', {}, 'Noch nicht platziert (' + unplaced.length + ')'),
@@ -374,6 +399,13 @@
           : h('span.hint', {}, 'Alle Schüler/innen sind platziert.'))
       );
 
+      function openStudentGrading(sid) {
+        var idx = students.findIndex(function (x) { return x.id === sid; });
+        captureState.mode = 'student';
+        captureState.studentIdx = idx >= 0 ? idx : 0;
+        captureState.date = Store.todayISO();
+        go('capture', { id: course.id, from: 'seating' });
+      }
       function nameOf(sid) {
         var s = cls.students.find(function (x) { return x.id === sid; });
         return s ? s.lastName + ', ' + s.firstName : '';
@@ -389,6 +421,13 @@
         UI.confirmDialog('Sitzplan leeren?', 'Alle Platzierungen dieses Kurses werden entfernt (Fotos bleiben erhalten).', 'Leeren', true)
           .then(function (ok) { if (!ok) return; course.seating.positions = {}; selectedSeatStudent = null; Store.save(); render(); });
       }
+    }
+
+    /* Kachelbeschriftung: Vorname ganz, Nachname bei Bedarf abgekürzt. */
+    function seatLabel(stu) {
+      var last = stu.lastName || '';
+      var lastShort = last.length > 10 ? last.slice(0, 9) + '.' : last;
+      return h('span.seat-name', {}, (stu.firstName || '') + ' ' + lastShort);
     }
   };
 
@@ -2266,8 +2305,12 @@
       ? criterionMode()
       : studentMode();
 
+    var backTarget = p.from === 'seating'
+      ? { name: 'seating', params: { id: course.id, tab: 'plan', mode: 'grade' } }
+      : { name: 'course', params: { id: course.id } };
+
     return h('div.screen.screen-capture',
-      header(q + '. Quartal · Punkte vergeben', { name: 'course', params: { id: course.id } },
+      header(q + '. Quartal · Punkte vergeben', backTarget,
         h('span')),
       h('div.capture-bar',
         h('label.hint', {}, 'Datum ', dateInput),

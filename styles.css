@@ -585,3 +585,18 @@ button:focus-visible, .input:focus-visible, select:focus-visible {
 /* ---------- Schüler-Modus: Foto im Kopf ---------- */
 .student-head { display: flex; align-items: center; gap: 10px; justify-content: center; flex: 1; min-width: 0; }
 .student-head .crit-current { text-align: left; }
+
+/* ---------- Sitzplan-Modusleiste ---------- */
+.seat-modebar { display: flex; gap: 6px; margin-bottom: 10px; }
+.seat-mode-btn {
+  flex: 1; border: 1px solid var(--line); background: var(--card);
+  border-radius: 11px; padding: 10px; font-weight: 600; color: var(--ink-soft); min-height: 46px;
+}
+.seat-mode-btn.active { background: var(--teal); border-color: var(--teal); color: #fff; }
+
+/* Editier-Modus optisch abgrenzen */
+.seat-grid.edit { outline: 2px dashed var(--amber); outline-offset: 3px; }
+.seat-grid.edit .seat-cell.filled { cursor: grab; }
+
+/* Kachelname (eine Zeile, Vorname + ggf. gekürzter Nachname) */
+.seat-name { font-size: 0.7rem; }

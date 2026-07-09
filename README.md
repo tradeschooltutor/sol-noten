@@ -1,4 +1,4 @@
-# SOL-Noten (Version 0.11)
+# SOL-Noten (Version 0.12)
 
 Notenverwaltung zum selbstorganisierten Lernen (SOL) als Progressive Web App (PWA).
 Basierend auf der Excel-Notenverwaltung V8.0 von Andreas Vandelaar.
@@ -25,6 +25,8 @@ Basierend auf der Excel-Notenverwaltung V8.0 von Andreas Vandelaar.
 - **Punkteprotokoll mit Kriterium-Filter und Diagramm** – ein Tipp auf ein Kriterium filtert alle Vergaben dieses Kriteriums im gewählten Quartal und zeigt die Entwicklung als Liniendiagramm (Rasterlinien auf den Tipp-Stufen, Datumsachse).
 - **Unentschuldigte Fehlzeiten** – je Kurs mit Datum erfassbar; jede Fehlzeit vergibt automatisch 0 Punkte in allen fünf SoLei-Kriterien des Tages (das Quartal ergibt sich aus dem Datum). Löschen einer Fehlzeit entfernt auch die 0-Punkte-Vergaben. Im Punkteprotokoll sind Fehlzeiten gekennzeichnet und nur über die Fehlzeiten-Seite veränderbar.
 - **Farbschemata** – in den globalen Einstellungen wählbar: Petrol (Standard), Ozeanblau, Aubergine, Waldgrün, Schieferblau.
+- **SoLei-Bewertung direkt aus dem Sitzplan** – der Sitzplan hat zwei Modi (Umschalter oben): Im Modus „Noten geben" (Standard) öffnet ein Tipp auf eine Person direkt die SoLei-Vergabe im Schüler-Modus (eine Person, alle fünf Kriterien, aktuelles Quartal und heutiges Datum); der Zurück-Weg führt wieder zum Sitzplan, die ‹ ›-Pfeile bleiben zum Weiterbewerten erhalten. Im Modus „Sitzplan bearbeiten" (optisch abgegrenzt) verschiebt und platziert ein Tipp die Personen wie zuvor. Kacheln ohne Foto (Initialen) sind ebenso bewertbar.
+- **Kachelbeschriftung** – die Sitzplan-Kacheln zeigen Vorname (ganz) und Nachname (bei Bedarf abgekürzt) in einer Zeile.
 - **Sitzplan mit Fotos** – je Kurs ein Sitzplan auf einem Raster mit einstellbarer Spaltenzahl (Zeilen wachsen nach Bedarf); Personen per Antippen setzen, verschieben, freiräumen, „automatisch anordnen“. Fotoverwaltung je Schüler/in über Kamera oder Galerie; Fotos werden auf 200 × 200 Pixel verkleinert (JPEG) und – bei aktiver Verschlüsselung – mit dem Hauptschlüssel verschlüsselt in einem eigenen Speicherbereich abgelegt. Ein Foto gilt für alle Kurse der Klasse. Beim ersten Öffnen ist ein Datenschutzhinweis (Einwilligungspflicht, rein lokale Speicherung) zu bestätigen.
 - **Getrennte Foto-Sicherung** – Fotos sind nicht Teil des schlanken Noten-Backups; sie werden über „Sitzplan → Fotos verwalten → Fotos jetzt sichern“ als eine einzelne, optional passwortverschlüsselte Datei gesichert und separat wieder eingespielt.
 - **Verschlüsselte Backups**- **Verschlüsselte Backups** – beim Speichern eines Backups kann ein Passwort vergeben werden; die Datei wird dann mit AES-256-GCM verschlüsselt (Schlüsselableitung PBKDF2/SHA-256, 310.000 Runden). Beim Einspielen fragt die App das Passwort ab. Ohne Passwort bleibt der Klartext-Export möglich. Achtung: Ein vergessenes Passwort ist nicht wiederherstellbar.
