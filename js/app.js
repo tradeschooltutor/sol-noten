@@ -4,13 +4,20 @@
   var h = UI.h, clear = UI.clear, toast = UI.toast;
   var route = { name: 'loading', params: {} };
 
-  function go(name, params) { route = { name: name, params: params || {} }; render(); }
+  function go(name, params) {
+    route = { name: name, params: params || {} };
+    render();
+    /* Neue Seite immer oben beginnen, damit der Titel sichtbar ist. */
+    window.scrollTo(0, 0);
+    var appEl = document.getElementById('app');
+    if (appEl) appEl.scrollTop = 0;
+  }
 
   function S() { return Store.getState(); }
 
   /* ================= App-Start ================= */
 
-  var APP_VERSION = '0.12.5';
+  var APP_VERSION = '0.12.6';
 
   Store.init().then(function () {
     if ('serviceWorker' in navigator) {
@@ -349,7 +356,7 @@
       var byPos = {};
       Object.keys(placed).forEach(function (sid) { byPos[placed[sid].r + '_' + placed[sid].c] = sid; });
 
-      var grid = h('div.seat-grid' + (editMode ? '.edit' : ''), { style: { gridTemplateColumns: 'repeat(' + cols + ', 1fr)' } });
+      var grid = h('div.seat-grid' + (editMode ? '.edit' : ''), { style: { gridTemplateColumns: 'repeat(' + cols + ', 88px)' } });
       for (var r = rows - 1; r >= 0; r--) {
         for (var c = 0; c < cols; c++) {
           (function (r, c) {
@@ -382,6 +389,8 @@
         }
       }
 
+      var gridScroll = h('div.seat-scroll', {}, grid);
+
       var teacherDesk = h('div.teacher-desk', h('span', {}, 'Lehrerpult'));
 
       var modeToggle = h('div.seat-modebar',
@@ -397,7 +406,7 @@
         return h('div',
           modeToggle,
           h('p.hint', {}, 'Tippen Sie auf eine Person, um ihre SoLei-Punkte zu vergeben (aktuelles Quartal, heutiges Datum).'),
-          grid,
+          gridScroll,
           teacherDesk,
           unplaced.length
             ? h('p.hint', {}, unplaced.length + ' Schüler/innen sind noch nicht platziert. Zum Setzen in den Modus „Sitzplan bearbeiten“ wechseln.')
@@ -418,7 +427,7 @@
               nameOf(selectedSeatStudent) + ' zu setzen – oder ' ,
               h('button.btn-inline', { onclick: function () { selectedSeatStudent = null; render(); } }, 'abbrechen'), '.')
           : h('p.hint', {}, 'Bearbeiten-Modus: Tippen Sie eine Person an und dann auf einen Platz. Eine gesetzte Person kann durch Antippen wieder ausgewählt und verschoben werden.'),
-        grid,
+        gridScroll,
         teacherDesk,
         h('div.section-head', {}, 'Noch nicht platziert (' + unplaced.length + ')'),
         h('div.seat-pool', {}, unplaced.length
