@@ -199,7 +199,28 @@ button { font: inherit; cursor: pointer; }
 .grade-pill.g5, .grade-pill.g6 { background: var(--red-soft); color: var(--red); }
 
 /* ---------- SoLei-Erfassung ---------- */
-.capture-bar { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.capture-bar { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.date-field { display: inline-flex; align-items: center; }
+
+/* Ansicht-Umschalter (Kriterium/Schüler bzw. Datum/Schüler) */
+.view-toggle { display: inline-flex; gap: 6px; flex-wrap: wrap; }
+.view-btn {
+  border: 1px solid var(--line); background: var(--card); color: var(--ink-soft);
+  border-radius: 10px; padding: 8px 12px; min-height: 40px; font-size: 0.85rem; font-weight: 600;
+}
+.view-btn.active { background: var(--teal); border-color: var(--teal); color: #fff; }
+
+/* Fehlzeiten – Ansicht Schüler/in: Werktags-Chips */
+.abs-student-block { padding: 10px 14px; border-bottom: 1px solid var(--line); background: var(--card); }
+.abs-student-block:first-child { border-top-left-radius: var(--radius); border-top-right-radius: var(--radius); }
+.abs-student-block:last-child { border-bottom: none; border-bottom-left-radius: var(--radius); border-bottom-right-radius: var(--radius); }
+.day-chip-grid { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.day-chip {
+  border: 1px solid var(--line); background: var(--paper); color: var(--ink);
+  border-radius: 8px; padding: 6px 8px; min-height: 38px; font-size: 0.8rem;
+  font-variant-numeric: tabular-nums; min-width: 3.6rem;
+}
+.day-chip.absent { background: var(--red); border-color: var(--red); color: #fff; font-weight: 700; }
 .crit-tabs { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 2px; }
 .crit-tab {
   flex-shrink: 0; border: 1px solid var(--line); background: var(--card);

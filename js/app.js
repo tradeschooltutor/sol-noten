@@ -17,7 +17,7 @@
 
   /* ================= App-Start ================= */
 
-  var APP_VERSION = '0.12.7';
+  var APP_VERSION = '0.13.0';
 
   Store.init().then(function () {
     if ('serviceWorker' in navigator) {
@@ -1126,13 +1126,13 @@
         h('button.btn-primary.grid-btn', { onclick: function () { go('absences', { id: course.id }); } },
           'Unentschuldigte Fehlzeiten'),
         h('button.btn-primary.grid-btn', { onclick: function () { go('quarterReview', { id: course.id, quarter: q }); } },
-          'SoLei-Quartalsabschluss: SL-Punkte & Portfolio/mdl. Prüfung'),
+          'SoLei-Quartalsabschluss'),
         h('button.btn-primary.grid-btn', { onclick: function () { go('grades', { id: course.id }); } },
           'Notenübersicht & Notenausdruck'),
         h('button.btn-primary.grid-btn', { onclick: function () { go('editCourse', { id: course.id }); } },
           'Kurs-Einstellungen')
       ),
-      h('div.section-head', {}, 'Punktestand im ' + q + '. Quartal'),
+      h('div.section-head', {}, 'SoLei-Punktestand im ' + q + '. Quartal'),
       cls.students.length === 0
         ? h('div.empty', h('p', {}, 'Diese Klasse hat noch keine Schüler/innen.'))
         : h('div.card.card-list', {}, studentRows)
@@ -2075,16 +2075,26 @@
       return (a.lastName + a.firstName).localeCompare(b.lastName + b.firstName, 'de');
     });
     var shownQ = p.quarter || course.currentQuarter;
+    var mode = p.view === 'student' ? 'student' : 'date';
 
     var qSel = h('select.input', { style: { maxWidth: '10rem' } });
     [1, 2, 3, 4].forEach(function (n) {
       qSel.appendChild(h('option', { value: n, selected: n === shownQ }, n + '. Quartal'));
     });
     qSel.addEventListener('change', function () {
-      go('absences', { id: course.id, quarter: Number(qSel.value), date: dateInput.value });
+      go('absences', { id: course.id, quarter: Number(qSel.value), date: dateInput.value, view: mode });
     });
 
     var dateInput = h('input.input.date-inline', { type: 'date', value: p.date || Store.todayISO() });
+
+    var viewToggle = h('div.view-toggle',
+      h('button.view-btn' + (mode === 'student' ? '.active' : ''), {
+        onclick: function () { if (mode !== 'student') go('absences', { id: course.id, quarter: shownQ, view: 'student' }); }
+      }, 'Ansicht: Schüler/in'),
+      h('button.view-btn' + (mode === 'date' ? '.active' : ''), {
+        onclick: function () { if (mode !== 'date') go('absences', { id: course.id, quarter: shownQ, view: 'date' }); }
+      }, 'Ansicht: Datum')
+    );
 
     function addFor(stu) {
       var d = dateInput.value;
@@ -2098,7 +2108,7 @@
       toast(stu.lastName + ': Fehlzeit am ' + UI.fmtDate(d) + ' erfasst – 0 Punkte in allen Kriterien (' +
         quarter + '. Quartal).', function () { Store.removeAbsence(a.id); render(); });
       if (quarter !== shownQ) {
-        go('absences', { id: course.id, quarter: quarter, date: d });
+        go('absences', { id: course.id, quarter: quarter, date: d, view: mode });
       } else render();
     }
 
@@ -2114,37 +2124,116 @@
         });
     }
 
-    var total = 0;
-    var rows = students.map(function (stu) {
-      var abs = Store.absencesFor(course.id, stu.id, shownQ);
-      total += abs.length;
-      return h('div.abs-row',
-        h('div.abs-head',
-          h('div.student-name', {}, stu.lastName + ', ' + stu.firstName,
-            abs.length ? h('span.abs-count', {}, abs.length) : null),
-          h('button.btn-small.btn-plain', { onclick: function () { addFor(stu); } }, '+ Fehlzeit')
-        ),
-        abs.length ? h('div.abs-chips', {}, abs.map(function (a) {
-          return h('span.abs-chip', {}, UI.fmtDate(a.date),
-            h('button.abs-x', { onclick: function () { removeAbs(a, stu); }, 'aria-label': 'Fehlzeit löschen' }, '×'));
-        })) : null
-      );
-    });
-
     return h('div.screen',
-      header('Unentschuldigte Fehlzeiten', { name: 'course', params: { id: course.id } }),
-      h('div.card.card-tight',
-        h('div.row-between', qSel,
-          h('label.hint', {}, 'Datum ', dateInput)),
-        h('p.hint', {}, '„+ Fehlzeit“ erfasst für das gewählte Datum eine unentschuldigte Fehlzeit – ' +
-          'die App vergibt dann automatisch 0 Punkte in allen fünf SoLei-Kriterien dieses Tages. ' +
-          'Das Quartal ergibt sich aus dem Datum. Löschen entfernt auch die 0-Punkte-Vergaben wieder.')
-      ),
-      h('div.section-head', {}, 'Fehlzeiten im ' + shownQ + '. Quartal (' + total + ')'),
-      h('div.card.card-list', {},
-        students.length ? rows : h('div.empty', h('p', {}, 'Diese Klasse hat noch keine Schüler/innen.')))
+      header('Unentschuldigte Fehlzeiten', { name: 'course', params: { id: course.id } },
+        h('span')),
+      h('div.capture-bar', qSel, viewToggle),
+      mode === 'student' ? studentView() : dateView()
     );
+
+    /* ---- Ansicht: Datum (bisher) ---- */
+    function dateView() {
+      var total = 0;
+      var rows = students.map(function (stu) {
+        var abs = Store.absencesFor(course.id, stu.id, shownQ);
+        total += abs.length;
+        return h('div.abs-row',
+          h('div.abs-head',
+            h('div.student-name', {}, stu.lastName + ', ' + stu.firstName,
+              abs.length ? h('span.abs-count', {}, abs.length) : null),
+            h('button.btn-small.btn-plain', { onclick: function () { addFor(stu); } }, '+ Fehlzeit')
+          ),
+          abs.length ? h('div.abs-chips', {}, abs.map(function (a) {
+            return h('span.abs-chip', {}, UI.fmtDate(a.date),
+              h('button.abs-x', { onclick: function () { removeAbs(a, stu); }, 'aria-label': 'Fehlzeit löschen' }, '×'));
+          })) : null
+        );
+      });
+      return h('div',
+        h('div.card.card-tight',
+          h('label.hint', {}, 'Datum wählen: ', dateInput),
+          h('p.hint', {}, '„+ Fehlzeit“ erfasst für das gewählte Datum eine unentschuldigte Fehlzeit – ' +
+            'die App vergibt dann automatisch 0 Punkte in allen fünf SoLei-Kriterien dieses Tages. ' +
+            'Das Quartal ergibt sich aus dem Datum. Löschen entfernt auch die 0-Punkte-Vergaben wieder.')
+        ),
+        h('div.section-head', {}, 'Fehlzeiten im ' + shownQ + '. Quartal (' + total + ')'),
+        h('div.card.card-list', {},
+          students.length ? rows : h('div.empty', h('p', {}, 'Diese Klasse hat noch keine Schüler/innen.')))
+      );
+    }
+
+    /* ---- Ansicht: Schüler/in (alle Werktage des Quartals als Chips) ---- */
+    function studentView() {
+      var qq = quarters[shownQ - 1];
+      var days = weekdaysBetween(qq.start, qq.end); /* alle Tage außer Sonntag */
+
+      if (!days.length) {
+        return h('div.card', h('p.hint', {}, 'Für das ' + shownQ + '. Quartal ist kein gültiger Zeitraum hinterlegt. ' +
+          'Bitte prüfen Sie die Quartalszeiträume in den Kurs-Einstellungen.'));
+      }
+
+      var blocks = students.map(function (stu) {
+        var absSet = {};
+        Store.absencesFor(course.id, stu.id, shownQ).forEach(function (a) { absSet[a.date] = a.id; });
+        var count = Object.keys(absSet).length;
+
+        var chips = days.map(function (iso) {
+          var isAbsent = !!absSet[iso];
+          var d = iso.split('-');
+          var label = d[2] + '.' + d[1] + '.';
+          return h('button.day-chip' + (isAbsent ? '.absent' : ''), {
+            onclick: function () {
+              if (absSet[iso]) {
+                Store.removeAbsence(absSet[iso]);
+                render();
+              } else {
+                var quarter = Quarters.quarterForDate(iso, quarters);
+                Store.addAbsence(course.id, stu.id, iso, quarter);
+                render();
+              }
+            }
+          }, label);
+        });
+
+        return h('div.abs-student-block',
+          h('div.abs-head',
+            h('div.student-name', {}, stu.lastName + ', ' + stu.firstName,
+              count ? h('span.abs-count', {}, count) : null)),
+          h('div.day-chip-grid', {}, chips)
+        );
+      });
+
+      return h('div',
+        h('div.card.card-tight',
+          h('p.hint', {}, 'Tippen Sie die Tage an, an denen die Person unentschuldigt gefehlt hat ' +
+            '(Sonntage sind ausgelassen). Ein markierter Tag vergibt automatisch 0 Punkte in allen fünf ' +
+            'SoLei-Kriterien; erneutes Antippen entfernt die Fehlzeit wieder.')
+        ),
+        h('div.section-head', {}, shownQ + '. Quartal · ' + UI.fmtDate(qq.start) + ' – ' + UI.fmtDate(qq.end)),
+        students.length ? blocks : h('div.empty', h('p', {}, 'Diese Klasse hat noch keine Schüler/innen.'))
+      );
+    }
   };
+
+  /* Alle Tage zwischen zwei ISO-Daten außer Sonntag, als ISO-Strings. */
+  function weekdaysBetween(startISO, endISO) {
+    var out = [];
+    if (!startISO || !endISO) return out;
+    var d = new Date(startISO + 'T12:00:00');
+    var end = new Date(endISO + 'T12:00:00');
+    if (isNaN(d) || isNaN(end) || d > end) return out;
+    var guard = 0;
+    while (d <= end && guard < 400) {
+      if (d.getDay() !== 0) { /* 0 = Sonntag */
+        out.push(d.getFullYear() + '-' +
+          String(d.getMonth() + 1).padStart(2, '0') + '-' +
+          String(d.getDate()).padStart(2, '0'));
+      }
+      d.setDate(d.getDate() + 1);
+      guard++;
+    }
+    return out;
+  }
 
   /* ================= Quartalszeiträume je Kurs ================= */
 
@@ -2347,12 +2436,14 @@
     var dateInput = h('input.input.date-inline', { type: 'date', value: captureState.date });
     dateInput.addEventListener('change', function () { captureState.date = dateInput.value; });
 
-    var modeBtn = h('button.btn-plain.btn-small', {
-      onclick: function () {
-        captureState.mode = captureState.mode === 'criterion' ? 'student' : 'criterion';
-        render();
-      }
-    }, captureState.mode === 'criterion' ? 'Ansicht: Kriterium' : 'Ansicht: Schüler/in');
+    var viewToggle = h('div.view-toggle',
+      h('button.view-btn' + (captureState.mode === 'criterion' ? '.active' : ''), {
+        onclick: function () { if (captureState.mode !== 'criterion') { captureState.mode = 'criterion'; render(); } }
+      }, 'Ansicht: Kriterium'),
+      h('button.view-btn' + (captureState.mode === 'student' ? '.active' : ''), {
+        onclick: function () { if (captureState.mode !== 'student') { captureState.mode = 'student'; render(); } }
+      }, 'Ansicht: Schüler/in')
+    );
 
     var body = captureState.mode === 'criterion'
       ? criterionMode()
@@ -2363,11 +2454,11 @@
       : { name: 'course', params: { id: course.id } };
 
     return h('div.screen.screen-capture',
-      header(q + '. Quartal · Punkte vergeben', backTarget,
+      header('SoLei-Punkte vergeben: ' + q + '. Quartal', backTarget,
         h('span')),
       h('div.capture-bar',
-        h('label.hint', {}, 'Datum ', dateInput),
-        modeBtn
+        h('label.date-field', {}, dateInput),
+        viewToggle
       ),
       body
     );
