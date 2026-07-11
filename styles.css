@@ -307,8 +307,16 @@ button:focus-visible, .input:focus-visible, select:focus-visible {
 .review-grades { display: flex; gap: 10px; align-items: stretch; }
 .review-cell {
   flex: 1; background: var(--paper); border-radius: 10px; padding: 8px 10px;
-  display: flex; flex-direction: column; gap: 3px; justify-content: space-between;
+  display: flex; flex-direction: column; gap: 3px; justify-content: flex-end;
 }
+.review-cell .hint {
+  min-height: 2.4em; display: flex; align-items: flex-end; line-height: 1.15;
+}
+.review-cell > strong, .review-cell > .grade-input {
+  align-self: stretch; min-height: 40px; display: flex; align-items: center;
+  box-sizing: border-box;
+}
+.review-cell > strong { padding: 0 2px; }
 .review-solei { font-size: 1.05rem; }
 .grade-input { min-height: 40px; padding: 6px 10px; font-weight: 700; max-width: 100%; }
 .input-error { border-color: var(--red); outline: 2px solid var(--red); }
@@ -571,11 +579,19 @@ button:focus-visible, .input:focus-visible, select:focus-visible {
 .photo-img:not([src]) { display: none; }
 
 /* ---------- Sitzplan-Raster ---------- */
-.seat-scroll { overflow-x: auto; margin: 8px 0; -webkit-overflow-scrolling: touch; }
+.seat-scroll {
+  overflow-x: auto; margin: 8px 0; -webkit-overflow-scrolling: touch;
+  display: flex; justify-content: safe center;
+  scrollbar-width: thin;
+}
+/* Sichtbarer horizontaler Scrollbalken als Hinweis auf weitere Spalten */
+.seat-scroll::-webkit-scrollbar { height: 10px; }
+.seat-scroll::-webkit-scrollbar-track { background: var(--line); border-radius: 999px; }
+.seat-scroll::-webkit-scrollbar-thumb { background: var(--teal); border-radius: 999px; }
 .seat-grid {
   display: grid; gap: 8px;
   background: var(--card); border-radius: var(--radius); padding: 10px; box-shadow: var(--shadow);
-  width: max-content; min-width: 100%;
+  width: max-content;
 }
 .seat-cell {
   width: 88px; height: 88px; border: 2px dashed var(--line); border-radius: 10px;

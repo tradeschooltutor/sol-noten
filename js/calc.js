@@ -124,10 +124,13 @@
     return best;
   }
 
-  /* Note SoLei = Durchschnitt aus Note SL-Bogen und Portfolionote.
-     Ohne Portfolionote bleibt sie leer (Excel-Logik). */
+  /* Note SoLei:
+     - ohne SL-Bogen-Note keine SoLei-Note (leer),
+     - ohne Portfolio/mdl.-Note zählt allein die SL-Bogen-Note,
+     - mit beiden: Durchschnitt aus SL-Bogen-Note und Portfolio/mdl.-Note. */
   function soleiGrade(slBogenGrade, portfolioGrade) {
-    if (slBogenGrade == null || portfolioGrade == null) return null;
+    if (slBogenGrade == null) return null;
+    if (portfolioGrade == null) return round2(slBogenGrade);
     return round2((slBogenGrade + portfolioGrade) / 2);
   }
 

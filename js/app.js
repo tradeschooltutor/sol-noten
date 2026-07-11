@@ -17,7 +17,7 @@
 
   /* ================= App-Start ================= */
 
-  var APP_VERSION = '0.12.6';
+  var APP_VERSION = '0.12.7';
 
   Store.init().then(function () {
     if ('serviceWorker' in navigator) {
@@ -1126,7 +1126,7 @@
         h('button.btn-primary.grid-btn', { onclick: function () { go('absences', { id: course.id }); } },
           'Unentschuldigte Fehlzeiten'),
         h('button.btn-primary.grid-btn', { onclick: function () { go('quarterReview', { id: course.id, quarter: q }); } },
-          'Quartalsabschluss: SoLei-Noten & Portfolio-Noten'),
+          'SoLei-Quartalsabschluss: SL-Punkte & Portfolio/mdl. Prüfung'),
         h('button.btn-primary.grid-btn', { onclick: function () { go('grades', { id: course.id }); } },
           'Notenübersicht & Notenausdruck'),
         h('button.btn-primary.grid-btn', { onclick: function () { go('editCourse', { id: course.id }); } },
@@ -1303,7 +1303,7 @@
       var pg = portfolioGrade(course, q, stu.id);
       var inp = h('input.input.grade-input', {
         type: 'text', inputmode: 'decimal',
-        value: pg == null ? '' : Calc.fmt(pg), placeholder: '–', 'aria-label': 'Portfolionote'
+        value: pg == null ? '' : Calc.fmt(pg), placeholder: '–', 'aria-label': 'Portfolio/mdl. Prüfung'
       });
       inputs[stu.id] = inp;
 
@@ -1313,7 +1313,8 @@
       function refreshSolei() {
         var r = parseGrade(inp.value);
         inp.classList.toggle('input-error', !r.ok);
-        var g = (r.ok && r.value != null && slGrade) ? Calc.soleiGrade(slGrade.g, r.value) : null;
+        /* Auslegung A: ohne Portfolio zählt allein der SL-Bogen; mit Portfolio wird gemittelt. */
+        var g = (r.ok && slGrade) ? Calc.soleiGrade(slGrade.g, r.value) : null;
         soleiCell.textContent = g == null ? '–' : Calc.fmt(g);
       }
       inp.addEventListener('input', refreshSolei);
@@ -1330,8 +1331,8 @@
         h('div.review-grades',
           h('div.review-cell', h('span.hint', {}, 'SL-Bogen'),
             h('strong', {}, slGrade ? Calc.fmt(slGrade.g) : '–')),
-          h('div.review-cell', h('span.hint', {}, 'Portfolio'), inp),
-          h('div.review-cell', h('span.hint', {}, 'SoLei'), soleiCell)
+          h('div.review-cell', h('span.hint', {}, 'Portfolio/mdl. Prüfung'), inp),
+          h('div.review-cell', h('span.hint', {}, 'SoLei-Note'), soleiCell)
         )
       );
       refreshSolei();
@@ -1363,8 +1364,8 @@
         h('div.row-between', qSel,
           q > 1 ? h('span.hint', {}, '▲ / ▼ = Entwicklung zum Vorquartal') : null),
         h('p.hint', {}, 'Die Note SL-Bogen ergibt sich aus der Punktesumme (15-Punkte-Schema). ' +
-          'Die Note SoLei ist der Durchschnitt aus Note SL-Bogen und Portfolionote – ' +
-          'ohne Portfolionote bleibt sie leer.')
+          'Die SoLei-Note ist der Durchschnitt aus Note SL-Bogen und Portfolio/mdl. Prüfung. ' +
+          'Wird kein Portfolio bzw. keine mündliche Prüfung eingetragen, zählt allein die Note SL-Bogen.')
       ),
       h('div.card.card-list', {},
         students.length ? rows : h('div.empty', h('p', {}, 'Diese Klasse hat noch keine Schüler/innen.'))),
@@ -1970,7 +1971,7 @@
       var prev = q > 1 ? r.statQ[q - 2] : null;
       var maxes = course.maxPoints[q];
       var headCells = [h('th', {}, '')].concat(names.map(function (n) { return h('th', {}, n); }))
-        .concat([h('th', {}, 'Summe'), h('th', {}, 'Note SL-Bogen'), h('th', {}, 'Portfolio'), h('th', {}, 'SoLei-Note')]);
+        .concat([h('th', {}, 'Summe'), h('th', {}, 'Note SL-Bogen'), h('th', {}, 'Portfolio/mdl. Prüfung'), h('th', {}, 'SoLei-Note')]);
       var maxCells = [h('td.row-label', {}, 'maximal')].concat(maxes.map(function (m) {
         return h('td', {}, Calc.fmt(m, 1));
       })).concat([h('td', {}, '15'), h('td'), h('td'), h('td')]);
