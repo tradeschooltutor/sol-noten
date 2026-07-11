@@ -17,7 +17,7 @@
 
   /* ================= App-Start ================= */
 
-  var APP_VERSION = '0.13.1';
+  var APP_VERSION = '0.13.2';
 
   Store.init().then(function () {
     if ('serviceWorker' in navigator) {
@@ -1679,7 +1679,7 @@
       refreshers.push(refresh);
       inp.addEventListener('input', refresh);
       return h('div.review-row',
-        h('div.review-name', h('div.student-name', {}, stu.lastName + ', ' + stu.firstName)),
+        h('div.review-name', nameWithPhoto(stu)),
         h('div.review-grades',
           h('div.review-cell', h('span.hint', {}, 'Punkte'), inp),
           h('div.review-cell', h('span.hint', {}, 'Prozent'), h('span.review-solei', {}, pctCell)),
@@ -1976,14 +1976,18 @@
       }, 'Ansicht: Schüler/in')
     );
 
+    function gradesTitle() {
+      return ['Notenübersicht', h('br'), cls.name + ' - ' + course.subject];
+    }
+
     if (gradesState.mode === 'student' && students.length) {
       if (gradesState.studentIdx >= students.length) gradesState.studentIdx = 0;
       var si = gradesState.studentIdx;
       var stu = students[si];
       var reportContent = buildReportContent(course, stu);
       return h('div.screen.screen-wide',
-        header('Notenübersicht ' + cls.name + ' - ' + course.subject, { name: 'course', params: { id: course.id } }),
-        h('div.row-between.grades-toolbar', h('span'), viewToggle),
+        header(gradesTitle(), { name: 'course', params: { id: course.id } }),
+        h('div.grades-toggle-row', viewToggle),
         h('div.crit-nav',
           h('button.icon-btn', { onclick: function () {
             gradesState.studentIdx = (si + students.length - 1) % students.length; render();
@@ -2001,13 +2005,12 @@
     }
 
     return h('div.screen.screen-wide',
-      header('Notenübersicht ' + cls.name + ' - ' + course.subject, { name: 'course', params: { id: course.id } }),
-      h('div.row-between.grades-toolbar',
-        h('p.hint.grades-hint',
-          'Hier vergeben Sie die ', h('strong', {}, 'Zeugnisnoten für das HJ-Zeugnis und das Jahreszeugnis'),
-          ' (in der Liste ganz rechts)!', h('br'),
-          h('strong', {}, 'Tippen Sie auf einen Namen'), ', um in dessen Einzelansicht zu wechseln.'),
-        viewToggle),
+      header(gradesTitle(), { name: 'course', params: { id: course.id } }),
+      h('div.grades-toggle-row', viewToggle),
+      h('p.hint.grades-hint',
+        'Hier vergeben Sie die ', h('strong', {}, 'Zeugnisnoten für das HJ-Zeugnis und das Jahreszeugnis'),
+        ' (in der Liste ganz rechts)!', h('br'),
+        h('strong', {}, 'Tippen Sie auf einen Namen'), ', um in dessen Einzelansicht zu wechseln.'),
       h('div.table-scroll', {}, table),
       h('div.actions-col',
         h('button.btn-primary.btn-block', { onclick: saveZeugnis }, 'Zeugnisnoten speichern'),

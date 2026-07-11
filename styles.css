@@ -43,6 +43,7 @@ body {
 .topbar-title {
   flex: 1; margin: 0;
   font-size: 1.25rem; font-weight: 650; letter-spacing: -0.01em;
+  line-height: 1.15;
 }
 .logo-dot {
   width: 34px; height: 34px; border-radius: 10px;
@@ -73,8 +74,8 @@ body {
   margin: 6px 4px -6px;
 }
 .section-head-spaced { margin-bottom: 12px; }
-.grades-toolbar { align-items: flex-start; gap: 12px; margin: 2px 4px 8px; }
-.grades-hint { flex: 1; margin: 0; }
+.grades-toggle-row { display: flex; justify-content: flex-end; margin: 2px 4px 8px; }
+.grades-hint { margin: 0 4px 8px; }
 .grades-toggle { flex-shrink: 0; }
 .empty { text-align: center; color: var(--ink-soft); padding: 26px 12px; background: var(--card); border-radius: var(--radius); box-shadow: var(--shadow); }
 .hint { color: var(--ink-soft); font-size: 0.85rem; margin: 0; }
