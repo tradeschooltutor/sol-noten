@@ -436,30 +436,9 @@ button:focus-visible, .input:focus-visible, select:focus-visible {
 .zeugnis-head { margin: 0 0 4px; font-weight: 750; }
 .zeugnis-line { text-align: center; }
 
-/* ---------- Druck / PDF ---------- */
-#print-host { display: none; }
-@media print {
-  /* App-Ebenen im Druck komplett ausblenden (display:none ist auf Mobilgeräten
-     zuverlässiger als visibility:hidden) und nur den Druckbereich zeigen. */
-  #app, #toast-host, #modal-host, .update-banner { display: none !important; }
-  #print-host { display: block !important; position: static; width: 100%; }
-  .print-page { color: #000; }
-  .print-page h2 { margin: 0 0 2mm; }
-  .grades-table { font-size: 6.5pt; width: 100%; }
-  .report-table { font-size: 8pt; }
-  .grades-table th, .grades-table td, .report-table th, .report-table td {
-    border: 0.5pt solid #888; padding: 0.8mm 1mm;
-  }
-  .grades-table th { white-space: normal; hyphens: auto; font-weight: 600; }
-  .grades-table td { white-space: nowrap; }
-  .grades-table .sticky-col { position: static; box-shadow: none; }
-  .grades-table .group-row th { background: #eee !important; color: #000; }
-  .grades-table tr:nth-child(2) th, .report-table th { background: #f2f2f2 !important; color: #000; }
-  .report-table .val.up { background: #e4f2e8 !important; }
-  .report-table .val.down { background: #f9e9e7 !important; }
-  .table-scroll { overflow: visible; box-shadow: none; }
-  .report-block { page-break-inside: avoid; }
-}
+/* ---------- Druck / PDF ----------
+   Der eigentliche Druck erfolgt über ein isoliertes Druckfenster (siehe printNode in app.js),
+   das seine Stile selbst mitbringt. Hier ist daher kein Druck-Stil mehr nötig. */
 
 /* ---------- Farbschemata ---------- */
 [data-theme="blau"]      { --teal: #1d63b8; --teal-dark: #154a8a; --teal-soft: #e4edf8; }
@@ -543,15 +522,6 @@ button:focus-visible, .input:focus-visible, select:focus-visible {
 }
 .legend-dot.red { background: var(--red); }
 
-@media print {
-  /* Diagramm-Druck: alle 5 Kriterien zuverlässig auf EINER A4-Seite */
-  .charts-print h2 { font-size: 13pt; margin: 0 0 1mm; }
-  .charts-print .print-sub { font-size: 9pt; margin: 0 0 3mm; }
-  .charts-print .report-block { page-break-inside: avoid; margin: 0 0 2.5mm; }
-  .charts-print .report-block h3 { font-size: 9pt; margin: 0 0 1mm; }
-  .charts-print .chart-host svg { height: 30mm; width: 100%; display: block; }
-  .charts-print .hint { font-size: 8pt; margin: 0; }
-}
 
 /* ---------- Sperrbildschirm ---------- */
 .lock-screen { align-items: center; max-width: 340px; margin: 0 auto; }

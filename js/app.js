@@ -17,7 +17,7 @@
 
   /* ================= App-Start ================= */
 
-  var APP_VERSION = '0.13.3';
+  var APP_VERSION = '0.13.4';
 
   Store.init().then(function () {
     if ('serviceWorker' in navigator) {
@@ -1804,54 +1804,110 @@
 
   function fmtG(v) { return v == null ? '' : Calc.fmt(v); }
 
-  /* Druck-/PDF-Ausgabe: Inhalt in den Druckbereich legen und Druckdialog öffnen.
-     Auf Mobilgeräten (iPadOS/Android) kehrt window.print() oft sofort zurück und die
-     Vorschau öffnet asynchron. Deshalb wird der Inhalt NICHT per festem Timeout entfernt,
-     sondern erst nach dem afterprint-Ereignis; ein langer Timeout dient nur als Fallback. */
-  var printCleanupPending = false;
+  /* Druck-/PDF-Ausgabe (Weg B): Ein isoliertes Druckfenster mit nur dem Druckinhalt.
+     Robuster auf iPadOS/Android, weil kein Alt-Kontext (Scroll-Container, position-Ebenen)
+     mitgeschleppt wird – genau das verhinderte dort die Anzeige der Tabelle. */
   function printNode(node, landscape) {
-    if (printCleanupPending) return; /* Schutz vor doppelter Auslösung */
-    var host = document.getElementById('print-host') || (function () {
-      var d = h('div#print-host');
-      document.body.appendChild(d);
-      return d;
-    })();
-    clear(host);
-    var style = h('style', {}, '@page { size: A4 ' + (landscape ? 'landscape; margin: 7mm' : 'portrait; margin: 12mm') + '; }');
-    host.appendChild(style);
-    host.appendChild(node);
-
-    printCleanupPending = true;
-
-    var done = false;
-    function cleanup() {
-      if (done) return;
-      done = true;
-      clear(host);
-      printCleanupPending = false;
-      window.removeEventListener('afterprint', cleanup);
-      if (mql && mql.removeListener) mql.removeListener(mqlHandler);
+    var win = window.open('', '_blank');
+    if (!win) {
+      /* Popup blockiert (auf Mobilgeräten häufig, wenn nicht als direkte Tippfolge erkannt). */
+      UI.modal('Druck/PDF blockiert',
+        h('p', {}, 'Der Browser hat das Druckfenster blockiert. Bitte erlauben Sie für diese Seite ' +
+          'Pop-up-Fenster und tippen Sie erneut auf „Drucken / als PDF speichern".'));
+      return;
     }
 
-    /* Primär: afterprint-Ereignis. */
-    window.addEventListener('afterprint', cleanup);
+    var theme = document.documentElement.getAttribute('data-theme') || '';
+    var pageRule = '@page { size: A4 ' + (landscape ? 'landscape; margin: 7mm' : 'portrait; margin: 12mm') + '; }';
 
-    /* Zusätzlich: matchMedia('print') – manche mobile Browser feuern afterprint nicht,
-       melden aber über die Media-Query das Ende der Druckvorschau. */
-    var mql = window.matchMedia ? window.matchMedia('print') : null;
-    function mqlHandler(m) { if (!m.matches) cleanup(); }
-    if (mql && mql.addListener) mql.addListener(mqlHandler);
+    /* Die Diagramme (SVG) verwenden CSS-Variablen wie var(--teal). Im isolierten Fenster
+       sind diese sonst undefiniert – daher die aktuell aufgelösten Werte übernehmen. */
+    var cs = getComputedStyle(document.documentElement);
+    function cssVar(name, fallback) {
+      var v = cs.getPropertyValue(name);
+      return (v && v.trim()) || fallback;
+    }
+    var rootVars = ':root{' +
+      '--teal:' + cssVar('--teal', '#0e7c74') + ';' +
+      '--teal-dark:' + cssVar('--teal-dark', '#0b5f59') + ';' +
+      '--red:' + cssVar('--red', '#c0392b') + ';' +
+      '--line:' + cssVar('--line', '#c8ccd0') + ';' +
+      '--ink-soft:' + cssVar('--ink-soft', '#555') + ';' +
+      '}';
 
-    /* Fallback: Falls kein Ereignis feuert, nach längerer Zeit trotzdem aufräumen.
-       Bewusst großzügig (60 s), damit die Vorschau/PDF-Erzeugung nicht vorzeitig geleert wird. */
-    setTimeout(cleanup, 60000);
+    /* Die Druck-spezifischen Tabellenregeln (bisher nur in @media print) auch hier direkt
+       anwenden, damit der Inhalt im Druckfenster sichtbar und korrekt gesetzt ist. */
+    var printCss =
+      'html,body{margin:0;padding:0;background:#fff;color:#000;' +
+      'font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;}' +
+      'body{padding:6mm;}' +
+      '.print-page h2{margin:0 0 2mm;}' +
+      '.print-sub{margin:0 0 3mm;color:#333;}' +
+      '.grades-table{font-size:6.5pt;width:100%;border-collapse:collapse;}' +
+      '.report-table{font-size:7.5pt;border-collapse:collapse;}' +
+      '.grades-table th,.grades-table td,.report-table th,.report-table td{' +
+        'border:0.5pt solid #888;padding:0.6mm 1mm;text-align:center;}' +
+      '.grades-table th{white-space:normal;hyphens:auto;font-weight:600;}' +
+      '.grades-table td{white-space:nowrap;}' +
+      '.grades-table .sticky-col{position:static;box-shadow:none;text-align:left;}' +
+      '.grades-table .group-row th{background:#eee;color:#000;}' +
+      '.grades-table tr:nth-child(2) th,.report-table th{background:#f2f2f2;color:#000;}' +
+      '.report-table .row-label{text-align:left;color:#333;}' +
+      '.report-table .val.strong{font-weight:750;background:#f6f8f7;}' +
+      '.report-table .val.up{background:#e4f2e8;}' +
+      '.report-table .val.down{background:#f9e9e7;}' +
+      '.report-table .tend-cell{font-weight:750;}' +
+      '.table-scroll{overflow:visible;box-shadow:none;}' +
+      '.report{font-size:8pt;}' +
+      '.report-head h2{font-size:12pt;margin:0 0 1mm;}' +
+      '.report-block{page-break-inside:avoid;margin:0 0 2mm;}' +
+      '.report-block h3{font-size:8.5pt;margin:0 0 0.8mm;}' +
+      '.report-section{font-size:8.5pt;margin:2mm 0 0.8mm;}' +
+      '.report-line{margin:0.6mm 0;}' +
+      '.zeugnis-box{text-align:center;margin-top:2mm;page-break-inside:avoid;break-inside:avoid;}' +
+      '.zeugnis-head{margin:0 0 0.6mm;font-weight:750;font-size:8.5pt;}' +
+      '.zeugnis-line{text-align:center;}' +
+      '.charts-print h2{font-size:13pt;margin:0 0 1mm;}' +
+      '.charts-print .print-sub{font-size:9pt;margin:0 0 3mm;}' +
+      '.charts-print .report-block{page-break-inside:avoid;margin:0 0 2.5mm;}' +
+      '.charts-print .report-block h3{font-size:9pt;margin:0 0 1mm;}' +
+      '.charts-print .chart-host svg{height:30mm;width:100%;display:block;}' +
+      '.charts-print .hint{font-size:8pt;margin:0;}' +
+      '.legend-dot{display:inline-block;width:0.5em;height:0.5em;border-radius:50%;background:#c0392b;}' +
+      'h3{font-size:10pt;margin:2mm 0 1mm;}';
 
-    /* Auf Touch-Geräten kurz erklären, wo die PDF-Option sitzt (Nutzerführung). */
-    if (window.matchMedia && !window.matchMedia('(any-pointer: fine)').matches) {
-      toast('Tipp: In der Druckvorschau finden Sie „Als PDF sichern/speichern" (iPad: über das Teilen-Symbol, Android: im Drucker-Auswahlfeld).');
+    var doc = win.document;
+    doc.open();
+    doc.write('<!DOCTYPE html><html lang="de"' + (theme ? ' data-theme="' + theme + '"' : '') + '><head>' +
+      '<meta charset="UTF-8">' +
+      '<meta name="viewport" content="width=device-width, initial-scale=1">' +
+      '<title>SOL-Noten – Druck</title>' +
+      '<style>' + pageRule + rootVars + printCss + '</style>' +
+      '</head><body></body></html>');
+    doc.close();
+
+    /* Knoten stammt aus dem Ursprungsdokument – für Fremddokument sicher übernehmen. */
+    var imported;
+    try { imported = doc.importNode(node, true); }
+    catch (e) { imported = node; }
+    doc.body.appendChild(imported);
+
+    /* Drucken erst starten, wenn das Layout im Fenster steht. */
+    var printed = false;
+    function triggerPrint() {
+      if (printed) return;
+      printed = true;
+      try { win.focus(); } catch (e) {}
+      try { win.print(); } catch (e) {}
     }
 
-    window.print();
+    if (doc.readyState === 'complete') {
+      setTimeout(triggerPrint, 300);
+    } else {
+      win.addEventListener('load', function () { setTimeout(triggerPrint, 200); });
+      /* Fallback, falls das load-Ereignis ausbleibt. */
+      setTimeout(triggerPrint, 1200);
+    }
   }
 
   var gradesState = { mode: 'class', studentIdx: 0 };
