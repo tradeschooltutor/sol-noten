@@ -17,7 +17,7 @@
 
   /* ================= App-Start ================= */
 
-  var APP_VERSION = '0.13.0';
+  var APP_VERSION = '0.13.1';
 
   Store.init().then(function () {
     if ('serviceWorker' in navigator) {
@@ -166,18 +166,14 @@
 
   function header(title, backTo, extra) {
     var right = [];
-    if (extra) right.push(extra);
-    else if (route.name !== 'settings') {
+    // Echte Zusatz-Buttons (z. B. „Drucken") zuerst; leere Platzhalter ignorieren.
+    if (extra && !(extra.tagName === 'SPAN' && !extra.hasChildNodes())) right.push(extra);
+    if (route.name !== 'settings') {
       right.push(h('button.icon-btn', { onclick: function () { go('settings', { back: route }); }, 'aria-label': 'Einstellungen' }, '⚙'));
     }
     if (backTo) {
       right.push(h('button.icon-btn', {
         onclick: function () { go('home'); }, 'aria-label': 'Zur Kursübersicht', html: HOME_SVG
-      }));
-    }
-    if (Store.isEncrypted() && !Store.isLocked()) {
-      right.push(h('button.icon-btn', {
-        onclick: doLock, 'aria-label': 'App sperren', html: LOCK_SVG
       }));
     }
     return h('header.topbar', {},
@@ -226,6 +222,13 @@
       h('span.photo-fallback', {}, initials(stu)), img);
     loadPhotoInto(stu.id, img);
     return tile;
+  }
+
+  /* Kleines Schülerbild links neben dem Namen (für Listen wie OBT / Quartalsabschluss). */
+  function nameWithPhoto(stu) {
+    return h('div.name-with-photo',
+      photoTile(stu, { small: true }),
+      h('div.student-name', {}, stu.lastName + ', ' + stu.firstName));
   }
 
   views.seating = function (p) {
@@ -1087,7 +1090,46 @@
     var quarters = courseQuarters(course);
     var due = Quarters.quarterChangeDue(Store.todayISO(), q, quarters) && !course.dismissedQuarterHint[q];
 
-    var studentRows = cls.students.map(function (stu) {
+    var studentRows = pointstandRows(course, cls, q);
+
+    return h('div.screen',
+      header(cls.name + ' · ' + course.subject, { name: 'home' }),
+      due ? quarterHint(course, quarters) : null,
+      h('div.card.card-tight',
+        h('div.row-between',
+          h('span.quarter-chip.big', {}, q + '. Quartal'),
+          h('span.hint', {}, UI.fmtDate(quarters[q - 1].start) + ' – ' + UI.fmtDate(quarters[q - 1].end))
+        )
+      ),
+      h('div.course-actions-grid',
+        h('button.btn-primary.grid-btn.grid-btn-full', { onclick: function () { go('seating', { id: course.id }); } },
+          'Sitzplan'),
+        h('button.btn-primary.grid-btn', { onclick: function () { go('capture', { id: course.id }); } },
+          'SoLei-Punkte vergeben'),
+        h('button.btn-primary.grid-btn', { onclick: function () { go('pointstand', { id: course.id }); } },
+          'SoLei-Punktestand'),
+        h('button.btn-primary.grid-btn', { onclick: function () { go('absences', { id: course.id }); } },
+          'Unentschuldigte Fehlzeiten'),
+        h('button.btn-primary.grid-btn', { onclick: function () { go('quarterReview', { id: course.id, quarter: q }); } },
+          'SoLei-Quartalsnoten'),
+        h('button.btn-primary.grid-btn', { onclick: function () { go('obt', { id: course.id }); } },
+          'Open Book Tests'),
+        h('button.btn-primary.grid-btn', { onclick: function () { go('klausuren', { id: course.id }); } },
+          'Klausuren'),
+        h('button.btn-primary.grid-btn', { onclick: function () { gradesState.mode = 'class'; gradesState.studentIdx = 0; go('grades', { id: course.id }); } },
+          'Notenübersicht & Zeugnisnoten'),
+        h('button.btn-primary.grid-btn', { onclick: function () { go('editCourse', { id: course.id }); } },
+          'Kurs-Einstellungen')
+      ),
+      h('div.section-head', {}, 'SoLei-Punktestand im ' + q + '. Quartal'),
+      cls.students.length === 0
+        ? h('div.empty', h('p', {}, 'Diese Klasse hat noch keine Schüler/innen.'))
+        : h('div.card.card-list', {}, studentRows)
+    );
+  };
+
+  function pointstandRows(course, cls, q) {
+    return cls.students.map(function (stu) {
       var e = Store.entriesFor(course.id, stu.id, q);
       var stat = Calc.quarterStatus(e.byCriterion);
       var grade = Calc.gradeFor15(stat.sum, S().settings.grading15);
@@ -1104,38 +1146,26 @@
         )
       );
     });
+  }
 
+  views.pointstand = function (p) {
+    var course = Store.courseById(p.id);
+    if (!course) return views.home({});
+    var cls = Store.classById(course.classId);
+    var q = course.currentQuarter;
+    var quarters = courseQuarters(course);
     return h('div.screen',
-      header(cls.name + ' · ' + course.subject, { name: 'home' }),
-      due ? quarterHint(course, quarters) : null,
+      header(cls.name + ' · ' + course.subject, { name: 'course', params: { id: course.id } }),
       h('div.card.card-tight',
         h('div.row-between',
           h('span.quarter-chip.big', {}, q + '. Quartal'),
           h('span.hint', {}, UI.fmtDate(quarters[q - 1].start) + ' – ' + UI.fmtDate(quarters[q - 1].end))
         )
       ),
-      h('div.course-actions-grid',
-        h('button.btn-primary.grid-btn', { onclick: function () { go('capture', { id: course.id }); } },
-          'SoLei-Punkte vergeben'),
-        h('button.btn-primary.grid-btn', { onclick: function () { go('seating', { id: course.id }); } },
-          'Sitzplan mit Fotos'),
-        h('button.btn-primary.grid-btn', { onclick: function () { go('obt', { id: course.id }); } },
-          'Open Book Tests'),
-        h('button.btn-primary.grid-btn', { onclick: function () { go('klausuren', { id: course.id }); } },
-          'Klausuren'),
-        h('button.btn-primary.grid-btn', { onclick: function () { go('absences', { id: course.id }); } },
-          'Unentschuldigte Fehlzeiten'),
-        h('button.btn-primary.grid-btn', { onclick: function () { go('quarterReview', { id: course.id, quarter: q }); } },
-          'SoLei-Quartalsabschluss'),
-        h('button.btn-primary.grid-btn', { onclick: function () { go('grades', { id: course.id }); } },
-          'Notenübersicht & Notenausdruck'),
-        h('button.btn-primary.grid-btn', { onclick: function () { go('editCourse', { id: course.id }); } },
-          'Kurs-Einstellungen')
-      ),
       h('div.section-head', {}, 'SoLei-Punktestand im ' + q + '. Quartal'),
       cls.students.length === 0
         ? h('div.empty', h('p', {}, 'Diese Klasse hat noch keine Schüler/innen.'))
-        : h('div.card.card-list', {}, studentRows)
+        : h('div.card.card-list', {}, pointstandRows(course, cls, q))
     );
   };
 
@@ -1320,12 +1350,15 @@
       inp.addEventListener('input', refreshSolei);
 
       var row = h('div.review-row',
-        h('div.review-name',
-          h('div.student-name', {}, stu.lastName + ', ' + stu.firstName),
-          h('div.tap-substats',
-            h('span.sum-pill.small' + (dev === 'up' ? '.up' : dev === 'down' ? '.down' : ''), {},
-              (dev === 'up' ? '▲ ' : dev === 'down' ? '▼ ' : '') + Calc.fmt(stat.sum, 1) + '/15'),
-            stat.rated > 0 && stat.rated < 5 ? h('span.hint', {}, stat.rated + '/5 Kriterien') : null
+        h('div.review-name.name-with-photo',
+          photoTile(stu, { small: true }),
+          h('div',
+            h('div.student-name', {}, stu.lastName + ', ' + stu.firstName),
+            h('div.tap-substats',
+              h('span.sum-pill.small' + (dev === 'up' ? '.up' : dev === 'down' ? '.down' : ''), {},
+                (dev === 'up' ? '▲ ' : dev === 'down' ? '▼ ' : '') + Calc.fmt(stat.sum, 1) + '/15'),
+              stat.rated > 0 && stat.rated < 5 ? h('span.hint', {}, stat.rated + '/5 Kriterien') : null
+            )
           )
         ),
         h('div.review-grades',
@@ -1359,7 +1392,7 @@
     }
 
     return h('div.screen',
-      header('Quartalsabschluss', { name: 'course', params: { id: course.id } }),
+      header('SoLei-Quartalsabschluss', { name: 'course', params: { id: course.id } }),
       h('div.card.card-tight',
         h('div.row-between', qSel,
           q > 1 ? h('span.hint', {}, '▲ / ▼ = Entwicklung zum Vorquartal') : null),
@@ -1459,7 +1492,7 @@
       }
       inp.addEventListener('input', refresh);
       var row = h('div.review-row',
-        h('div.review-name', h('div.student-name', {}, stu.lastName + ', ' + stu.firstName)),
+        h('div.review-name', nameWithPhoto(stu)),
         h('div.review-grades',
           h('div.review-cell', h('span.hint', {}, 'Prozent'), inp),
           h('div.review-cell', h('span.hint', {}, 'Note'), gradeCell)
@@ -1786,6 +1819,8 @@
     setTimeout(function () { clear(host); }, 500);
   }
 
+  var gradesState = { mode: 'class', studentIdx: 0 };
+
   views.grades = function (p) {
     var course = Store.courseById(p.id);
     var cls = Store.classById(course.classId);
@@ -1932,9 +1967,47 @@
       printNode(pt, true);
     }
 
+    var viewToggle = h('div.view-toggle.grades-toggle',
+      h('button.view-btn' + (gradesState.mode === 'class' ? '.active' : ''), {
+        onclick: function () { if (gradesState.mode !== 'class') { gradesState.mode = 'class'; render(); } }
+      }, 'Ansicht: Klasse'),
+      h('button.view-btn' + (gradesState.mode === 'student' ? '.active' : ''), {
+        onclick: function () { if (gradesState.mode !== 'student') { gradesState.mode = 'student'; render(); } }
+      }, 'Ansicht: Schüler/in')
+    );
+
+    if (gradesState.mode === 'student' && students.length) {
+      if (gradesState.studentIdx >= students.length) gradesState.studentIdx = 0;
+      var si = gradesState.studentIdx;
+      var stu = students[si];
+      var reportContent = buildReportContent(course, stu);
+      return h('div.screen.screen-wide',
+        header('Notenübersicht ' + cls.name + ' - ' + course.subject, { name: 'course', params: { id: course.id } }),
+        h('div.row-between.grades-toolbar', h('span'), viewToggle),
+        h('div.crit-nav',
+          h('button.icon-btn', { onclick: function () {
+            gradesState.studentIdx = (si + students.length - 1) % students.length; render();
+          } }, '‹'),
+          h('span.crit-current', {}, stu.lastName + ', ' + stu.firstName),
+          h('button.icon-btn', { onclick: function () {
+            gradesState.studentIdx = (si + 1) % students.length; render();
+          } }, '›')
+        ),
+        h('div.card', {}, reportContent),
+        h('div.actions-col',
+          h('button.btn-plain.btn-block', { onclick: function () { printNode(reportContent.cloneNode(true), false); } },
+            'Drucken / als PDF speichern'))
+      );
+    }
+
     return h('div.screen.screen-wide',
-      header(cls.name + ' · Notenübersicht', { name: 'course', params: { id: course.id } }),
-      h('p.hint', {}, 'Antippen eines Namens öffnet den Notenausdruck. Die Spalten „HJ-Zeugnis“ und „Jahreszeugnis“ sind Ihre manuelle pädagogische Entscheidung.'),
+      header('Notenübersicht ' + cls.name + ' - ' + course.subject, { name: 'course', params: { id: course.id } }),
+      h('div.row-between.grades-toolbar',
+        h('p.hint.grades-hint',
+          'Hier vergeben Sie die ', h('strong', {}, 'Zeugnisnoten für das HJ-Zeugnis und das Jahreszeugnis'),
+          ' (in der Liste ganz rechts)!', h('br'),
+          h('strong', {}, 'Tippen Sie auf einen Namen'), ', um in dessen Einzelansicht zu wechseln.'),
+        viewToggle),
       h('div.table-scroll', {}, table),
       h('div.actions-col',
         h('button.btn-primary.btn-block', { onclick: saveZeugnis }, 'Zeugnisnoten speichern'),
@@ -1944,18 +2017,12 @@
     );
   };
 
-  /* ---------- Notenausdruck je Schüler/in (Blatt "Notenausdruck") ---------- */
+  /* ---------- Notenausdruck-Inhalt je Schüler/in (wiederverwendbar) ---------- */
 
-  views.report = function (p) {
-    var course = Store.courseById(p.id);
+  function buildReportContent(course, stu) {
     var cls = Store.classById(course.classId);
     var year = Store.yearById(course.yearId);
     var names = S().settings.criteriaNames;
-    var students = cls.students.slice().sort(function (a, b) {
-      return (a.lastName + a.firstName).localeCompare(b.lastName + b.firstName, 'de');
-    });
-    var si = Math.max(0, students.findIndex(function (s) { return s.id === p.studentId; }));
-    var stu = students[si];
     var r = studentGradeRow(course, stu);
     var w = course.weights || { sl: 40, obt: 20, ka: 40 };
     var nObt = Math.max(1, course.numOBT || 4);
@@ -2015,7 +2082,7 @@
     for (var i = 0; i < nObt; i++) obtLabels.push('OBT' + (i + 1));
     for (var k = 0; k < nKa; k++) kaLabels.push('K' + (k + 1));
 
-    var reportContent = h('div.report',
+    return h('div.report',
       h('div.report-head',
         h('h2', {}, 'Notenübersicht'),
         h('p.print-sub', {},
@@ -2038,10 +2105,26 @@
             h('td.val.strong', {}, fmtG(r.zSJ)), h('td.val.tend-cell', {}, r.tendenz)))
       ),
       (r.zeugnisHJ != null || r.zeugnisJahr != null)
-        ? h('p.report-line', {}, 'Note HJ-Zeugnis: ', h('strong', {}, fmtG(r.zeugnisHJ) || '–'),
-            '   ·   Note Jahreszeugnis: ', h('strong', {}, fmtG(r.zeugnisJahr) || '–'))
+        ? h('div.zeugnis-box',
+            h('h3.zeugnis-head', {}, 'Zeugnisnoten'),
+            h('p.report-line.zeugnis-line', {}, 'Note HJ-Zeugnis: ', h('strong', {}, fmtG(r.zeugnisHJ) || '–'),
+              '   ·   Note Jahreszeugnis: ', h('strong', {}, fmtG(r.zeugnisJahr) || '–')))
         : null
     );
+  }
+
+  /* ---------- Notenausdruck je Schüler/in (Blatt "Notenausdruck") ---------- */
+
+  views.report = function (p) {
+    var course = Store.courseById(p.id);
+    var cls = Store.classById(course.classId);
+    var students = cls.students.slice().sort(function (a, b) {
+      return (a.lastName + a.firstName).localeCompare(b.lastName + b.firstName, 'de');
+    });
+    var si = Math.max(0, students.findIndex(function (s) { return s.id === p.studentId; }));
+    var stu = students[si];
+
+    var reportContent = buildReportContent(course, stu);
 
     function doReportPrint() {
       printNode(reportContent.cloneNode(true), false);
@@ -2075,9 +2158,9 @@
       return (a.lastName + a.firstName).localeCompare(b.lastName + b.firstName, 'de');
     });
     var shownQ = p.quarter || course.currentQuarter;
-    var mode = p.view === 'student' ? 'student' : 'date';
+    var mode = p.view === 'date' ? 'date' : 'student';
 
-    var qSel = h('select.input', { style: { maxWidth: '10rem' } });
+    var qSel = h('select.input.q-select', { style: { maxWidth: '7.5rem' } });
     [1, 2, 3, 4].forEach(function (n) {
       qSel.appendChild(h('option', { value: n, selected: n === shownQ }, n + '. Quartal'));
     });
@@ -2088,12 +2171,12 @@
     var dateInput = h('input.input.date-inline', { type: 'date', value: p.date || Store.todayISO() });
 
     var viewToggle = h('div.view-toggle',
-      h('button.view-btn' + (mode === 'student' ? '.active' : ''), {
-        onclick: function () { if (mode !== 'student') go('absences', { id: course.id, quarter: shownQ, view: 'student' }); }
-      }, 'Ansicht: Schüler/in'),
       h('button.view-btn' + (mode === 'date' ? '.active' : ''), {
         onclick: function () { if (mode !== 'date') go('absences', { id: course.id, quarter: shownQ, view: 'date' }); }
-      }, 'Ansicht: Datum')
+      }, 'Ansicht: Datum'),
+      h('button.view-btn' + (mode === 'student' ? '.active' : ''), {
+        onclick: function () { if (mode !== 'student') go('absences', { id: course.id, quarter: shownQ, view: 'student' }); }
+      }, 'Ansicht: Schüler/in')
     );
 
     function addFor(stu) {
@@ -2209,7 +2292,7 @@
             '(Sonntage sind ausgelassen). Ein markierter Tag vergibt automatisch 0 Punkte in allen fünf ' +
             'SoLei-Kriterien; erneutes Antippen entfernt die Fehlzeit wieder.')
         ),
-        h('div.section-head', {}, shownQ + '. Quartal · ' + UI.fmtDate(qq.start) + ' – ' + UI.fmtDate(qq.end)),
+        h('div.section-head.section-head-spaced', {}, shownQ + '. Quartal · ' + UI.fmtDate(qq.start) + ' – ' + UI.fmtDate(qq.end)),
         students.length ? blocks : h('div.empty', h('p', {}, 'Diese Klasse hat noch keine Schüler/innen.'))
       );
     }

@@ -72,6 +72,10 @@ body {
   text-transform: uppercase; color: var(--ink-soft);
   margin: 6px 4px -6px;
 }
+.section-head-spaced { margin-bottom: 12px; }
+.grades-toolbar { align-items: flex-start; gap: 12px; margin: 2px 4px 8px; }
+.grades-hint { flex: 1; margin: 0; }
+.grades-toggle { flex-shrink: 0; }
 .empty { text-align: center; color: var(--ink-soft); padding: 26px 12px; background: var(--card); border-radius: var(--radius); box-shadow: var(--shadow); }
 .hint { color: var(--ink-soft); font-size: 0.85rem; margin: 0; }
 .hint.block { display: block; }
@@ -199,16 +203,25 @@ button { font: inherit; cursor: pointer; }
 .grade-pill.g5, .grade-pill.g6 { background: var(--red-soft); color: var(--red); }
 
 /* ---------- SoLei-Erfassung ---------- */
-.capture-bar { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
-.date-field { display: inline-flex; align-items: center; }
+.capture-bar { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: nowrap; }
+.date-field { display: inline-flex; align-items: center; flex-shrink: 1; min-width: 0; }
 
 /* Ansicht-Umschalter (Kriterium/Schüler bzw. Datum/Schüler) */
-.view-toggle { display: inline-flex; gap: 6px; flex-wrap: wrap; }
+.view-toggle { display: inline-flex; gap: 6px; flex-wrap: nowrap; flex-shrink: 0; }
 .view-btn {
   border: 1px solid var(--line); background: var(--card); color: var(--ink-soft);
   border-radius: 10px; padding: 8px 12px; min-height: 40px; font-size: 0.85rem; font-weight: 600;
+  white-space: nowrap;
 }
 .view-btn.active { background: var(--teal); border-color: var(--teal); color: #fff; }
+
+/* Auf schmalen Displays Datum/Quartal & Umschalter in einer Zeile halten */
+@media (max-width: 420px) {
+  .capture-bar { gap: 6px; }
+  .date-inline { font-size: 0.8rem; padding: 6px 6px; min-height: 36px; }
+  .q-select { font-size: 0.8rem; padding: 6px 6px; min-height: 36px; max-width: 6.5rem; }
+  .view-btn { padding: 8px 9px; font-size: 0.8rem; }
+}
 
 /* Fehlzeiten – Ansicht Schüler/in: Werktags-Chips */
 .abs-student-block { padding: 10px 14px; border-bottom: 1px solid var(--line); background: var(--card); }
@@ -339,6 +352,8 @@ button:focus-visible, .input:focus-visible, select:focus-visible {
 }
 .review-cell > strong { padding: 0 2px; }
 .review-solei { font-size: 1.05rem; }
+.name-with-photo { display: flex; align-items: center; gap: 10px; }
+.name-with-photo .photo-avatar { flex-shrink: 0; }
 .grade-input { min-height: 40px; padding: 6px 10px; font-weight: 700; max-width: 100%; }
 .input-error { border-color: var(--red); outline: 2px solid var(--red); }
 
@@ -416,6 +431,9 @@ button:focus-visible, .input:focus-visible, select:focus-visible {
 .report-table .val.up { background: var(--green-soft); color: var(--green); font-weight: 700; }
 .report-table .val.down { background: var(--red-soft); color: var(--red); font-weight: 700; }
 .report-line { margin: 0; }
+.zeugnis-box { text-align: center; margin-top: 10px; }
+.zeugnis-head { margin: 0 0 4px; font-weight: 750; }
+.zeugnis-line { text-align: center; }
 
 /* ---------- Druck / PDF ---------- */
 #print-host { display: none; }
@@ -675,3 +693,4 @@ button:focus-visible, .input:focus-visible, select:focus-visible {
   display: flex; align-items: center; justify-content: center; text-align: center;
   font-size: 0.95rem; line-height: 1.2;
 }
+.grid-btn-full { grid-column: 1 / -1; }
