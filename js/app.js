@@ -17,7 +17,7 @@
 
   /* ================= App-Start ================= */
 
-  var APP_VERSION = '0.13.2';
+  var APP_VERSION = '0.13.3';
 
   Store.init().then(function () {
     if ('serviceWorker' in navigator) {
@@ -1804,8 +1804,13 @@
 
   function fmtG(v) { return v == null ? '' : Calc.fmt(v); }
 
-  /* Druck-/PDF-Ausgabe: Inhalt in den Druckbereich legen und Druckdialog öffnen. */
+  /* Druck-/PDF-Ausgabe: Inhalt in den Druckbereich legen und Druckdialog öffnen.
+     Auf Mobilgeräten (iPadOS/Android) kehrt window.print() oft sofort zurück und die
+     Vorschau öffnet asynchron. Deshalb wird der Inhalt NICHT per festem Timeout entfernt,
+     sondern erst nach dem afterprint-Ereignis; ein langer Timeout dient nur als Fallback. */
+  var printCleanupPending = false;
   function printNode(node, landscape) {
+    if (printCleanupPending) return; /* Schutz vor doppelter Auslösung */
     var host = document.getElementById('print-host') || (function () {
       var d = h('div#print-host');
       document.body.appendChild(d);
@@ -1815,8 +1820,38 @@
     var style = h('style', {}, '@page { size: A4 ' + (landscape ? 'landscape; margin: 7mm' : 'portrait; margin: 12mm') + '; }');
     host.appendChild(style);
     host.appendChild(node);
+
+    printCleanupPending = true;
+
+    var done = false;
+    function cleanup() {
+      if (done) return;
+      done = true;
+      clear(host);
+      printCleanupPending = false;
+      window.removeEventListener('afterprint', cleanup);
+      if (mql && mql.removeListener) mql.removeListener(mqlHandler);
+    }
+
+    /* Primär: afterprint-Ereignis. */
+    window.addEventListener('afterprint', cleanup);
+
+    /* Zusätzlich: matchMedia('print') – manche mobile Browser feuern afterprint nicht,
+       melden aber über die Media-Query das Ende der Druckvorschau. */
+    var mql = window.matchMedia ? window.matchMedia('print') : null;
+    function mqlHandler(m) { if (!m.matches) cleanup(); }
+    if (mql && mql.addListener) mql.addListener(mqlHandler);
+
+    /* Fallback: Falls kein Ereignis feuert, nach längerer Zeit trotzdem aufräumen.
+       Bewusst großzügig (60 s), damit die Vorschau/PDF-Erzeugung nicht vorzeitig geleert wird. */
+    setTimeout(cleanup, 60000);
+
+    /* Auf Touch-Geräten kurz erklären, wo die PDF-Option sitzt (Nutzerführung). */
+    if (window.matchMedia && !window.matchMedia('(any-pointer: fine)').matches) {
+      toast('Tipp: In der Druckvorschau finden Sie „Als PDF sichern/speichern" (iPad: über das Teilen-Symbol, Android: im Drucker-Auswahlfeld).');
+    }
+
     window.print();
-    setTimeout(function () { clear(host); }, 500);
   }
 
   var gradesState = { mode: 'class', studentIdx: 0 };

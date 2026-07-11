@@ -439,10 +439,10 @@ button:focus-visible, .input:focus-visible, select:focus-visible {
 /* ---------- Druck / PDF ---------- */
 #print-host { display: none; }
 @media print {
-  body * { visibility: hidden; }
-  #print-host, #print-host * { visibility: visible; }
-  #print-host { display: block; position: absolute; left: 0; top: 0; width: 100%; }
+  /* App-Ebenen im Druck komplett ausblenden (display:none ist auf Mobilgeräten
+     zuverlässiger als visibility:hidden) und nur den Druckbereich zeigen. */
   #app, #toast-host, #modal-host, .update-banner { display: none !important; }
+  #print-host { display: block !important; position: static; width: 100%; }
   .print-page { color: #000; }
   .print-page h2 { margin: 0 0 2mm; }
   .grades-table { font-size: 6.5pt; width: 100%; }
