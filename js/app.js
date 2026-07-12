@@ -17,7 +17,7 @@
 
   /* ================= App-Start ================= */
 
-  var APP_VERSION = '0.13.4';
+  var APP_VERSION = '0.13.5';
 
   Store.init().then(function () {
     if ('serviceWorker' in navigator) {
@@ -1844,9 +1844,9 @@
       '.print-page h2{margin:0 0 2mm;}' +
       '.print-sub{margin:0 0 3mm;color:#333;}' +
       '.grades-table{font-size:6.5pt;width:100%;border-collapse:collapse;}' +
-      '.report-table{font-size:7.5pt;border-collapse:collapse;}' +
+      '.report-table{font-size:8.5pt;width:100%;border-collapse:collapse;}' +
       '.grades-table th,.grades-table td,.report-table th,.report-table td{' +
-        'border:0.5pt solid #888;padding:0.6mm 1mm;text-align:center;}' +
+        'border:0.5pt solid #888;padding:1mm 1.2mm;text-align:center;}' +
       '.grades-table th{white-space:normal;hyphens:auto;font-weight:600;}' +
       '.grades-table td{white-space:nowrap;}' +
       '.grades-table .sticky-col{position:static;box-shadow:none;text-align:left;}' +
@@ -1858,12 +1858,12 @@
       '.report-table .val.down{background:#f9e9e7;}' +
       '.report-table .tend-cell{font-weight:750;}' +
       '.table-scroll{overflow:visible;box-shadow:none;}' +
-      '.report{font-size:8pt;}' +
-      '.report-head h2{font-size:12pt;margin:0 0 1mm;}' +
-      '.report-block{page-break-inside:avoid;margin:0 0 2mm;}' +
-      '.report-block h3{font-size:8.5pt;margin:0 0 0.8mm;}' +
-      '.report-section{font-size:8.5pt;margin:2mm 0 0.8mm;}' +
-      '.report-line{margin:0.6mm 0;}' +
+      '.report{font-size:8.5pt;}' +
+      '.report-head h2{font-size:13pt;margin:0 0 1mm;}' +
+      '.report-block{page-break-inside:avoid;margin:0 0 2.5mm;}' +
+      '.report-block h3{font-size:9.5pt;margin:0 0 1mm;}' +
+      '.report-section{font-size:9.5pt;margin:2mm 0 1mm;}' +
+      '.report-line{margin:0.8mm 0;}' +
       '.zeugnis-box{text-align:center;margin-top:2mm;page-break-inside:avoid;break-inside:avoid;}' +
       '.zeugnis-head{margin:0 0 0.6mm;font-weight:750;font-size:8.5pt;}' +
       '.zeugnis-line{text-align:center;}' +
@@ -1874,7 +1874,15 @@
       '.charts-print .chart-host svg{height:30mm;width:100%;display:block;}' +
       '.charts-print .hint{font-size:8pt;margin:0;}' +
       '.legend-dot{display:inline-block;width:0.5em;height:0.5em;border-radius:50%;background:#c0392b;}' +
-      'h3{font-size:10pt;margin:2mm 0 1mm;}';
+      'h3{font-size:10pt;margin:2mm 0 1mm;}' +
+      /* Bedienleiste nur am Bildschirm – im Ausdruck ausgeblendet. */
+      '.print-toolbar{position:sticky;top:0;display:flex;gap:10px;justify-content:flex-end;' +
+        'padding:8px 4px;margin:0 0 6px;background:#fff;border-bottom:1px solid #ddd;}' +
+      '.print-toolbar button{font:inherit;font-size:14px;padding:8px 16px;border-radius:8px;' +
+        'border:1px solid ' + cssVar('--teal', '#0e7c74') + ';background:' + cssVar('--teal', '#0e7c74') + ';' +
+        'color:#fff;cursor:pointer;}' +
+      '.print-toolbar .btn-secondary{background:#fff;color:' + cssVar('--teal', '#0e7c74') + ';}' +
+      '@media print{.print-toolbar{display:none !important;}}';
 
     var doc = win.document;
     doc.open();
@@ -1890,6 +1898,21 @@
     var imported;
     try { imported = doc.importNode(node, true); }
     catch (e) { imported = node; }
+
+    /* Bedienleiste (nur am Bildschirm): erneut drucken bzw. Fenster schließen.
+       Wichtig für iPad-PWA, wo sonst kein sichtbarer Weg zurück zur App besteht. */
+    var toolbar = doc.createElement('div');
+    toolbar.className = 'print-toolbar';
+    var btnPrint = doc.createElement('button');
+    btnPrint.className = 'btn-secondary';
+    btnPrint.textContent = 'Drucken / als PDF';
+    btnPrint.onclick = function () { try { win.print(); } catch (e) {} };
+    var btnClose = doc.createElement('button');
+    btnClose.textContent = 'Schließen';
+    btnClose.onclick = function () { try { win.close(); } catch (e) {} };
+    toolbar.appendChild(btnPrint);
+    toolbar.appendChild(btnClose);
+    doc.body.appendChild(toolbar);
     doc.body.appendChild(imported);
 
     /* Drucken erst starten, wenn das Layout im Fenster steht. */
