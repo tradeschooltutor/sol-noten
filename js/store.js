@@ -79,7 +79,8 @@
                              weights:{sl,obt,ka}, maxPoints:{1:[..],2:..,3:..,4:..},
                              currentQuarter, portfolio:{q:{studentId:grade}},
                              dismissedQuarterHint:{q:true}} */
-      soleiEntries: []   /* {id, courseId, studentId, quarter, criterion, points, date, createdAt} */
+      soleiEntries: [],  /* {id, courseId, studentId, quarter, criterion, points, date, createdAt} */
+      uploadTallies: []  /* {courseId, studentId, quarter, done, missed} – Ergebnis-Uploads, Zählung am Quartalsende */
     };
   }
 
@@ -90,6 +91,10 @@
       if (!s.settings.gradingPct) s.settings.gradingPct = Calc.DEFAULT_GRADING_PCT.slice();
       if (!s.settings.theme) s.settings.theme = 'petrol';
       if (!Array.isArray(s.absences)) s.absences = [];
+      if (!Array.isArray(s.uploadTallies)) s.uploadTallies = [];
+      if (Array.isArray(s.courses)) s.courses.forEach(function (c) {
+        if (typeof c.uploadCriterion !== 'number') c.uploadCriterion = 2; /* Standard: 3. Kriterium (Arbeitsergebnisse) */
+      });
     }
     return s;
   }
@@ -660,7 +665,44 @@
         list.push(e);
       }
     }
+    /* Ergebnis-Uploads (Quartalsend-Zählung, ohne Datum) in die Durchschnitte einrechnen:
+       jeder erledigte Upload = Maximalpunktzahl des gewählten Kriteriums, jeder vergessene = 0.
+       Bewusst NICHT in "list" – dort stehen nur datierte Vergaben (Diagramm/Vergabeliste). */
+    var t = uploadTallyFor(courseId, studentId, quarter);
+    if (t && (t.done > 0 || t.missed > 0)) {
+      var course = courseById(courseId);
+      if (course) {
+        var ci = typeof course.uploadCriterion === 'number' ? course.uploadCriterion : 2;
+        var max = (course.maxPoints && course.maxPoints[quarter] && course.maxPoints[quarter][ci]) || 3;
+        for (var d = 0; d < t.done; d++) byCrit[ci].push(max);
+        for (var m = 0; m < t.missed; m++) byCrit[ci].push(0);
+      }
+    }
     return { byCriterion: byCrit, list: list };
+  }
+
+  /* ---------- Ergebnis-Uploads (Zählung am Quartalsende) ---------- */
+
+  function uploadTallyFor(courseId, studentId, quarter) {
+    return state.uploadTallies.find(function (t) {
+      return t.courseId === courseId && t.studentId === studentId && t.quarter === quarter;
+    }) || null;
+  }
+
+  /* Setzt (ersetzt) die Upload-Zählung. done/missed = 0/0 entfernt den Eintrag. */
+  function setUploadTally(courseId, studentId, quarter, done, missed) {
+    var i = state.uploadTallies.findIndex(function (t) {
+      return t.courseId === courseId && t.studentId === studentId && t.quarter === quarter;
+    });
+    if (!done && !missed) {
+      if (i >= 0) state.uploadTallies.splice(i, 1);
+    } else if (i >= 0) {
+      state.uploadTallies[i].done = done;
+      state.uploadTallies[i].missed = missed;
+    } else {
+      state.uploadTallies.push({ courseId: courseId, studentId: studentId, quarter: quarter, done: done, missed: missed });
+    }
+    save();
   }
 
   function addEntry(courseId, studentId, quarter, criterion, points, dateISO) {
@@ -723,6 +765,7 @@
     getState: getState, freshState: freshState,
     yearById: yearById, classById: classById, courseById: courseById, studentById: studentById,
     entriesFor: entriesFor, addEntry: addEntry, updateEntry: updateEntry, deleteEntry: deleteEntry,
+    uploadTallyFor: uploadTallyFor, setUploadTally: setUploadTally,
     addAbsence: addAbsence, removeAbsence: removeAbsence, absencesFor: absencesFor,
     exportJSON: exportJSON, importJSON: importJSON, parseBackup: parseBackup, applyImport: applyImport,
     listSnapshots: listSnapshots, restoreSnapshot: restoreSnapshot,

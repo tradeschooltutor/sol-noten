@@ -17,7 +17,7 @@
 
   /* ================= App-Start ================= */
 
-  var APP_VERSION = '0.13.5';
+  var APP_VERSION = '0.14.0';
 
   Store.init().then(function () {
     if ('serviceWorker' in navigator) {
@@ -979,6 +979,13 @@
     var wSl = h('input.input.input-num', { type: 'number', min: 0, max: 100, value: w.sl });
     var wObt = h('input.input.input-num', { type: 'number', min: 0, max: 100, value: w.obt });
     var wKa = h('input.input.input-num', { type: 'number', min: 0, max: 100, value: w.ka });
+
+    var upCritDefault = course && typeof course.uploadCriterion === 'number' ? course.uploadCriterion : 2;
+    var upCritSel = h('select.input');
+    st.settings.criteriaNames.forEach(function (n, i) {
+      upCritSel.appendChild(h('option', { value: i, selected: i === upCritDefault }, n));
+    });
+
     var status = h('p.hint.error-text');
 
     function saveCourse() {
@@ -1000,6 +1007,7 @@
         course.subject = subjectInput.value.trim();
         course.numOBT = Number(obtInput.value); course.numKA = Number(kaInput.value);
         course.weights = { sl: Number(wSl.value), obt: Number(wObt.value), ka: Number(wKa.value) };
+        course.uploadCriterion = Number(upCritSel.value);
       } else {
         course = {
           id: Store.uid(), yearId: year.id, classId: classId,
@@ -1008,7 +1016,8 @@
           weights: { sl: Number(wSl.value), obt: Number(wObt.value), ka: Number(wKa.value) },
           maxPoints: { 1: Calc.DEFAULT_MAX.slice(), 2: Calc.DEFAULT_MAX.slice(), 3: Calc.DEFAULT_MAX.slice(), 4: Calc.DEFAULT_MAX.slice() },
           currentQuarter: Quarters.quarterForDate(Store.todayISO(), year.quarters),
-          portfolio: {}, quarterOverrides: null, dismissedQuarterHint: {}
+          portfolio: {}, quarterOverrides: null, dismissedQuarterHint: {},
+          uploadCriterion: Number(upCritSel.value)
         };
         st.courses.push(course);
         Store.save();
@@ -1030,6 +1039,7 @@
           st2.courses = st2.courses.filter(function (c) { return c.id !== course.id; });
           st2.soleiEntries = st2.soleiEntries.filter(function (e) { return e.courseId !== course.id; });
           st2.absences = (st2.absences || []).filter(function (a) { return a.courseId !== course.id; });
+          st2.uploadTallies = (st2.uploadTallies || []).filter(function (t) { return t.courseId !== course.id; });
           Store.save();
           go('home');
         });
@@ -1068,6 +1078,8 @@
             h('label.field', h('span.hint', {}, 'Klausuren'), wKa)
           )
         ),
+        h('label.field', h('span.field-label', {}, 'Kriterium für Ergebnis-Uploads'), upCritSel,
+          h('p.hint', {}, 'Auf dieses SoLei-Kriterium werden die auf der Seite „Ergebnis-Uploads“ gezählten Uploads angerechnet.')),
         status,
         h('button.btn-primary.btn-block', { onclick: saveCourse }, course ? 'Änderungen speichern' : 'Kurs anlegen')
       ),
@@ -1102,12 +1114,14 @@
         )
       ),
       h('div.course-actions-grid',
-        h('button.btn-primary.grid-btn.grid-btn-full', { onclick: function () { go('seating', { id: course.id }); } },
-          'Sitzplan'),
         h('button.btn-primary.grid-btn', { onclick: function () { go('capture', { id: course.id }); } },
           'SoLei-Punkte vergeben'),
+        h('button.btn-primary.grid-btn', { onclick: function () { go('seating', { id: course.id }); } },
+          'Sitzplan'),
         h('button.btn-primary.grid-btn', { onclick: function () { go('pointstand', { id: course.id }); } },
           'SoLei-Punktestand'),
+        h('button.btn-primary.grid-btn', { onclick: function () { go('uploads', { id: course.id }); } },
+          'Ergebnis-Uploads'),
         h('button.btn-primary.grid-btn', { onclick: function () { go('absences', { id: course.id }); } },
           'Unentschuldigte Fehlzeiten'),
         h('button.btn-primary.grid-btn', { onclick: function () { go('quarterReview', { id: course.id, quarter: q }); } },
@@ -1166,6 +1180,116 @@
       cls.students.length === 0
         ? h('div.empty', h('p', {}, 'Diese Klasse hat noch keine Schüler/innen.'))
         : h('div.card.card-list', {}, pointstandRows(course, cls, q))
+    );
+  };
+
+  /* ================= Ergebnis-Uploads (Zählung am Quartalsende) ================= */
+
+  views.uploads = function (p) {
+    var course = Store.courseById(p.id);
+    if (!course) return views.home({});
+    var cls = Store.classById(course.classId);
+    var shownQ = p.quarter || course.currentQuarter;
+    var ci = typeof course.uploadCriterion === 'number' ? course.uploadCriterion : 2;
+    var critName = S().settings.criteriaNames[ci];
+    var max = course.maxPoints[shownQ][ci];
+    var students = cls.students.slice().sort(function (a, b) {
+      return (a.lastName + a.firstName).localeCompare(b.lastName + b.firstName, 'de');
+    });
+
+    var qSel = h('select.input.q-select', { style: { maxWidth: '7.5rem' } });
+    [1, 2, 3, 4].forEach(function (n) {
+      qSel.appendChild(h('option', { value: n, selected: n === shownQ }, n + '. Quartal'));
+    });
+    qSel.addEventListener('change', function () {
+      go('uploads', { id: course.id, quarter: Number(qSel.value) });
+    });
+
+    var intro = h('div.card',
+      h('p', {},
+        'Wenn Ihre Schüler/innen die Aufgabe haben, ihre Arbeitsergebnisse in das Learning Management System der Schule (z.B. Moodle/Logineo, OneNote, usw.) hochzuladen, haben Sie zwei Möglichkeiten:',
+        h('br'),
+        'a) Sie prüfen die Uploads täglich über den Menüpunkt „SoLei-Punkte vergeben“.',
+        h('br'),
+        'b) Sie prüfen alle erfolgten / vergessenen Uploads am Quartalsende. Das können Sie hier auf dieser Seite eintragen.'),
+      h('p', {},
+        h('strong', {}, 'Wie funktioniert das?'),
+        h('br'),
+        'Die Anzahl der erfolgten Uploads wird mit jeweils ' + Calc.fmt(max, 1) + ' Punkten beim SoLei-Kriterium ',
+        h('strong', {}, critName),
+        ' gezählt. Die Anzahl der vergessenen Uploads wird mit jeweils 0 Punkten gezählt. Eine Datumsangabe erfolgt hier nicht, da die Zählung erst am Quartalsende erfolgt. Die Punkte gehen aber in die Durchschnittsberechnung beim SoLei-Kriterium ',
+        h('strong', {}, critName),
+        ' ein.'),
+      h('p', {},
+        'Wenn Sie die Uploads Ihrer Schüler/innen genauer bewerten möchten, d.h. mit Datumsangabe und abgestufter Punktevergabe für deren Vollständigkeit, nutzen Sie stattdessen Möglichkeit a), d.h. den Menüpunkt ',
+        h('strong', {}, 'SoLei-Punkte vergeben'),
+        '.')
+    );
+
+    var inputs = {};
+    function parseCount(str) {
+      var s = String(str).trim();
+      if (s === '') return { ok: true, value: 0 };
+      var v = Number(s);
+      if (isNaN(v) || v < 0 || v !== Math.floor(v)) return { ok: false };
+      return { ok: true, value: v };
+    }
+
+    var rows = students.map(function (stu) {
+      var t = Store.uploadTallyFor(course.id, stu.id, shownQ);
+      var inpDone = h('input.input.grade-input', {
+        type: 'text', inputmode: 'numeric', placeholder: '0',
+        value: t && t.done ? t.done : '', 'aria-label': 'Erledigte Uploads'
+      });
+      var inpMissed = h('input.input.grade-input', {
+        type: 'text', inputmode: 'numeric', placeholder: '0',
+        value: t && t.missed ? t.missed : '', 'aria-label': 'Vergessene Uploads'
+      });
+      inputs[stu.id] = { done: inpDone, missed: inpMissed };
+      function refresh() {
+        inpDone.classList.toggle('input-error', !parseCount(inpDone.value).ok);
+        inpMissed.classList.toggle('input-error', !parseCount(inpMissed.value).ok);
+      }
+      inpDone.addEventListener('input', refresh);
+      inpMissed.addEventListener('input', refresh);
+      return h('div.review-row',
+        h('div.review-name', nameWithPhoto(stu)),
+        h('div.review-grades',
+          h('div.review-cell', h('span.hint', {}, 'Erledigte Uploads'), inpDone),
+          h('div.review-cell', h('span.hint', {}, 'Vergessene Uploads'), inpMissed)
+        )
+      );
+    });
+
+    function saveAll() {
+      var bad = [];
+      students.forEach(function (stu) {
+        var rd = parseCount(inputs[stu.id].done.value);
+        var rm = parseCount(inputs[stu.id].missed.value);
+        if (!rd.ok || !rm.ok) bad.push(stu.lastName + ', ' + stu.firstName);
+      });
+      if (bad.length) {
+        UI.modal('Ungültige Eingabe',
+          h('p', {}, 'Bitte geben Sie ganze Zahlen (0 oder größer) ein. Bitte prüfen Sie: ' + bad.join('; ') + '.'));
+        return;
+      }
+      students.forEach(function (stu) {
+        var done = parseCount(inputs[stu.id].done.value).value;
+        var missed = parseCount(inputs[stu.id].missed.value).value;
+        Store.setUploadTally(course.id, stu.id, shownQ, done, missed);
+      });
+      toast('Ergebnis-Uploads (' + shownQ + '. Quartal) gespeichert.');
+    }
+
+    return h('div.screen',
+      header('Ergebnis-Uploads', { name: 'course', params: { id: course.id } }),
+      intro,
+      h('div.capture-bar', qSel, h('span')),
+      students.length === 0
+        ? h('div.empty', h('p', {}, 'Diese Klasse hat noch keine Schüler/innen.'))
+        : h('div.card.card-list', {}, rows),
+      h('div.actions-col',
+        h('button.btn-primary.btn-block', { onclick: saveAll }, 'Uploads speichern'))
     );
   };
 
@@ -2541,6 +2665,7 @@
           var st = S();
           st.soleiEntries = st.soleiEntries.filter(function (e) { return e.studentId !== stu.id; });
           st.absences = (st.absences || []).filter(function (a) { return a.studentId !== stu.id; });
+          st.uploadTallies = (st.uploadTallies || []).filter(function (t) { return t.studentId !== stu.id; });
           /* Sitzplatz-Positionen in allen Kursen dieser Klasse entfernen */
           st.courses.forEach(function (co) {
             if (co.seating && co.seating.positions) delete co.seating.positions[stu.id];
@@ -2875,6 +3000,12 @@
       var chartPoints = e.list.filter(function (x) { return x.criterion === filterCrit; })
         .sort(function (a, b) { return a.date.localeCompare(b.date) || a.createdAt.localeCompare(b.createdAt); })
         .map(function (x) { return { date: x.date, points: x.points, absence: !!x.absenceId }; });
+      /* Ergebnis-Uploads (Quartalsend-Zählung ohne Datum): nicht im Diagramm, sondern als Anmerkung darunter. */
+      var upCi = typeof course.uploadCriterion === 'number' ? course.uploadCriterion : 2;
+      var upTally = filterCrit === upCi ? Store.uploadTallyFor(course.id, stu.id, shownQ) : null;
+      var upNote = (upTally && (upTally.done > 0 || upTally.missed > 0))
+        ? h('p.hint', {}, upTally.done + ' mal Ergebnisse hochgeladen, ' + upTally.missed + ' Ergebnisse fehlen')
+        : null;
       chartCard = h('div.card.card-tight',
         h('div.row-between',
           h('strong', {}, names[filterCrit] + ' im ' + shownQ + '. Quartal'),
@@ -2884,7 +3015,8 @@
              chartPoints.some(function (cp) { return cp.absence; })
                ? h('p.hint', {}, h('span.legend-dot.red'), ' rote Punkte = unentschuldigte Fehlzeit (0 Punkte)')
                : null]
-          : h('p.hint', {}, 'In diesem Quartal wurden für dieses Kriterium noch keine Punkte vergeben.')
+          : h('p.hint', {}, 'In diesem Quartal wurden für dieses Kriterium noch keine Punkte vergeben.'),
+        upNote
       );
     }
 
@@ -2948,7 +3080,16 @@
             h('h3', {}, n + (stat.averages[ci] != null ? ' · ø ' + Calc.fmt(stat.averages[ci], 1) +
               ' von ' + Calc.fmt(course.maxPoints[shownQ][ci], 1) : '')),
             pts.length ? lineChart(pts, course.maxPoints[shownQ][ci])
-              : h('p.hint', {}, 'Keine Punktevergaben in diesem Quartal.'));
+              : h('p.hint', {}, 'Keine Punktevergaben in diesem Quartal.'),
+            (function () {
+              /* Ergebnis-Uploads (Quartalsend-Zählung ohne Datum) als Anmerkung unter dem Diagramm. */
+              var upCi = typeof course.uploadCriterion === 'number' ? course.uploadCriterion : 2;
+              if (ci !== upCi) return null;
+              var t = Store.uploadTallyFor(course.id, stu.id, shownQ);
+              return (t && (t.done > 0 || t.missed > 0))
+                ? h('p.hint', {}, t.done + ' mal Ergebnisse hochgeladen, ' + t.missed + ' Ergebnisse fehlen')
+                : null;
+            })());
         }),
         Store.absencesFor(course.id, stu.id, shownQ).length
           ? h('p.hint', {}, h('span.legend-dot.red'), ' rote Punkte = unentschuldigte Fehlzeit (0 Punkte)')
