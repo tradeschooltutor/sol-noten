@@ -74,6 +74,7 @@ body {
   margin: 6px 4px -6px;
 }
 .section-head-spaced { margin-bottom: 12px; }
+.course-box { text-align: center; font-size: 1.05rem; }
 .grades-toggle-row { display: flex; justify-content: flex-end; margin: 2px 4px 8px; }
 .grades-hint { margin: 0 4px 8px; }
 .grades-toggle { flex-shrink: 0; }

@@ -17,7 +17,7 @@
 
   /* ================= App-Start ================= */
 
-  var APP_VERSION = '0.14.0';
+  var APP_VERSION = '0.14.1';
 
   Store.init().then(function () {
     if ('serviceWorker' in navigator) {
@@ -231,6 +231,13 @@
       h('div.student-name', {}, stu.lastName + ', ' + stu.firstName));
   }
 
+  /* Kursname (Klasse - Fach) als weiße Box unterhalb der Kopfzeile – auf allen Kursseiten. */
+  function courseBox(course) {
+    var cls = Store.classById(course.classId);
+    return h('div.card.card-tight.course-box',
+      h('strong', {}, cls.name + ' - ' + course.subject));
+  }
+
   views.seating = function (p) {
     var course = Store.courseById(p.id);
     var cls = Store.classById(course.classId);
@@ -241,7 +248,8 @@
       var consentCheck = h('input', { type: 'checkbox' });
       var consentErr = h('p.hint.error-text');
       return h('div.screen',
-        header('Sitzplan mit Fotos', { name: 'course', params: { id: course.id } }),
+        header('Sitzplan', { name: 'course', params: { id: course.id } }),
+        courseBox(course),
         h('div.card',
           h('h3', {}, 'Hinweis zu Schülerfotos'),
           h('p', {}, 'Fotos von Schülerinnen und Schülern sind besonders schützenswerte personenbezogene Daten. ' +
@@ -270,7 +278,8 @@
     });
 
     return h('div.screen',
-      header(cls.name + ' · Sitzplan', { name: 'course', params: { id: course.id } }),
+      header('Sitzplan', { name: 'course', params: { id: course.id } }),
+      courseBox(course),
       h('div.tabbar',
         h('button.tab' + (p.tab !== 'photos' ? '.active' : ''), {
           onclick: function () { go('seating', { id: course.id, tab: 'plan' }); } }, 'Sitzplan'),
@@ -1062,6 +1071,7 @@
 
     return h('div.screen',
       header(course ? 'Kurs-Einstellungen' : 'Kurs anlegen', p.id ? { name: 'course', params: { id: p.id } } : { name: 'home' }),
+      course ? courseBox(course) : null,
       h('div.card',
         h('label.field', h('span.field-label', {}, 'Klasse'), classSel, newClassInput,
           h('p.hint', {}, 'Die Schülerliste gehört zur Klasse und wird von allen Kursen dieser Klasse gemeinsam genutzt.')),
@@ -1147,7 +1157,7 @@
       var e = Store.entriesFor(course.id, stu.id, q);
       var stat = Calc.quarterStatus(e.byCriterion);
       var grade = Calc.gradeFor15(stat.sum, S().settings.grading15);
-      return h('div.student-row', { onclick: function () { go('protokoll', { courseId: course.id, studentId: stu.id }); } },
+      return h('div.student-row', { onclick: function () { go('protokoll', { courseId: course.id, studentId: stu.id, quarter: q }); } },
         h('div.student-name', {}, stu.lastName + ', ' + stu.firstName),
         h('div.student-stats', {},
           stat.rated === 0
@@ -1166,20 +1176,36 @@
     var course = Store.courseById(p.id);
     if (!course) return views.home({});
     var cls = Store.classById(course.classId);
-    var q = course.currentQuarter;
+    var shownQ = p.quarter || course.currentQuarter;
     var quarters = courseQuarters(course);
+
+    var qSel = h('select.input.q-select', { style: { maxWidth: '7.5rem' } });
+    [1, 2, 3, 4].forEach(function (n) {
+      qSel.appendChild(h('option', { value: n, selected: n === shownQ }, n + '. Quartal'));
+    });
+    qSel.addEventListener('change', function () {
+      go('pointstand', { id: course.id, quarter: Number(qSel.value) });
+    });
+
+    var viewToggle = h('div.view-toggle',
+      h('button.view-btn.active', {}, 'Ansicht: Liste'),
+      h('button.view-btn', {
+        onclick: function () {
+          if (!cls.students.length) return;
+          go('protokoll', { courseId: course.id, studentId: cls.students[0].id, quarter: shownQ });
+        }
+      }, 'Ansicht: Schüler/in')
+    );
+
     return h('div.screen',
-      header(cls.name + ' · ' + course.subject, { name: 'course', params: { id: course.id } }),
-      h('div.card.card-tight',
-        h('div.row-between',
-          h('span.quarter-chip.big', {}, q + '. Quartal'),
-          h('span.hint', {}, UI.fmtDate(quarters[q - 1].start) + ' – ' + UI.fmtDate(quarters[q - 1].end))
-        )
-      ),
-      h('div.section-head', {}, 'SoLei-Punktestand im ' + q + '. Quartal'),
+      header('SoLei-Punktestand', { name: 'course', params: { id: course.id } }),
+      courseBox(course),
+      h('div.capture-bar', qSel, viewToggle),
+      h('div.section-head.section-head-spaced', {},
+        shownQ + '. Quartal · ' + UI.fmtDate(quarters[shownQ - 1].start) + ' – ' + UI.fmtDate(quarters[shownQ - 1].end)),
       cls.students.length === 0
         ? h('div.empty', h('p', {}, 'Diese Klasse hat noch keine Schüler/innen.'))
-        : h('div.card.card-list', {}, pointstandRows(course, cls, q))
+        : h('div.card.card-list', {}, pointstandRows(course, cls, shownQ))
     );
   };
 
@@ -1283,6 +1309,7 @@
 
     return h('div.screen',
       header('Ergebnis-Uploads', { name: 'course', params: { id: course.id } }),
+      courseBox(course),
       intro,
       h('div.capture-bar', qSel, h('span')),
       students.length === 0
@@ -1370,6 +1397,7 @@
 
     return h('div.screen',
       header('Maximalpunkte', { name: 'course', params: { id: course.id } }),
+      courseBox(course),
       p.intro ? h('div.banner-info', {},
         h('span', {}, 'Bitte prüfen Sie die Maximalpunkte der Kriterien für das ' + q + '. Quartal, ' +
           'bevor Sie die ersten Punkte vergeben. Der Standard ist 5 × 3 Punkte.')) : null,
@@ -1517,6 +1545,7 @@
 
     return h('div.screen',
       header('SoLei-Quartalsabschluss', { name: 'course', params: { id: course.id } }),
+      courseBox(course),
       h('div.card.card-tight',
         h('div.row-between', qSel,
           q > 1 ? h('span.hint', {}, '▲ / ▼ = Entwicklung zum Vorquartal') : null),
@@ -1702,6 +1731,7 @@
 
     return h('div.screen',
       header('Open Book Tests', { name: 'course', params: { id: course.id } }),
+      courseBox(course),
       h('div.card.card-tight',
         h('div.row-between', hjSeg, avgEl),
         tabs,
@@ -1845,6 +1875,7 @@
 
     return h('div.screen',
       header('Klausuren', { name: 'course', params: { id: course.id } }),
+      courseBox(course),
       h('div.card.card-tight',
         h('div.row-between', hjSeg, null),
         tabs,
@@ -2214,17 +2245,14 @@
       }, 'Ansicht: Schüler/in')
     );
 
-    function gradesTitle() {
-      return ['Notenübersicht', h('br'), cls.name + ' - ' + course.subject];
-    }
-
     if (gradesState.mode === 'student' && students.length) {
       if (gradesState.studentIdx >= students.length) gradesState.studentIdx = 0;
       var si = gradesState.studentIdx;
       var stu = students[si];
       var reportContent = buildReportContent(course, stu);
       return h('div.screen.screen-wide',
-        header(gradesTitle(), { name: 'course', params: { id: course.id } }),
+        header('Notenübersicht und Zeugnisnoten', { name: 'course', params: { id: course.id } }),
+        courseBox(course),
         h('div.grades-toggle-row', viewToggle),
         h('div.crit-nav',
           h('button.icon-btn', { onclick: function () {
@@ -2243,7 +2271,8 @@
     }
 
     return h('div.screen.screen-wide',
-      header(gradesTitle(), { name: 'course', params: { id: course.id } }),
+      header('Notenübersicht und Zeugnisnoten', { name: 'course', params: { id: course.id } }),
+        courseBox(course),
       h('div.grades-toggle-row', viewToggle),
       h('p.hint.grades-hint',
         'Hier vergeben Sie die ', h('strong', {}, 'Zeugnisnoten für das HJ-Zeugnis und das Jahreszeugnis'),
@@ -2374,6 +2403,7 @@
     return h('div.screen',
       header('Notenausdruck', { name: 'grades', params: { id: course.id } },
         h('button.btn-small.btn-plain', { onclick: doReportPrint }, 'Drucken')),
+      courseBox(course),
       h('div.crit-nav',
         h('button.icon-btn', { onclick: function () {
           go('report', { id: course.id, studentId: students[(si + students.length - 1) % students.length].id });
@@ -2451,6 +2481,7 @@
     return h('div.screen',
       header('Unentschuldigte Fehlzeiten', { name: 'course', params: { id: course.id } },
         h('span')),
+      courseBox(course),
       h('div.capture-bar', qSel, viewToggle),
       mode === 'student' ? studentView() : dateView()
     );
@@ -2579,6 +2610,7 @@
 
     return h('div.screen',
       header('Quartalszeiträume', { name: 'course', params: { id: course.id } }),
+      courseBox(course),
       h('div.card',
         h('p.hint', {}, 'Vorgeschlagen aus dem Schuljahresplan (' + year.name + ', je 10 Schulwochen ohne Ferien). Anpassungen gelten nur für diesen Kurs.'),
         rows,
@@ -2752,6 +2784,7 @@
     if (students.length === 0) {
       return h('div.screen',
         header('SoLei-Punkte', { name: 'course', params: { id: course.id } }),
+        courseBox(course),
         h('div.empty', h('p', {}, 'Diese Klasse hat noch keine Schüler/innen.'),
           h('button.btn-primary', { onclick: function () { go('students', { classId: cls.id, courseId: course.id }); } },
             'Schülerliste öffnen'))
@@ -2781,6 +2814,7 @@
     return h('div.screen.screen-capture',
       header('SoLei-Punkte vergeben: ' + q + '. Quartal', backTarget,
         h('span')),
+      courseBox(course),
       h('div.capture-bar',
         h('label.date-field', {}, dateInput),
         viewToggle
@@ -2913,7 +2947,7 @@
     var names = S().settings.criteriaNames;
     var q = course.currentQuarter;
 
-    var qSel = h('select.input', { style: { maxWidth: '10rem' } });
+    var qSel = h('select.input.q-select', { style: { maxWidth: '7.5rem' } });
     [1, 2, 3, 4].forEach(function (n) {
       qSel.appendChild(h('option', { value: n, selected: n === (p.quarter || q) }, n + '. Quartal'));
     });
@@ -2922,6 +2956,13 @@
     });
     var shownQ = p.quarter || q;
     var filterCrit = (p.crit != null) ? p.crit : null;
+
+    var viewToggle = h('div.view-toggle',
+      h('button.view-btn', {
+        onclick: function () { go('pointstand', { id: course.id, quarter: shownQ }); }
+      }, 'Ansicht: Liste'),
+      h('button.view-btn.active', {}, 'Ansicht: Schüler/in')
+    );
 
     var e = Store.entriesFor(course.id, stu.id, shownQ);
     var stat = Calc.quarterStatus(e.byCriterion);
@@ -3099,15 +3140,22 @@
     }
 
     return h('div.screen',
-      header(stu.lastName + ', ' + stu.firstName, { name: 'course', params: { id: course.id } },
+      header('SoLei-Punktestand', { name: 'course', params: { id: course.id } },
         h('button.btn-small.btn-plain', { onclick: printCharts }, 'Diagramme drucken')),
+      courseBox(course),
       h('div.card.card-tight',
-        h('div.row-between', qSel,
+        h('div.row-between',
+          h('div.name-with-photo',
+            photoTile(stu, { small: true }),
+            h('strong', {}, stu.lastName + ', ' + stu.firstName)),
           h('div.row-gap',
             h('span.sum-pill', {}, Calc.fmt(stat.sum, 1) + ' / 15'),
             stat.rated > 0 ? h('span.grade-pill.g' + Math.round(grade.g), {}, 'Note ' + Calc.fmt(grade.g) + ' (' + grade.label + ')') : null
           )
-        ),
+        )
+      ),
+      h('div.capture-bar', qSel, viewToggle),
+      h('div.card.card-tight',
         h('p.hint', {}, 'Tipp: Ein Kriterium antippen filtert die Vergaben und zeigt die Entwicklung als Diagramm.'),
         critSummary,
         gradeLine,
