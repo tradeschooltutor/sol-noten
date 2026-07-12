@@ -17,7 +17,7 @@
 
   /* ================= App-Start ================= */
 
-  var APP_VERSION = '0.14.2';
+  var APP_VERSION = '0.14.3';
 
   Store.init().then(function () {
     if ('serviceWorker' in navigator) {
@@ -238,6 +238,13 @@
       h('strong', {}, cls.name + ' - ' + course.subject));
   }
 
+  /* Schuljahr als Kurzform für Dateinamen: „2026/27" -> „26-27", „2026/2027" -> „26-27". */
+  function yearShort(year) {
+    var m = (year && year.name || '').match(/(\d{2})(\d{2})\D+(\d{2})?(\d{2})/);
+    if (m) return m[2] + '-' + (m[4] || m[3] || '');
+    return (year && year.name || '').replace(/[\/\s]+/g, '-');
+  }
+
   views.seating = function (p) {
     var course = Store.courseById(p.id);
     var cls = Store.classById(course.classId);
@@ -408,7 +415,7 @@
       var modeToggle = h('div.seat-modebar',
         h('button.seat-mode-btn' + (!editMode ? '.active' : ''), {
           onclick: function () { if (editMode) { selectedSeatStudent = null; go('seating', { id: course.id, tab: 'plan', mode: 'grade' }); } }
-        }, 'Noten geben'),
+        }, 'SL-Punkte geben'),
         h('button.seat-mode-btn' + (editMode ? '.active' : ''), {
           onclick: function () { if (!editMode) go('seating', { id: course.id, tab: 'plan', mode: 'edit' }); }
         }, 'Sitzplan bearbeiten')
@@ -1562,7 +1569,7 @@
     }
 
     return h('div.screen',
-      header('SoLei-Quartalsabschluss', { name: 'course', params: { id: course.id } }),
+      header('SoLei-Quartalsnoten', { name: 'course', params: { id: course.id } }),
       courseBox(course),
       h('div.card.card-tight',
         h('div.row-between', qSel,
@@ -1980,7 +1987,7 @@
   /* Druck-/PDF-Ausgabe (Weg B): Ein isoliertes Druckfenster mit nur dem Druckinhalt.
      Robuster auf iPadOS/Android, weil kein Alt-Kontext (Scroll-Container, position-Ebenen)
      mitgeschleppt wird – genau das verhinderte dort die Anzeige der Tabelle. */
-  function printNode(node, landscape) {
+  function printNode(node, landscape, docTitle) {
     var win = window.open('', '_blank');
     if (!win) {
       /* Popup blockiert (auf Mobilgeräten häufig, wenn nicht als direkte Tippfolge erkannt). */
@@ -1991,7 +1998,7 @@
     }
 
     var theme = document.documentElement.getAttribute('data-theme') || '';
-    var pageRule = '@page { size: A4 ' + (landscape ? 'landscape; margin: 7mm' : 'portrait; margin: 12mm') + '; }';
+    var pageRule = '@page { size: A4 ' + (landscape ? 'landscape' : 'portrait') + '; margin: ' + (landscape ? '7mm' : '12mm') + '; }';
 
     /* Die Diagramme (SVG) verwenden CSS-Variablen wie var(--teal). Im isolierten Fenster
        sind diese sonst undefiniert – daher die aktuell aufgelösten Werte übernehmen. */
@@ -2062,7 +2069,7 @@
     doc.write('<!DOCTYPE html><html lang="de"' + (theme ? ' data-theme="' + theme + '"' : '') + '><head>' +
       '<meta charset="UTF-8">' +
       '<meta name="viewport" content="width=device-width, initial-scale=1">' +
-      '<title>SOL-Noten – Druck</title>' +
+      '<title>' + (docTitle ? String(docTitle).replace(/[<>]/g, '') : 'SOL-Noten – Druck') + '</title>' +
       '<style>' + pageRule + rootVars + printCss + '</style>' +
       '</head><body></body></html>');
     doc.close();
@@ -2251,7 +2258,7 @@
       pt.querySelectorAll('input').forEach(function (inp) {
         inp.parentNode.replaceChild(document.createTextNode(inp.value || ''), inp);
       });
-      printNode(pt, true);
+      printNode(pt, true, yearShort(year) + ' ' + cls.name + ' ' + course.subject + ' Notenliste');
     }
 
     var viewToggle = h('div.view-toggle.grades-toggle',
@@ -2283,7 +2290,7 @@
         ),
         h('div.card', {}, reportContent),
         h('div.actions-col',
-          h('button.btn-plain.btn-block', { onclick: function () { printNode(reportContent.cloneNode(true), false); } },
+          h('button.btn-plain.btn-block', { onclick: function () { printNode(reportContent.cloneNode(true), false, yearShort(year) + ' ' + stu.lastName + ' ' + stu.firstName + ' Notenübersicht'); } },
             'Drucken / als PDF speichern'))
       );
     }
@@ -2406,6 +2413,7 @@
   views.report = function (p) {
     var course = Store.courseById(p.id);
     var cls = Store.classById(course.classId);
+    var year = Store.yearById(course.yearId);
     var students = cls.students.slice().sort(function (a, b) {
       return (a.lastName + a.firstName).localeCompare(b.lastName + b.firstName, 'de');
     });
@@ -2415,7 +2423,7 @@
     var reportContent = buildReportContent(course, stu);
 
     function doReportPrint() {
-      printNode(reportContent.cloneNode(true), false);
+      printNode(reportContent.cloneNode(true), false, yearShort(year) + ' ' + stu.lastName + ' ' + stu.firstName + ' Notenübersicht');
     }
 
     return h('div.screen',
@@ -2529,7 +2537,7 @@
             'die App vergibt dann automatisch 0 Punkte in allen fünf SoLei-Kriterien dieses Tages. ' +
             'Das Quartal ergibt sich aus dem Datum. Löschen entfernt auch die 0-Punkte-Vergaben wieder.')
         ),
-        h('div.section-head', {}, 'Fehlzeiten im ' + shownQ + '. Quartal (' + total + ')'),
+        h('div.section-head.section-head-spaced', {}, 'Fehlzeiten im ' + shownQ + '. Quartal (' + total + ')'),
         h('div.card.card-list', {},
           students.length ? rows : h('div.empty', h('p', {}, 'Diese Klasse hat noch keine Schüler/innen.')))
       );

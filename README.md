@@ -42,31 +42,6 @@ Basierend auf der Excel-Notenverwaltung V8.0 von Andreas Vandelaar.
 - **Datensicherung** – alles bleibt lokal (IndexedDB). Backup-Datei speichern/einspielen, Erinnerung nach 7 Tagen, automatisches Backup in einen freigegebenen Ordner (Chrome/Edge am Computer und Android), interne tägliche Sicherungsstände der letzten 14 Tage gegen Fehlbedienung.
 - **Einstellungen** – Kriteriennamen (global), Bewertungsspiegel für das 15-Punkte-Schema (SoLei) und für Prozentwerte (OBT/Klausuren); Standardwerte jeweils aus der Excel-Datei.
 
-## Veröffentlichen über GitHub Pages
-
-1. Auf https://github.com ein Konto anlegen (falls noch nicht vorhanden).
-2. Neues Repository erstellen, z. B. `sol-noten` (öffentlich).
-3. Alle Dateien dieses Ordners hochladen: „Add file → Upload files", den kompletten Ordnerinhalt hineinziehen, „Commit changes".
-4. Im Repository: „Settings → Pages → Branch: main / (root) → Save".
-5. Nach 1–2 Minuten ist die App unter `https://IHR-NAME.github.io/sol-noten/` erreichbar.
-
-Lehrkräfte öffnen diese Adresse und installieren die App:
-- **iPad/iPhone:** Teilen-Symbol → „Zum Home-Bildschirm".
-- **Android:** Menü → „App installieren".
-- **Computer (Chrome/Edge):** Installations-Symbol in der Adressleiste.
-
-Nach der Installation läuft die App vollständig offline. Ein späterer Umzug auf eine eigene Domain ist problemlos möglich – die Daten liegen auf den Geräten der Lehrkräfte; sie nehmen sie per Backup-Datei mit.
-
-## Lokal testen
-
-Im Ordner ein kleines Webserver-Programm starten, z. B.:
-
-```
-python3 -m http.server 8000
-```
-
-Dann im Browser `http://localhost:8000` öffnen. (Direktes Öffnen der index.html per Doppelklick funktioniert nicht, da Service Worker einen Webserver benötigen.)
-
 ## Hinweis bei Updates
 
 Bei jeder neuen Version die Versionsnummer in `sw.js` (Zeile `var CACHE = 'sol-noten-v…'`) erhöhen, damit installierte Apps die neuen Dateien laden.
@@ -76,4 +51,4 @@ Bei jeder neuen Version die Versionsnummer in `sw.js` (Zeile `var CACHE = 'sol-n
 Es gibt keinen Server und kein Konto. Sämtliche Noten und Schülerdaten bleiben ausschließlich auf dem Gerät. Die einzige Internetverbindung ist der einmalige Abruf der Schulferientermine (openholidaysapi.org) beim Anlegen eines Schuljahres – dabei werden keine personenbezogenen Daten übertragen.
 
 ---
-© 2026 Andreas Vandelaar · Weitergabe und Anpassung unter Namensnennung gestattet.
+© 2026 Andreas Vandelaar
