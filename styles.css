@@ -75,6 +75,10 @@ body {
 }
 .section-head-spaced { margin-bottom: 12px; }
 .course-box { text-align: center; font-size: 1.05rem; }
+.collapse-head { display: flex; justify-content: space-between; align-items: center; cursor: pointer; min-height: 32px; }
+.collapse-arrow { color: var(--ink-soft); font-size: 1.1rem; }
+.collapse-body > p:first-child { margin-top: 8px; }
+.collapse-body > p:last-child { margin-bottom: 0; }
 .grades-toggle-row { display: flex; justify-content: flex-end; margin: 2px 4px 8px; }
 .grades-hint { margin: 0 4px 8px; }
 .grades-toggle { flex-shrink: 0; }

@@ -17,7 +17,7 @@
 
   /* ================= App-Start ================= */
 
-  var APP_VERSION = '0.14.1';
+  var APP_VERSION = '0.14.2';
 
   Store.init().then(function () {
     if ('serviceWorker' in navigator) {
@@ -1231,7 +1231,10 @@
       go('uploads', { id: course.id, quarter: Number(qSel.value) });
     });
 
-    var intro = h('div.card',
+    /* Erläuterungen ein-/ausklappbar; der Zustand wird gemerkt (erster Aufruf: ausgeklappt). */
+    var helpCollapsed = !!S().settings.uploadsHelpCollapsed;
+    var helpArrow = h('span.collapse-arrow', {}, helpCollapsed ? '▸' : '▾');
+    var helpBody = h('div.collapse-body',
       h('p', {},
         'Wenn Ihre Schüler/innen die Aufgabe haben, ihre Arbeitsergebnisse in das Learning Management System der Schule (z.B. Moodle/Logineo, OneNote, usw.) hochzuladen, haben Sie zwei Möglichkeiten:',
         h('br'),
@@ -1250,6 +1253,21 @@
         'Wenn Sie die Uploads Ihrer Schüler/innen genauer bewerten möchten, d.h. mit Datumsangabe und abgestufter Punktevergabe für deren Vollständigkeit, nutzen Sie stattdessen Möglichkeit a), d.h. den Menüpunkt ',
         h('strong', {}, 'SoLei-Punkte vergeben'),
         '.')
+    );
+    if (helpCollapsed) helpBody.style.display = 'none';
+
+    var intro = h('div.card',
+      h('div.collapse-head', {
+        role: 'button', tabindex: 0,
+        onclick: function () {
+          helpCollapsed = !helpCollapsed;
+          S().settings.uploadsHelpCollapsed = helpCollapsed;
+          Store.save();
+          helpBody.style.display = helpCollapsed ? 'none' : '';
+          helpArrow.textContent = helpCollapsed ? '▸' : '▾';
+        }
+      }, h('strong', {}, 'Erläuterungen'), helpArrow),
+      helpBody
     );
 
     var inputs = {};
@@ -2251,7 +2269,7 @@
       var stu = students[si];
       var reportContent = buildReportContent(course, stu);
       return h('div.screen.screen-wide',
-        header('Notenübersicht und Zeugnisnoten', { name: 'course', params: { id: course.id } }),
+        header('Notenübersicht & Zeugnisnoten', { name: 'course', params: { id: course.id } }),
         courseBox(course),
         h('div.grades-toggle-row', viewToggle),
         h('div.crit-nav',
@@ -2271,7 +2289,7 @@
     }
 
     return h('div.screen.screen-wide',
-      header('Notenübersicht und Zeugnisnoten', { name: 'course', params: { id: course.id } }),
+      header('Notenübersicht & Zeugnisnoten', { name: 'course', params: { id: course.id } }),
         courseBox(course),
       h('div.grades-toggle-row', viewToggle),
       h('p.hint.grades-hint',
@@ -3143,6 +3161,7 @@
       header('SoLei-Punktestand', { name: 'course', params: { id: course.id } },
         h('button.btn-small.btn-plain', { onclick: printCharts }, 'Diagramme drucken')),
       courseBox(course),
+      h('div.capture-bar', qSel, viewToggle),
       h('div.card.card-tight',
         h('div.row-between',
           h('div.name-with-photo',
@@ -3154,7 +3173,6 @@
           )
         )
       ),
-      h('div.capture-bar', qSel, viewToggle),
       h('div.card.card-tight',
         h('p.hint', {}, 'Tipp: Ein Kriterium antippen filtert die Vergaben und zeigt die Entwicklung als Diagramm.'),
         critSummary,
