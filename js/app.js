@@ -17,7 +17,7 @@
 
   /* ================= App-Start ================= */
 
-  var APP_VERSION = '0.14.3';
+  var APP_VERSION = '0.15.0';
 
   Store.init().then(function () {
     if ('serviceWorker' in navigator) {
@@ -2795,7 +2795,17 @@
 
   /* ================= SoLei-Erfassung (Herzstück) ================= */
 
-  var captureState = { mode: 'criterion', criterion: 0, studentIdx: 0, date: null };
+  var captureState = { mode: 'criterion', criterion: 0, studentIdx: 0, date: null,
+    kbActive: null, kbBuffer: '', kbTimer: null, kbCourse: null };
+
+  /* Tastatur-Erfassung (PC/Mac): globaler Listener, aktiv nur auf der Erfassungsseite.
+     Der eigentliche Handler wird bei jedem Aufbau der Seite frisch gesetzt (Closures). */
+  var captureKeyHandler = null;
+  document.addEventListener('keydown', function (ev) {
+    if (route && route.name === 'capture' && typeof captureKeyHandler === 'function') {
+      captureKeyHandler(ev);
+    }
+  });
 
   views.capture = function (p) {
     var course = Store.courseById(p.id);
@@ -2803,11 +2813,16 @@
     var names = S().settings.criteriaNames;
     var q = course.currentQuarter;
     if (!captureState.date) captureState.date = Store.todayISO();
+    if (captureState.kbCourse !== course.id) {
+      captureState.kbCourse = course.id;
+      captureState.kbActive = null; captureState.kbBuffer = '';
+    }
     var students = cls.students.slice().sort(function (a, b) {
       return (a.lastName + a.firstName).localeCompare(b.lastName + b.firstName, 'de');
     });
 
     if (students.length === 0) {
+      captureKeyHandler = null;
       return h('div.screen',
         header('SoLei-Punkte', { name: 'course', params: { id: course.id } }),
         courseBox(course),
@@ -2822,10 +2837,10 @@
 
     var viewToggle = h('div.view-toggle',
       h('button.view-btn' + (captureState.mode === 'criterion' ? '.active' : ''), {
-        onclick: function () { if (captureState.mode !== 'criterion') { captureState.mode = 'criterion'; render(); } }
+        onclick: function () { if (captureState.mode !== 'criterion') { captureState.mode = 'criterion'; captureState.kbActive = null; captureState.kbBuffer = ''; render(); } }
       }, 'Ansicht: Kriterium'),
       h('button.view-btn' + (captureState.mode === 'student' ? '.active' : ''), {
-        onclick: function () { if (captureState.mode !== 'student') { captureState.mode = 'student'; render(); } }
+        onclick: function () { if (captureState.mode !== 'student') { captureState.mode = 'student'; captureState.kbActive = null; captureState.kbBuffer = ''; render(); } }
       }, 'Ansicht: Schüler/in')
     );
 
@@ -2836,6 +2851,14 @@
     var backTarget = p.from === 'seating'
       ? { name: 'seating', params: { id: course.id, tab: 'plan', mode: 'grade' } }
       : { name: 'course', params: { id: course.id } };
+
+    captureKeyHandler = kbHandler;
+    if (captureState.kbActive != null) {
+      requestAnimationFrame(function () {
+        var el = document.querySelector('.tap-row.key-active');
+        if (el && el.scrollIntoView) el.scrollIntoView({ block: 'nearest' });
+      });
+    }
 
     return h('div.screen.screen-capture',
       header('SoLei-Punkte vergeben: ' + q + '. Quartal', backTarget,
@@ -2860,7 +2883,7 @@
         }, n);
       }));
 
-      var rows = students.map(function (stu) {
+      var rows = students.map(function (stu, rowIdx) {
         var e = Store.entriesFor(course.id, stu.id, q);
         var stat = Calc.quarterStatus(e.byCriterion);
         var grade = Calc.gradeFor15(stat.sum, S().settings.grading15);
@@ -2869,7 +2892,7 @@
         });
         var lastToday = todays.length ? todays[todays.length - 1] : null;
 
-        return h('div.tap-row',
+        return h('div.tap-row' + (captureState.kbActive === rowIdx ? '.key-active' : ''),
           photoTile(stu, { small: true }),
           h('div.tap-info',
             h('div.student-name', {}, stu.lastName + ', ' + stu.firstName),
@@ -2912,7 +2935,7 @@
         var taps = Calc.tapValues(max);
         var todays = e.list.filter(function (x) { return x.criterion === ci && x.date === captureState.date; });
         var lastToday = todays.length ? todays[todays.length - 1] : null;
-        return h('div.tap-row',
+        return h('div.tap-row' + (captureState.kbActive === ci ? '.key-active' : ''),
           h('div.tap-info',
             h('div.student-name', {}, n),
             stat.averages[ci] !== null ? h('span.hint', {}, 'ø ' + Calc.fmt(stat.averages[ci], 1)) : h('span.hint', {}, '–')
@@ -2961,6 +2984,164 @@
         render();
       });
       render();
+    }
+
+    /* ---------- Tastatur-Erfassung (PC/Mac) ----------
+       Ziffern vergeben Punkte an die aktive Zeile; Enter/Pfeile bewegen die Markierung
+       (kein automatisches Weiterspringen nach einer Ziffer). Mehrdeutige Eingaben
+       (nur bei Stufen 1,5/1/0,5/0) werden durch die nächste Taste, Enter/Pfeil oder
+       nach 600 ms aufgelöst. Ungültige Eingaben blinken kurz rot. */
+
+    function kbItemsCount() {
+      return captureState.mode === 'criterion' ? students.length : names.length;
+    }
+    function kbAllowedValues() {
+      var ci = captureState.mode === 'criterion' ? captureState.criterion : captureState.kbActive;
+      if (ci == null) return [];
+      return Calc.tapValues(course.maxPoints[q][ci]);
+    }
+    function kbTarget() {
+      if (captureState.mode === 'criterion') {
+        return { stu: students[captureState.kbActive], ci: captureState.criterion };
+      }
+      return { stu: students[Math.min(captureState.studentIdx, students.length - 1)], ci: captureState.kbActive };
+    }
+    function canonOf(v) { return Calc.fmt(v, 1).replace(/[^0-9]/g, ''); }
+    function kbCanonBuf(buf) {
+      var b = buf.charAt(0) === ',' ? '0' + buf : buf;
+      return b.replace(/[^0-9]/g, '');
+    }
+    function kbClearTimer() {
+      if (captureState.kbTimer) { clearTimeout(captureState.kbTimer); captureState.kbTimer = null; }
+    }
+    function kbClearBuffer() { captureState.kbBuffer = ''; kbClearTimer(); }
+
+    /* Punkte setzen: wie tap(), aber ohne Umschalt-Löschen – Tastatur bedeutet „setzen". */
+    function kbSet(points) {
+      var t = kbTarget();
+      if (!t.stu || t.ci == null) return;
+      var e = Store.entriesFor(course.id, t.stu.id, q);
+      var todays = e.list.filter(function (x) { return x.criterion === t.ci && x.date === captureState.date; });
+      var lastToday = todays.length ? todays[todays.length - 1] : null;
+      if (lastToday && lastToday.points === points) return; /* unverändert */
+      if (lastToday) {
+        Store.updateEntry(lastToday.id, points, captureState.date);
+        toast(t.stu.lastName + ': ' + names[t.ci] + ' geändert auf ' + Calc.fmt(points, 1) + ' Punkte.');
+        render();
+        return;
+      }
+      var entry = Store.addEntry(course.id, t.stu.id, q, t.ci, points, captureState.date);
+      toast(t.stu.lastName + ': ' + Calc.fmt(points, 1) + ' Punkte für ' + names[t.ci] + '.', function () {
+        Store.deleteEntry(entry.id); render();
+      });
+      render();
+    }
+
+    function kbCommitPending() {
+      if (!captureState.kbBuffer) return;
+      var buf = captureState.kbBuffer;
+      var canon = kbCanonBuf(buf);
+      kbClearBuffer();
+      var allowed = kbAllowedValues();
+      var exact = null;
+      allowed.forEach(function (v) { if (canonOf(v) === canon) exact = v; });
+      if (/,$/.test(buf)) {
+        /* Komma am Ende: der Nutzer wollte den längeren Wert (z. B. „1," -> 1,5) */
+        var longer = allowed.filter(function (v) {
+          return canonOf(v).indexOf(canon) === 0 && canonOf(v).length > canon.length;
+        });
+        if (longer.length === 1) { kbSet(longer[0]); return; }
+      }
+      if (exact != null) kbSet(exact);
+    }
+
+    function kbFlashInvalid() {
+      var el = document.querySelector('.tap-row.key-active');
+      if (!el) return;
+      el.classList.add('key-invalid');
+      setTimeout(function () { el.classList.remove('key-invalid'); }, 450);
+    }
+
+    function kbMove(dir) {
+      var n = kbItemsCount();
+      if (!n) return;
+      if (captureState.kbActive == null) captureState.kbActive = 0;
+      else captureState.kbActive = Math.max(0, Math.min(n - 1, captureState.kbActive + dir));
+      render();
+    }
+
+    function kbArmTimer(commitValue) {
+      kbClearTimer();
+      captureState.kbTimer = setTimeout(function () {
+        captureState.kbTimer = null;
+        captureState.kbBuffer = '';
+        if (route.name !== 'capture') return; /* Seite inzwischen verlassen */
+        if (commitValue != null) kbSet(commitValue);
+      }, 600);
+    }
+
+    function kbChar(ch) {
+      if (captureState.kbActive == null) { captureState.kbActive = 0; render(); }
+      kbClearTimer();
+      var buf = captureState.kbBuffer + ch;
+      var canon = kbCanonBuf(buf);
+      var endsComma = /,$/.test(buf);
+      var allowed = kbAllowedValues();
+      var cands = allowed.filter(function (v) { return canonOf(v).indexOf(canon) === 0; });
+      var exact = null;
+      allowed.forEach(function (v) { if (canonOf(v) === canon) exact = v; });
+      if (endsComma && exact != null) {
+        /* Komma kündigt Nachkommastelle an – auf sie warten statt sofort festzuschreiben,
+           sonst würde die nachgetippte Ziffer fälschlich als neue (ungültige) Eingabe gelten. */
+        var longer = cands.filter(function (v) { return canonOf(v).length > canon.length; });
+        if (longer.length === 0) { captureState.kbBuffer = ''; kbSet(exact); return; }
+        captureState.kbBuffer = buf;
+        kbArmTimer(longer.length === 1 ? longer[0] : exact);
+        return;
+      }
+      if (cands.length === 0) {
+        /* Schwebende exakte Eingabe ggf. abschließen, dann das Zeichen frisch versuchen */
+        var pendingCanon = kbCanonBuf(captureState.kbBuffer);
+        var pendingExact = null;
+        allowed.forEach(function (v) { if (pendingCanon && canonOf(v) === pendingCanon) pendingExact = v; });
+        captureState.kbBuffer = '';
+        if (pendingExact != null) {
+          kbSet(pendingExact);
+          kbChar(ch);
+          return;
+        }
+        kbFlashInvalid();
+        return;
+      }
+      if (cands.length === 1) { captureState.kbBuffer = ''; kbSet(cands[0]); return; }
+      /* Mehrdeutig (z. B. „1" bei Stufen 1,5/1/0,5/0): kurz warten */
+      captureState.kbBuffer = buf;
+      kbArmTimer(exact);
+    }
+
+    function kbHandler(ev) {
+      var t = ev.target;
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'SELECT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+      var mh = document.getElementById('modal-host');
+      if (mh && mh.hasChildNodes()) return;
+      if (!students.length) return;
+      var k = ev.key;
+      if (k === 'Escape') {
+        kbClearBuffer();
+        if (captureState.kbActive != null) { captureState.kbActive = null; render(); }
+        return;
+      }
+      var isDigit = k.length === 1 && k >= '0' && k <= '9';
+      var isComma = (k === ',' || k === '.');
+      var isNext = (k === 'Enter' || k === 'ArrowDown' || k === 'ArrowRight');
+      var isPrev = (k === 'ArrowUp' || k === 'ArrowLeft');
+      if (!isDigit && !isComma && !isNext && !isPrev) return;
+      if (isComma && !captureState.kbBuffer) return; /* Komma ohne führende Ziffer ignorieren */
+      /* Enter auf Bedienelementen außerhalb der Liste normal wirken lassen */
+      if (k === 'Enter' && t && t.closest && t.closest('.view-toggle, .crit-tabs, .capture-bar, .topbar, .crit-nav')) return;
+      ev.preventDefault();
+      if (isNext || isPrev) { kbCommitPending(); kbMove(isNext ? 1 : -1); return; }
+      kbChar(isComma ? ',' : k);
     }
   };
 

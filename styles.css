@@ -258,6 +258,15 @@ button { font: inherit; cursor: pointer; }
   padding: 10px 14px; border-bottom: 1px solid var(--line);
 }
 .tap-row:last-child { border-bottom: none; }
+/* Tastatur-Erfassung: aktive Zeile und Rückweisung ungültiger Eingaben */
+.tap-row.key-active {
+  outline: 2px solid var(--teal); outline-offset: -2px;
+  border-radius: 10px; background: var(--teal-soft);
+}
+.tap-row.key-invalid {
+  outline-color: var(--red); background: var(--red-soft);
+  transition: none;
+}
 .tap-info { min-width: 0; flex: 1; }
 .tap-row > .photo-avatar { flex-shrink: 0; }
 .tap-substats { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 2px; }
