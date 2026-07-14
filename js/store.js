@@ -12,7 +12,7 @@
   var saveTimer = null;
   var listeners = [];
   var backupDirHandle = null;
-  var security = null;      /* {enabled, wrapped, fail:{count,lockUntil}, autolockMinutes} */
+  var security = null;      /* {enabled, wrapped, secretKind:'pin'|'password', fail:{count,lockUntil}, autolockMinutes} */
   var masterRaw = null;     /* Uint8Array – nur im Arbeitsspeicher der entsperrten App */
   var masterKey = null;     /* CryptoKey */
 
@@ -240,13 +240,14 @@
     });
   }
 
-  /* Verschlüsselung aktivieren: Hauptschlüssel erzeugen, mit PIN umhüllen,
+  /* Verschlüsselung aktivieren: Hauptschlüssel erzeugen, mit PIN oder Passwort umhüllen,
      Datenbank und Sicherungsstände verschlüsselt neu schreiben. */
-  function enableEncryption(pin) {
+  function enableEncryption(secret, kind) {
     masterRaw = CryptoBox.generateMasterRaw();
-    return CryptoBox.wrapMaster(pin, masterRaw).then(function (wrapped) {
+    return CryptoBox.wrapMaster(secret, masterRaw).then(function (wrapped) {
       security = {
         enabled: true, wrapped: wrapped,
+        secretKind: kind === 'password' ? 'password' : 'pin',
         fail: { count: 0, lockUntil: 0 }, autolockMinutes: 5,
         createdAt: new Date().toISOString()
       };
@@ -271,13 +272,19 @@
     }).then(function () { return persist(); });
   }
 
-  function changePin(oldPin, newPin) {
-    return CryptoBox.unwrapMaster(oldPin, security.wrapped).then(function (raw) {
-      return CryptoBox.wrapMaster(newPin, raw);
+  function changePin(oldSecret, newSecret, newKind) {
+    return CryptoBox.unwrapMaster(oldSecret, security.wrapped).then(function (raw) {
+      return CryptoBox.wrapMaster(newSecret, raw);
     }).then(function (wrapped) {
       security.wrapped = wrapped;
+      if (newKind) security.secretKind = newKind === 'password' ? 'password' : 'pin';
       return saveSecurity();
     });
+  }
+
+  /* 'pin' (Standard, auch für Bestandsnutzer ohne Flag) oder 'password'. */
+  function secretKind() {
+    return (security && security.secretKind) === 'password' ? 'password' : 'pin';
   }
 
   function setAutolock(minutesOrNull) {
@@ -768,7 +775,7 @@
     daysSincePhotoExport: daysSincePhotoExport,
     isEncrypted: isEncrypted, isLocked: isLocked, unlock: unlock, lock: lock,
     enableEncryption: enableEncryption, disableEncryption: disableEncryption,
-    changePin: changePin, setAutolock: setAutolock, getAutolock: getAutolock,
+    changePin: changePin, secretKind: secretKind, setAutolock: setAutolock, getAutolock: getAutolock,
     biometricsEnabled: biometricsEnabled, enableBiometrics: enableBiometrics,
     disableBiometrics: disableBiometrics, unlockBiometric: unlockBiometric,
     getLockWait: getLockWait, failedAttempts: failedAttempts, factoryReset: factoryReset,

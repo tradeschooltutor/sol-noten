@@ -17,7 +17,7 @@
 
   /* ================= App-Start ================= */
 
-  var APP_VERSION = '0.15.0';
+  var APP_VERSION = '0.15.1';
 
   Store.init().then(function () {
     if ('serviceWorker' in navigator) {
@@ -579,6 +579,24 @@
     var bioTries = 0;
     var bioActive = Store.biometricsEnabled();
     var showPinPad = !bioActive; /* bei aktiver Biometrie zunächst Biometrie-Ansicht */
+    var kind = Store.secretKind();
+    var pwInput = null, pwBtn = null;
+    if (kind === 'password') {
+      pwInput = h('input.input.lock-pw', { type: 'password', autocomplete: 'current-password', placeholder: 'Passwort' });
+      pwInput.addEventListener('keydown', function (ev) {
+        if (ev.key === 'Enter') { submit(); ev.preventDefault(); }
+      });
+      pwBtn = h('button.btn-primary.btn-block', { onclick: function () { submit(); } }, 'Entsperren');
+    }
+    /* Eingabemöglichkeiten sperren/freigeben – je nach Modus Ziffernfeld oder Passwortfeld. */
+    function setLockDisabled(d) {
+      if (kind === 'password') {
+        if (pwInput) pwInput.disabled = d;
+        if (pwBtn) pwBtn.disabled = d;
+      } else {
+        drawPad(d);
+      }
+    }
 
     function refreshDots() {
       UI.clear(dots);
@@ -589,8 +607,8 @@
 
     function waitCountdown() {
       var w = Store.getLockWait();
-      if (w <= 0) { msg.textContent = ''; drawPad(false); return; }
-      drawPad(true);
+      if (w <= 0) { msg.textContent = ''; setLockDisabled(false); return; }
+      setLockDisabled(true);
       msg.textContent = 'Zu viele Fehlversuche – bitte ' + w + ' Sekunden warten.';
       var iv = setInterval(function () {
         if (!msg.isConnected) { clearInterval(iv); return; }
@@ -598,7 +616,7 @@
         if (rest <= 0) {
           clearInterval(iv);
           msg.textContent = '';
-          drawPad(false);
+          setLockDisabled(false);
         } else {
           msg.textContent = 'Zu viele Fehlversuche – bitte ' + rest + ' Sekunden warten.';
         }
@@ -606,18 +624,21 @@
     }
 
     function submit() {
-      if (busy || pin.length < 4) return;
+      var secret = kind === 'password' ? (pwInput ? pwInput.value : '') : pin;
+      if (busy || (kind === 'password' ? secret.length === 0 : secret.length < 4)) return;
       busy = true;
-      Store.unlock(pin).then(function () {
+      Store.unlock(secret).then(function () {
         busy = false;
         afterUnlock();
       }).catch(function (err) {
         busy = false;
         pin = '';
-        refreshDots();
+        if (pwInput) pwInput.value = '';
+        if (kind !== 'password') refreshDots();
         if (err.waitSeconds > 0) waitCountdown();
         else {
-          msg.textContent = 'Falsche PIN.' + (err.attempts >= 3 ? ' (' + err.attempts + ' Fehlversuche)' : '');
+          msg.textContent = (kind === 'password' ? 'Falsches Passwort.' : 'Falsche PIN.') +
+            (err.attempts >= 3 ? ' (' + err.attempts + ' Fehlversuche)' : '');
         }
       });
     }
@@ -640,10 +661,10 @@
     }
 
     function forgotPin() {
-      UI.modal('PIN vergessen?',
+      UI.modal(kind === 'password' ? 'Passwort vergessen?' : 'PIN vergessen?',
         h('div', {},
-          h('p', {}, 'Ohne PIN können die verschlüsselten Daten auf diesem Gerät nicht wiederhergestellt werden – es gibt bewusst keine Hintertür.'),
-          h('p', {}, 'Der Weg zurück: App zurücksetzen und anschließend Ihre Backup-Datei einspielen (Passwort der Backup-Datei bzw. bei automatischen Ordner-Backups die damalige PIN erforderlich).'),
+          h('p', {}, 'Ohne ' + (kind === 'password' ? 'Passwort' : 'PIN') + ' können die verschlüsselten Daten auf diesem Gerät nicht wiederhergestellt werden – es gibt bewusst keine Hintertür.'),
+          h('p', {}, 'Der Weg zurück: App zurücksetzen und anschließend Ihre Backup-Datei einspielen (Passwort der Backup-Datei bzw. bei automatischen Ordner-Backups die damalige PIN bzw. das damalige Passwort erforderlich).'),
           h('p.error-text', {}, 'Das Zurücksetzen löscht alle Daten auf diesem Gerät unwiderruflich.')
         ), [
           { label: 'Abbrechen', value: false },
@@ -685,10 +706,10 @@
         if (bioTries >= 3) {
           bioActive = false;
           showPinPad = true;
-          msg.textContent = 'Biometrie nicht erfolgreich. Bitte PIN eingeben.';
+          msg.textContent = 'Biometrie nicht erfolgreich. Bitte ' + (kind === 'password' ? 'Passwort' : 'PIN') + ' eingeben.';
           renderLock();
         } else {
-          msg.textContent = 'Biometrie nicht erkannt (' + bioTries + '/3). Erneut versuchen oder PIN verwenden.';
+          msg.textContent = 'Biometrie nicht erkannt (' + bioTries + '/3). Erneut versuchen oder ' + (kind === 'password' ? 'Passwort' : 'PIN') + ' verwenden.';
           renderLock();
         }
       });
@@ -700,9 +721,11 @@
       container.appendChild(h('div.setup-hero',
         h('div.setup-mark', { html: LOCK_SVG.replace('width="18" height="18"', 'width="30" height="30"') }),
         h('h1', {}, 'SOL-Noten'),
-        h('p', {}, bioActive && !showPinPad ? 'Bitte biometrisch entsperren' : 'Bitte PIN eingeben')
+        h('p', {}, bioActive && !showPinPad
+          ? 'Bitte biometrisch entsperren'
+          : (kind === 'password' ? 'Bitte Passwort eingeben' : 'Bitte PIN eingeben'))
       ));
-      container.appendChild(dots);
+      if (kind !== 'password') container.appendChild(dots);
       container.appendChild(msg);
 
       if (bioActive && !showPinPad) {
@@ -710,7 +733,16 @@
           'Mit Fingerabdruck / Gesicht entsperren'));
         container.appendChild(h('button.btn-plain.btn-small.lock-alt', {
           onclick: function () { showPinPad = true; renderLock(); }
-        }, 'Stattdessen PIN eingeben'));
+        }, kind === 'password' ? 'Stattdessen Passwort eingeben' : 'Stattdessen PIN eingeben'));
+      } else if (kind === 'password') {
+        container.appendChild(h('label.field', h('span.field-label', {}, 'Passwort'), pwInput));
+        container.appendChild(pwBtn);
+        if (Store.biometricsEnabled()) {
+          container.appendChild(h('button.btn-plain.btn-small.lock-alt', {
+            onclick: function () { bioActive = true; showPinPad = false; bioTries = 0; msg.textContent = ''; renderLock(); tryBiometric(); }
+          }, 'Biometrie verwenden'));
+        }
+        setTimeout(function () { try { pwInput.focus(); } catch (e) {} }, 50);
       } else {
         refreshDots();
         container.appendChild(padHost);
@@ -723,12 +755,13 @@
           container.appendChild(h('p.hint.lock-kbd-hint', {}, 'Am Computer können Sie die PIN auch über die Tastatur eingeben (Enter bestätigt).'));
         }
       }
-      container.appendChild(h('button.btn-plain.btn-small.lock-forgot', { onclick: forgotPin }, 'PIN vergessen?'));
+      container.appendChild(h('button.btn-plain.btn-small.lock-forgot', { onclick: forgotPin },
+        kind === 'password' ? 'Passwort vergessen?' : 'PIN vergessen?'));
     }
 
     if (Store.getLockWait() > 0) { showPinPad = true; bioActive = false; }
     renderLock();
-    if (Store.getLockWait() > 0) waitCountdown(); else drawPad(false);
+    if (Store.getLockWait() > 0) waitCountdown(); else setLockDisabled(false);
 
     /* Biometrie beim Öffnen automatisch anstoßen (nur wenn keine Wartesperre aktiv). */
     if (bioActive && Store.getLockWait() <= 0) {
@@ -740,6 +773,7 @@
        Sperrseite verlässt – unabhängig von DOM-Mutationen. */
     function onKey(ev) {
       if (route.name !== 'lock') { document.removeEventListener('keydown', onKey); return; }
+      if (kind === 'password') return; /* Passwortfeld verarbeitet Eingaben selbst */
       if (ev.metaKey || ev.ctrlKey || ev.altKey) return;
       if (Store.getLockWait() > 0) return;
       if (bioActive && !showPinPad) return;
@@ -3446,7 +3480,7 @@
               .then(function (raw) { return CryptoBox.importAesKey(raw); })
               .then(function (key) { return CryptoBox.decryptWithKey(key, parsed.envelope); })
               .then(function (plain) { return JSON.parse(plain); })
-              .catch(function () { throw new Error('Falsche PIN oder beschädigte Datei.'); });
+              .catch(function () { throw new Error('Falsche PIN / falsches Passwort oder beschädigte Datei.'); });
           });
         } else if (parsed.encrypted) {
           getData = askPassword(f.name, false).then(function (pw) {
@@ -3470,14 +3504,13 @@
       }).catch(function (e) { UI.modal('Import fehlgeschlagen', h('p', {}, e.message)); });
     });
 
-    function askPassword(fileName, isPin) {
-      var label = isPin ? 'PIN' : 'Passwort';
+    function askPassword(fileName, isKeyEnvelope) {
+      var label = isKeyEnvelope ? 'PIN / Passwort' : 'Passwort';
       var pw = h('input.input', { type: 'password',
-        inputmode: isPin ? 'numeric' : null,
         autocomplete: 'current-password', placeholder: label });
       return UI.modal('Verschlüsseltes Backup',
-        [h('p.hint', {}, isPin
-          ? 'Die Datei „' + fileName + '“ ist ein automatisches Backup und mit einer PIN verschlüsselt. Bitte geben Sie die PIN ein, die beim Erstellen aktiv war.'
+        [h('p.hint', {}, isKeyEnvelope
+          ? 'Die Datei „' + fileName + '“ ist ein automatisches Backup. Bitte geben Sie die PIN bzw. das Passwort ein, die/das beim Erstellen der Datei aktiv war.'
           : 'Die Datei „' + fileName + '“ ist verschlüsselt. Bitte geben Sie das Passwort ein.'),
          h('label.field', h('span.field-label', {}, label), pw)],
         [{ label: 'Abbrechen', value: false }, { label: 'Entschlüsseln', value: true, primary: true }]
@@ -3524,7 +3557,7 @@
         }))
       ),
 
-      h('div.section-head', {}, 'PIN-Sperre & Verschlüsselung'),
+      h('div.section-head', {}, 'Zugangsschutz & Verschlüsselung'),
       h('div.card', {}, securitySection()),
 
       h('div.section-head', {}, 'Datensicherung'),
@@ -3670,18 +3703,18 @@
         .then(function () { if (onDone) onDone(); });
       return;
     }
-    var pins = pinInputPair(['PIN festlegen', 'PIN wiederholen']);
-    UI.modal('PIN festlegen', [
+    var pins = secretInputPair(['Festlegen', 'Wiederholen']);
+    UI.modal('Zugangsschutz festlegen', [
       h('p', {}, 'Zum Schutz der Schülerdaten verschlüsselt SOL-Noten alle Daten auf diesem Gerät. ' +
-        'Dazu legen Sie jetzt eine PIN fest. Nach Eingabe der PIN werden alle Daten durch die App verschlüsselt.'),
-      h('p.hint', {}, 'Die App fragt die PIN künftig beim Start ab. Wichtig: Bei Verlust der PIN sind die Daten nur über ein Backup wiederherstellbar – es gibt bewusst keine Hintertür.')
+        'Dazu legen Sie jetzt eine PIN oder ein Passwort fest.'),
+      h('p.hint', {}, 'Die App fragt PIN bzw. Passwort künftig beim Start ab. Wichtig: Bei Verlust sind die Daten nur über ein Backup wiederherstellbar – es gibt bewusst keine Hintertür.')
     ].concat(pins.nodes), [
-      { label: 'PIN festlegen und verschlüsseln', value: true, primary: true, validate: pins.validate }
+      { label: 'Festlegen und verschlüsseln', value: true, primary: true, validate: pins.validate }
     ], { mandatory: true }).then(function () {
-      Store.enableEncryption(pins.value()).then(function () {
+      Store.enableEncryption(pins.value(), pins.kind()).then(function () {
         UI.modal('Verschlüsselung aktiv', [
           h('p', {}, 'Alle Daten auf diesem Gerät sind jetzt verschlüsselt.'),
-          h('p.hint', {}, 'Empfehlung: Sobald Sie Schüler und Noten erfasst haben, sichern Sie Ihre Daten über „Einstellungen → Backup-Datei jetzt speichern“. Bewahren Sie PIN und Backup an einem sicheren Ort auf (z. B. in einem Passwort-Manager).')
+          h('p.hint', {}, 'Empfehlung: Sobald Sie Schüler und Noten erfasst haben, sichern Sie Ihre Daten über „Einstellungen → Backup-Datei jetzt speichern“. Bewahren Sie Zugangsdaten und Backup an einem sicheren Ort auf (z. B. in einem Passwort-Manager).')
         ], [{ label: 'Verstanden', value: true, primary: true }]).then(function () {
           if (onDone) onDone();
         });
@@ -3693,27 +3726,55 @@
     });
   }
 
-  function pinInputPair(labels) {
+  /* Eingabepaar für den Zugangsschutz: PIN (4–8 Ziffern) oder Passwort (mind. 10 Zeichen).
+     Liefert value(), kind() und validate() für den umgebenden Dialog. */
+  var HINT_PIN = 'Die PIN schützt vor neugierigen Blicken im Alltag. Wer das Gerät häufig mitnimmt, wählt besser das Passwort – es schützt auch bei Verlust oder Diebstahl.';
+  var HINT_PW = 'Länge zählt mehr als Sonderzeichen: Eine merkbare Wortfolge wie „roterTraktorImSchnee“ ist stark und lässt sich gut behalten.';
+  function secretInputPair(labels) {
+    var sel = h('select.input');
+    sel.appendChild(h('option', { value: 'pin' }, 'PIN (4–8 Ziffern) – schneller Zugriff'));
+    sel.appendChild(h('option', { value: 'password' }, 'Passwort (mind. 10 Zeichen) – höherer Schutz'));
     var p1 = h('input.input', { type: 'password', inputmode: 'numeric', autocomplete: 'new-password', placeholder: '4–8 Ziffern' });
     var p2 = h('input.input', { type: 'password', inputmode: 'numeric', autocomplete: 'new-password', placeholder: 'Wiederholung' });
     var err = h('p.hint.error-text');
+    var hint = h('p.hint', {}, HINT_PIN);
+    function applyMode() {
+      var pw = sel.value === 'password';
+      p1.value = ''; p2.value = ''; err.textContent = '';
+      if (pw) {
+        p1.removeAttribute('inputmode'); p2.removeAttribute('inputmode');
+        p1.placeholder = 'Mindestens 10 Zeichen';
+        hint.textContent = HINT_PW;
+      } else {
+        p1.setAttribute('inputmode', 'numeric'); p2.setAttribute('inputmode', 'numeric');
+        p1.placeholder = '4–8 Ziffern';
+        hint.textContent = HINT_PIN;
+      }
+    }
+    sel.addEventListener('change', applyMode);
     function validate() {
-      if (!/^\d{4,8}$/.test(p1.value)) { err.textContent = 'Die PIN muss aus 4 bis 8 Ziffern bestehen.'; return false; }
-      if (p1.value !== p2.value) { err.textContent = 'Die PINs stimmen nicht überein.'; return false; }
+      if (sel.value === 'password') {
+        if (p1.value.length < 10) { err.textContent = 'Das Passwort muss mindestens 10 Zeichen lang sein.'; return false; }
+      } else {
+        if (!/^\d{4,8}$/.test(p1.value)) { err.textContent = 'Die PIN muss aus 4 bis 8 Ziffern bestehen.'; return false; }
+      }
+      if (p1.value !== p2.value) { err.textContent = 'Die Eingaben stimmen nicht überein.'; return false; }
       return true;
     }
     return { nodes: [
+      h('label.field', h('span.field-label', {}, 'Art des Zugangsschutzes'), sel),
       h('label.field', h('span.field-label', {}, labels[0]), p1),
       h('label.field', h('span.field-label', {}, labels[1]), p2),
+      hint,
       err
-    ], value: function () { return p1.value; }, validate: validate };
+    ], value: function () { return p1.value; }, kind: function () { return sel.value; }, validate: validate };
   }
 
   function enableEncryptionFlow() {
-    UI.modal('PIN-Sperre einrichten – Schritt 1 von 2',
+    UI.modal('Sperre einrichten – Schritt 1 von 2',
       h('div', {},
-        h('p', {}, 'Bevor die Verschlüsselung aktiviert wird, verlangt die App ein frisches Backup. Denn es gilt: Ohne PIN gibt es keinen Zugriff auf die Daten – der einzige Rettungsweg ist Ihre Backup-Datei.'),
-        h('p.hint', {}, 'Bitte notieren Sie PIN und Backup-Passwort an einem sicheren Ort, z. B. in einem Passwort-Manager.')
+        h('p', {}, 'Bevor die Verschlüsselung aktiviert wird, verlangt die App ein frisches Backup. Denn es gilt: Ohne PIN bzw. Passwort gibt es keinen Zugriff auf die Daten – der einzige Rettungsweg ist Ihre Backup-Datei.'),
+        h('p.hint', {}, 'Bitte notieren Sie Zugangsdaten und Backup-Passwort an einem sicheren Ort, z. B. in einem Passwort-Manager.')
       ), [
         { label: 'Abbrechen', value: false },
         { label: 'Backup jetzt speichern', value: true, primary: true }
@@ -3723,16 +3784,16 @@
       });
 
     function pinStep() {
-      var pins = pinInputPair(['Neue PIN', 'PIN wiederholen']);
-      UI.modal('PIN-Sperre einrichten – Schritt 2 von 2',
-        [h('p.hint', {}, 'Die Datenbank wird mit einem Hauptschlüssel verschlüsselt (AES-256), den Ihre PIN entsperrt. Die App fragt die PIN künftig beim Start ab.')].concat(pins.nodes),
+      var pins = secretInputPair(['Festlegen', 'Wiederholen']);
+      UI.modal('Sperre einrichten – Schritt 2 von 2',
+        [h('p.hint', {}, 'Die Datenbank wird mit einem Hauptschlüssel verschlüsselt (AES-256), den Ihre PIN bzw. Ihr Passwort entsperrt. Die App fragt die Eingabe künftig beim Start ab.')].concat(pins.nodes),
         [
           { label: 'Abbrechen', value: false },
           { label: 'Verschlüsselung aktivieren', value: true, primary: true, validate: pins.validate }
         ]).then(function (ok) {
           if (!ok) return;
-          Store.enableEncryption(pins.value()).then(function () {
-            toast('Verschlüsselung ist aktiv. Die App fragt die PIN künftig beim Start ab.');
+          Store.enableEncryption(pins.value(), pins.kind()).then(function () {
+            toast('Verschlüsselung ist aktiv. Die App fragt ' + (pins.kind() === 'password' ? 'das Passwort' : 'die PIN') + ' künftig beim Start ab.');
             render();
           }).catch(function (e) {
             UI.modal('Aktivierung fehlgeschlagen', h('p', {}, e.message));
@@ -3741,29 +3802,39 @@
     }
   }
 
+  /* 'PIN' oder 'Passwort' – je nach aktivem Modus, für Beschriftungen. */
+  function secretWord() { return Store.secretKind() === 'password' ? 'Passwort' : 'PIN'; }
+
   function changePinFlow() {
-    var oldPin = h('input.input', { type: 'password', inputmode: 'numeric', autocomplete: 'current-password', placeholder: 'Aktuelle PIN' });
-    var pins = pinInputPair(['Neue PIN', 'Neue PIN wiederholen']);
-    UI.modal('PIN ändern',
-      [h('label.field', h('span.field-label', {}, 'Aktuelle PIN'), oldPin)].concat(pins.nodes),
+    var isPw = Store.secretKind() === 'password';
+    var oldPin = h('input.input', { type: 'password',
+      inputmode: isPw ? null : 'numeric',
+      autocomplete: 'current-password',
+      placeholder: isPw ? 'Aktuelles Passwort' : 'Aktuelle PIN' });
+    var pins = secretInputPair(['Neu festlegen', 'Wiederholen']);
+    UI.modal('PIN / Passwort ändern',
+      [h('p.hint', {}, 'Hier können Sie auch zwischen PIN und Passwort wechseln.'),
+       h('label.field', h('span.field-label', {}, isPw ? 'Aktuelles Passwort' : 'Aktuelle PIN'), oldPin)].concat(pins.nodes),
       [
         { label: 'Abbrechen', value: false },
-        { label: 'PIN ändern', value: true, primary: true, validate: pins.validate }
+        { label: 'Ändern', value: true, primary: true, validate: pins.validate }
       ]).then(function (ok) {
         if (!ok) return;
-        Store.changePin(oldPin.value, pins.value()).then(function () {
-          toast('PIN wurde geändert.');
+        Store.changePin(oldPin.value, pins.value(), pins.kind()).then(function () {
+          toast((pins.kind() === 'password' ? 'Passwort' : 'PIN') + ' wurde geändert.');
+          render();
         }).catch(function () {
-          UI.modal('PIN ändern fehlgeschlagen', h('p', {}, 'Die aktuelle PIN ist nicht korrekt.'));
+          UI.modal('Ändern fehlgeschlagen', h('p', {}, isPw ? 'Das aktuelle Passwort ist nicht korrekt.' : 'Die aktuelle PIN ist nicht korrekt.'));
         });
       });
   }
 
   function disableEncryptionFlow() {
-    var pin = h('input.input', { type: 'password', inputmode: 'numeric', placeholder: 'PIN' });
+    var isPw = Store.secretKind() === 'password';
+    var pin = h('input.input', { type: 'password', inputmode: isPw ? null : 'numeric', placeholder: secretWord() });
     UI.modal('Verschlüsselung deaktivieren',
-      [h('p', {}, 'Die Daten werden wieder unverschlüsselt auf dem Gerät gespeichert und die PIN-Abfrage entfällt.'),
-       h('label.field', h('span.field-label', {}, 'PIN zur Bestätigung'), pin)],
+      [h('p', {}, 'Die Daten werden wieder unverschlüsselt auf dem Gerät gespeichert und die Abfrage beim Start entfällt.'),
+       h('label.field', h('span.field-label', {}, secretWord() + ' zur Bestätigung'), pin)],
       [
         { label: 'Abbrechen', value: false },
         { label: 'Deaktivieren', value: true, danger: true }
@@ -3773,7 +3844,7 @@
           toast('Verschlüsselung wurde deaktiviert.');
           render();
         }).catch(function () {
-          UI.modal('Deaktivieren fehlgeschlagen', h('p', {}, 'Die PIN ist nicht korrekt.'));
+          UI.modal('Deaktivieren fehlgeschlagen', h('p', {}, isPw ? 'Das Passwort ist nicht korrekt.' : 'Die PIN ist nicht korrekt.'));
         });
       });
   }
@@ -3794,15 +3865,16 @@
           } }, 'Deaktivieren')));
       } else {
         host.appendChild(h('div.actions-col',
-          h('p.hint', {}, 'Bequemer entsperren: Statt der PIN können Sie Fingerabdruck oder Gesichtserkennung dieses Geräts nutzen. Die PIN bleibt weiterhin gültig. Sicherheit und Verschlüsselung bleiben unverändert – die Biometrie ist nur ein bequemer Zugang.'),
+          h('p.hint', {}, 'Bequemer entsperren: Statt ' + (Store.secretKind() === 'password' ? 'des Passworts' : 'der PIN') + ' können Sie Fingerabdruck oder Gesichtserkennung dieses Geräts nutzen. ' + secretWord() + ' bleibt weiterhin gültig. Sicherheit und Verschlüsselung bleiben unverändert – die Biometrie ist nur ein bequemer Zugang.'),
           h('button.btn-plain.btn-block', { onclick: setupBio }, 'Mit Fingerabdruck / Gesicht entsperren einrichten')));
       }
     }
     function setupBio() {
-      var pin = h('input.input', { type: 'password', inputmode: 'numeric', placeholder: 'PIN' });
+      var isPw = Store.secretKind() === 'password';
+      var pin = h('input.input', { type: 'password', inputmode: isPw ? null : 'numeric', placeholder: secretWord() });
       UI.modal('Biometrie einrichten',
-        [h('p.hint', {}, 'Bitte bestätigen Sie einmal Ihre PIN. Danach richtet das Gerät die biometrische Entsperrung ein.'),
-         h('label.field', h('span.field-label', {}, 'PIN'), pin)],
+        [h('p.hint', {}, 'Bitte bestätigen Sie einmal ' + (isPw ? 'Ihr Passwort' : 'Ihre PIN') + '. Danach richtet das Gerät die biometrische Entsperrung ein.'),
+         h('label.field', h('span.field-label', {}, secretWord()), pin)],
         [{ label: 'Abbrechen', value: false }, { label: 'Weiter', value: true, primary: true }]
       ).then(function (ok) {
         if (!ok) return;
@@ -3811,7 +3883,7 @@
           draw(true);
         }).catch(function (e) {
           UI.modal('Einrichtung nicht möglich', h('p.prewrap', {},
-            /Falsche PIN/.test(e.message) ? 'Die PIN ist nicht korrekt.' : e.message));
+            /Falsche PIN/.test(e.message) ? (isPw ? 'Das Passwort ist nicht korrekt.' : 'Die PIN ist nicht korrekt.') : e.message));
         });
       });
     }
@@ -3825,8 +3897,8 @@
     }
     if (!Store.isEncrypted()) {
       return h('div.actions-col',
-        h('p.hint', {}, 'Schützt die Daten auf diesem Gerät: Die Datenbank wird verschlüsselt (AES-256) und die App beim Start mit einer PIN entsperrt. Wichtig: Bei vergessener PIN sind die Gerätedaten nur über ein Backup wiederherstellbar – die Einrichtung verlangt deshalb zuerst ein frisches Backup.'),
-        h('button.btn-primary.btn-block', { onclick: enableEncryptionFlow }, 'PIN-Sperre einrichten')
+        h('p.hint', {}, 'Schützt die Daten auf diesem Gerät: Die Datenbank wird verschlüsselt (AES-256) und die App beim Start mit einer PIN oder einem Passwort entsperrt. Wichtig: Bei vergessenem Zugang sind die Gerätedaten nur über ein Backup wiederherstellbar – die Einrichtung verlangt deshalb zuerst ein frisches Backup.'),
+        h('button.btn-primary.btn-block', { onclick: enableEncryptionFlow }, 'Sperre einrichten (PIN oder Passwort)')
       );
     }
     var lockSel = h('select.input');
@@ -3840,11 +3912,11 @@
       toast('Automatische Sperre: ' + lockSel.options[lockSel.selectedIndex].text + '.');
     });
     return h('div.actions-col',
-      h('p.hint', {}, 'Verschlüsselung ist aktiv (AES-256). Automatische Ordner-Backups werden mit dem Hauptschlüssel verschlüsselt und lassen sich mit Ihrer PIN wiederherstellen; manuelle Backups behalten ihr eigenes Passwort.'),
+      h('p.hint', {}, 'Verschlüsselung ist aktiv (AES-256). Automatische Ordner-Backups werden mit dem Hauptschlüssel verschlüsselt und lassen sich mit ' + (Store.secretKind() === 'password' ? 'Ihrem Passwort' : 'Ihrer PIN') + ' wiederherstellen; manuelle Backups behalten ihr eigenes Passwort.'),
       biometricRow(),
       h('label.field', h('span.field-label', {}, 'Automatische Sperre bei Inaktivität'), lockSel),
       h('button.btn-plain.btn-block', { onclick: doLock }, 'Jetzt sperren'),
-      h('button.btn-plain.btn-block', { onclick: changePinFlow }, 'PIN ändern'),
+      h('button.btn-plain.btn-block', { onclick: changePinFlow }, secretWord() + ' ändern'),
       h('button.btn-plain.btn-block.danger-text', { onclick: disableEncryptionFlow }, 'Verschlüsselung deaktivieren')
     );
   }
