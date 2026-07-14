@@ -17,7 +17,7 @@
 
   /* ================= App-Start ================= */
 
-  var APP_VERSION = '0.15.3';
+  var APP_VERSION = '0.15.4';
 
   Store.init().then(function () {
     if ('serviceWorker' in navigator) {
@@ -1236,7 +1236,7 @@
       h('button.view-btn', {
         onclick: function () {
           if (!cls.students.length) return;
-          go('protokoll', { courseId: course.id, studentId: cls.students[0].id, quarter: shownQ });
+          go('protokoll', { courseId: course.id, studentId: cls.students[0].id, quarter: shownQ, back: p.back });
         }
       }, 'Ansicht: Schüler/in')
     );
@@ -1566,15 +1566,15 @@
       var row = h('div.review-row',
         h('div.review-name.name-with-photo.tappable-name', {
           role: 'button', tabindex: '0',
-          title: 'SoLei-Punktestand mit Kriteriendetails anzeigen',
+          title: 'SoLei-Punktestand dieser Person mit Kriteriendetails anzeigen',
           onclick: function () {
-            go('pointstand', { id: course.id, quarter: q,
+            go('protokoll', { courseId: course.id, studentId: stu.id, quarter: q,
               back: { name: 'quarterReview', params: { id: course.id, quarter: q, advance: p.advance } } });
           },
           onkeydown: function (ev) {
             if (ev.key === 'Enter' || ev.key === ' ') {
               ev.preventDefault();
-              go('pointstand', { id: course.id, quarter: q,
+              go('protokoll', { courseId: course.id, studentId: stu.id, quarter: q,
                 back: { name: 'quarterReview', params: { id: course.id, quarter: q, advance: p.advance } } });
             }
           }
@@ -3210,14 +3210,14 @@
       qSel.appendChild(h('option', { value: n, selected: n === (p.quarter || q) }, n + '. Quartal'));
     });
     qSel.addEventListener('change', function () {
-      go('protokoll', { courseId: course.id, studentId: stu.id, quarter: Number(qSel.value) });
+      go('protokoll', { courseId: course.id, studentId: stu.id, quarter: Number(qSel.value), back: p.back });
     });
     var shownQ = p.quarter || q;
     var filterCrit = (p.crit != null) ? p.crit : null;
 
     var viewToggle = h('div.view-toggle',
       h('button.view-btn', {
-        onclick: function () { go('pointstand', { id: course.id, quarter: shownQ }); }
+        onclick: function () { go('pointstand', { id: course.id, quarter: shownQ, back: p.back }); }
       }, 'Ansicht: Liste'),
       h('button.view-btn.active', {}, 'Ansicht: Schüler/in')
     );
@@ -3232,7 +3232,7 @@
 
     function setFilter(ci) {
       go('protokoll', { courseId: course.id, studentId: stu.id, quarter: shownQ,
-        crit: (filterCrit === ci ? null : ci) });
+        crit: (filterCrit === ci ? null : ci), back: p.back });
     }
 
     var critSummary = h('div.crit-summary', {}, names.map(function (n, ci) {
@@ -3398,7 +3398,7 @@
     }
 
     return h('div.screen',
-      header('SoLei-Punktestand', { name: 'course', params: { id: course.id } },
+      header('SoLei-Punktestand', p.back || { name: 'course', params: { id: course.id } },
         h('button.btn-small.btn-plain', { onclick: printCharts }, 'Diagramme drucken')),
       courseBox(course),
       h('div.capture-bar', qSel, viewToggle),
@@ -3582,7 +3582,7 @@
           : 'Es wurde noch kein Backup erstellt.'),
         h('div.actions-col',
           h('button.btn-primary.btn-block', { onclick: function () { exportDialog(); } },
-            'Backup-Datei jetzt speichern (mit Passwort: verschlüsselt)'),
+            'Backup-Datei jetzt verschlüsselt speichern'),
           h('button.btn-plain.btn-block', { onclick: function () { fileInput.click(); } },
             'Backup-Datei einspielen'),
           Store.folderBackupSupported()
