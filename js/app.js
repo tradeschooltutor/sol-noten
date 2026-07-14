@@ -17,7 +17,7 @@
 
   /* ================= App-Start ================= */
 
-  var APP_VERSION = '0.15.1';
+  var APP_VERSION = '0.15.2';
 
   Store.init().then(function () {
     if ('serviceWorker' in navigator) {
@@ -3606,7 +3606,9 @@
       h('div.section-head', {}, 'Bewertungsspiegel (15-Punkte-Schema)'),
       h('div.card',
         h('p.hint', {}, 'Die Note gilt ab der jeweils erreichten vollen Punktstufe. Beispiel: 11,9 Punkte → Stufe „ab 11“ → Note 2.'),
-        gradeTable,
+        h('details.pct-details',
+          h('summary', {}, 'Tabelle anzeigen (0 – 15 Punkte)'),
+          h('div.pct-scroll', {}, gradeTable)),
         h('div.actions-col',
           h('button.btn-primary.btn-block', { onclick: function () {
             st.settings.grading15.forEach(function (row, i) { row.g = Number(gradeInputs[i].value); });
@@ -3829,26 +3831,6 @@
       });
   }
 
-  function disableEncryptionFlow() {
-    var isPw = Store.secretKind() === 'password';
-    var pin = h('input.input', { type: 'password', inputmode: isPw ? null : 'numeric', placeholder: secretWord() });
-    UI.modal('Verschlüsselung deaktivieren',
-      [h('p', {}, 'Die Daten werden wieder unverschlüsselt auf dem Gerät gespeichert und die Abfrage beim Start entfällt.'),
-       h('label.field', h('span.field-label', {}, secretWord() + ' zur Bestätigung'), pin)],
-      [
-        { label: 'Abbrechen', value: false },
-        { label: 'Deaktivieren', value: true, danger: true }
-      ]).then(function (ok) {
-        if (!ok) return;
-        Store.disableEncryption(pin.value).then(function () {
-          toast('Verschlüsselung wurde deaktiviert.');
-          render();
-        }).catch(function () {
-          UI.modal('Deaktivieren fehlgeschlagen', h('p', {}, isPw ? 'Das Passwort ist nicht korrekt.' : 'Die PIN ist nicht korrekt.'));
-        });
-      });
-  }
-
   function biometricRow() {
     var host = h('div.bio-row');
     function draw(available) {
@@ -3916,8 +3898,7 @@
       biometricRow(),
       h('label.field', h('span.field-label', {}, 'Automatische Sperre bei Inaktivität'), lockSel),
       h('button.btn-plain.btn-block', { onclick: doLock }, 'Jetzt sperren'),
-      h('button.btn-plain.btn-block', { onclick: changePinFlow }, secretWord() + ' ändern'),
-      h('button.btn-plain.btn-block.danger-text', { onclick: disableEncryptionFlow }, 'Verschlüsselung deaktivieren')
+      h('button.btn-plain.btn-block', { onclick: changePinFlow }, 'PIN / Passwort ändern')
     );
   }
 

@@ -111,6 +111,9 @@ body {
 }
 .input:focus { outline: 2px solid var(--teal); outline-offset: 1px; border-color: var(--teal); }
 .input-num { max-width: 7rem; }
+/* type="date" hat auf iOS/WebKit eine intrinsische Mindestbreite, die width:100%
+   sprengen kann und das Feld über die Box hinauswachsen lässt. min-width:0 zähmt das. */
+.input[type="date"] { min-width: 0; max-width: 100%; -webkit-appearance: none; appearance: none; }
 .import-area { font-family: ui-monospace, Consolas, monospace; font-size: 0.85rem; }
 .date-inline { min-height: 38px; padding: 6px 8px; width: auto; }
 
