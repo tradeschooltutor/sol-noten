@@ -57,6 +57,7 @@
   function doLock() {
     if (!Store.isEncrypted() || Store.isLocked()) return;
     Store.lock();
+    photoCache = {}; /* entschlüsselte Fotos nicht im Speicher belassen */
     go('lock');
   }
 
@@ -926,32 +927,33 @@
     }
   };
 
-  /* Backup speichern – mit optionalem Passwort (verschlüsselt). */
+  /* Backup speichern – immer mit Passwort verschlüsselt (kein Klartext-Export). */
   function exportDialog(onDone) {
-    var pw1 = h('input.input', { type: 'password', autocomplete: 'new-password', placeholder: 'Passwort (empfohlen)' });
+    var pw1 = h('input.input', { type: 'password', autocomplete: 'new-password', placeholder: 'Passwort' });
     var pw2 = h('input.input', { type: 'password', autocomplete: 'new-password', placeholder: 'Passwort wiederholen' });
     var err = h('p.hint.error-text');
     UI.modal('Backup speichern', [
-      h('p.hint', {}, 'Mit Passwort wird die Datei verschlüsselt (AES-256) – empfohlen, wenn das Backup in Cloud-Ordnern oder Mails landet. Ohne Passwort wird sie im Klartext gespeichert.'),
+      h('p.hint', {}, 'Das Backup wird mit Ihrem Passwort verschlüsselt (AES-256). Da es Schülerdaten enthält, ist ein Passwort verpflichtend.'),
       h('label.field', h('span.field-label', {}, 'Passwort'), pw1),
       h('label.field', h('span.field-label', {}, 'Wiederholung'), pw2),
-      h('p.hint', {}, 'Wichtig: Ein vergessenes Passwort kann nicht wiederhergestellt werden – die Datei ist dann unlesbar.'),
+      h('p.hint', {}, 'Wichtig: Ein vergessenes Passwort kann nicht wiederhergestellt werden – die Datei ist dann unlesbar. Bewahren Sie es sicher auf (z. B. in einem Passwort-Manager).'),
       err
     ], [
       { label: 'Abbrechen', value: false },
       { label: 'Backup speichern', value: true, primary: true,
         validate: function () {
+          if (pw1.value.length < 6) { err.textContent = 'Bitte ein Passwort mit mindestens 6 Zeichen vergeben.'; return false; }
           if (pw1.value !== pw2.value) { err.textContent = 'Die Passwörter stimmen nicht überein.'; return false; }
-          if (pw1.value && pw1.value.length < 6) { err.textContent = 'Bitte mindestens 6 Zeichen verwenden.'; return false; }
           return true;
         } }
     ]).then(function (ok) {
       if (!ok) return;
-      var pw = pw1.value || null;
-      Store.exportJSON(pw).then(function () {
-        toast(pw ? 'Verschlüsseltes Backup wird gespeichert.' : 'Backup (unverschlüsselt) wird gespeichert.');
+      Store.exportJSON(pw1.value).then(function () {
+        toast('Verschlüsseltes Backup wird gespeichert.');
         render();
         if (typeof onDone === 'function') onDone();
+      }).catch(function (e) {
+        UI.modal('Backup fehlgeschlagen', h('p', {}, e.message));
       });
     });
   }

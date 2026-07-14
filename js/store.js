@@ -12,7 +12,7 @@
   var saveTimer = null;
   var listeners = [];
   var backupDirHandle = null;
-  var security = null;      /* {enabled, wrapped, fail:{count,lockUntil}, autolockMinutes, pinLength} */
+  var security = null;      /* {enabled, wrapped, fail:{count,lockUntil}, autolockMinutes} */
   var masterRaw = null;     /* Uint8Array – nur im Arbeitsspeicher der entsperrten App */
   var masterKey = null;     /* CryptoKey */
 
@@ -246,7 +246,7 @@
     masterRaw = CryptoBox.generateMasterRaw();
     return CryptoBox.wrapMaster(pin, masterRaw).then(function (wrapped) {
       security = {
-        enabled: true, wrapped: wrapped, pinLength: pin.length,
+        enabled: true, wrapped: wrapped,
         fail: { count: 0, lockUntil: 0 }, autolockMinutes: 5,
         createdAt: new Date().toISOString()
       };
@@ -276,7 +276,6 @@
       return CryptoBox.wrapMaster(newPin, raw);
     }).then(function (wrapped) {
       security.wrapped = wrapped;
-      security.pinLength = newPin.length;
       return saveSecurity();
     });
   }
@@ -541,21 +540,17 @@
     setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 500);
   }
 
-  /* Backup exportieren; mit Passwort verschlüsselt (AES-256-GCM), ohne Passwort im Klartext. */
+  /* Backup exportieren; immer mit Passwort verschlüsselt (AES-256-GCM).
+     Ein unverschlüsselter Klartext-Export ist bewusst nicht mehr möglich. */
   function exportJSON(password) {
-    var done = function () {
+    if (!password) {
+      return Promise.reject(new Error('Für das Backup ist ein Passwort erforderlich.'));
+    }
+    return CryptoBox.encrypt(JSON.stringify(state), password).then(function (env) {
+      downloadText('SOL-Noten-Backup-' + todayISO() + '.json', JSON.stringify(env));
       state.settings.lastExport = new Date().toISOString();
       save();
-    };
-    if (password) {
-      return CryptoBox.encrypt(JSON.stringify(state), password).then(function (env) {
-        downloadText('SOL-Noten-Backup-' + todayISO() + '.json', JSON.stringify(env));
-        done();
-      });
-    }
-    downloadText('SOL-Noten-Backup-' + todayISO() + '.json', JSON.stringify(state, null, 1));
-    done();
-    return Promise.resolve();
+    });
   }
 
   function parseBackup(text) {
@@ -618,18 +613,16 @@
       })
       .then(function (p) {
         if (p !== 'granted') return;
-        var content;
-        if (isEncrypted() && masterKey) {
-          content = CryptoBox.encryptWithKey(masterKey, JSON.stringify(state)).then(function (box) {
-            return JSON.stringify({
-              app: 'SOL-Noten', encrypted: true, v: 2, mode: 'pin-master',
-              wrapped: security.wrapped, iv: box.iv, data: box.data
-            });
+        /* Nur verschlüsselt sichern. Ohne aktive Verschlüsselung entsteht bewusst
+           kein Auto-Backup (kein Klartext auf der Platte). In der Praxis erzwingt
+           die App ohnehin die PIN, bevor Daten erfasst werden. */
+        if (!(isEncrypted() && masterKey)) return;
+        return CryptoBox.encryptWithKey(masterKey, JSON.stringify(state)).then(function (box) {
+          return JSON.stringify({
+            app: 'SOL-Noten', encrypted: true, v: 2, mode: 'pin-master',
+            wrapped: security.wrapped, iv: box.iv, data: box.data
           });
-        } else {
-          content = Promise.resolve(JSON.stringify(state));
-        }
-        return content.then(function (text) {
+        }).then(function (text) {
           return backupDirHandle.getFileHandle('SOL-Noten-Backup-' + todayISO() + '.json', { create: true })
             .then(function (fh) { return fh.createWritable(); })
             .then(function (w) {
