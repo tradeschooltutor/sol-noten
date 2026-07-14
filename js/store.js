@@ -260,18 +260,6 @@
       .then(function () { return reencryptPhotos(true); });
   }
 
-  /* Verschlüsselung deaktivieren (PIN erforderlich). */
-  function disableEncryption(pin) {
-    return CryptoBox.unwrapMaster(pin, security.wrapped).then(function () {
-      return reencryptSnapshots(false);
-    }).then(function () {
-      return reencryptPhotos(false);
-    }).then(function () {
-      security = null; masterRaw = null; masterKey = null;
-      return saveSecurity();
-    }).then(function () { return persist(); });
-  }
-
   function changePin(oldSecret, newSecret, newKind) {
     return CryptoBox.unwrapMaster(oldSecret, security.wrapped).then(function (raw) {
       return CryptoBox.wrapMaster(newSecret, raw);
@@ -774,7 +762,7 @@
     exportPhotos: exportPhotos, parsePhotoBackup: parsePhotoBackup, applyPhotoImport: applyPhotoImport,
     daysSincePhotoExport: daysSincePhotoExport,
     isEncrypted: isEncrypted, isLocked: isLocked, unlock: unlock, lock: lock,
-    enableEncryption: enableEncryption, disableEncryption: disableEncryption,
+    enableEncryption: enableEncryption,
     changePin: changePin, secretKind: secretKind, setAutolock: setAutolock, getAutolock: getAutolock,
     biometricsEnabled: biometricsEnabled, enableBiometrics: enableBiometrics,
     disableBiometrics: disableBiometrics, unlockBiometric: unlockBiometric,

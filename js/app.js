@@ -17,7 +17,7 @@
 
   /* ================= App-Start ================= */
 
-  var APP_VERSION = '0.15.2';
+  var APP_VERSION = '0.15.3';
 
   Store.init().then(function () {
     if ('serviceWorker' in navigator) {
@@ -894,7 +894,8 @@
             h('p', {}, 'Noch kein Kurs in diesem Schuljahr.'),
             h('p.hint', {}, 'Ein Kurs ist eine Klasse in einem Fach – z. B. „AK 2026 · Fahrzeugvertriebsprozesse“.'))
         : h('div.course-grid', {}, courses.map(courseTile)),
-      h('button.btn-primary.btn-block', { onclick: function () { go('editCourse', {}); } }, '+ Kurs anlegen')
+      h('button.btn-primary.btn-block', { onclick: function () { go('editCourse', {}); } }, '+ Kurs anlegen'),
+      h('button.btn-plain.btn-block', { onclick: function () { go('settings', { back: { name: 'home' } }); } }, 'Globale Einstellungen')
     );
     return screen;
 
@@ -1227,7 +1228,7 @@
       qSel.appendChild(h('option', { value: n, selected: n === shownQ }, n + '. Quartal'));
     });
     qSel.addEventListener('change', function () {
-      go('pointstand', { id: course.id, quarter: Number(qSel.value) });
+      go('pointstand', { id: course.id, quarter: Number(qSel.value), back: p.back });
     });
 
     var viewToggle = h('div.view-toggle',
@@ -1241,7 +1242,7 @@
     );
 
     return h('div.screen',
-      header('SoLei-Punktestand', { name: 'course', params: { id: course.id } }),
+      header('SoLei-Punktestand', p.back || { name: 'course', params: { id: course.id } }),
       courseBox(course),
       h('div.capture-bar', qSel, viewToggle),
       h('div.section-head.section-head-spaced', {},
@@ -1563,7 +1564,21 @@
       inp.addEventListener('input', refreshSolei);
 
       var row = h('div.review-row',
-        h('div.review-name.name-with-photo',
+        h('div.review-name.name-with-photo.tappable-name', {
+          role: 'button', tabindex: '0',
+          title: 'SoLei-Punktestand mit Kriteriendetails anzeigen',
+          onclick: function () {
+            go('pointstand', { id: course.id, quarter: q,
+              back: { name: 'quarterReview', params: { id: course.id, quarter: q, advance: p.advance } } });
+          },
+          onkeydown: function (ev) {
+            if (ev.key === 'Enter' || ev.key === ' ') {
+              ev.preventDefault();
+              go('pointstand', { id: course.id, quarter: q,
+                back: { name: 'quarterReview', params: { id: course.id, quarter: q, advance: p.advance } } });
+            }
+          }
+        },
           photoTile(stu, { small: true }),
           h('div',
             h('div.student-name', {}, stu.lastName + ', ' + stu.firstName),
@@ -3715,8 +3730,11 @@
     ], { mandatory: true }).then(function () {
       Store.enableEncryption(pins.value(), pins.kind()).then(function () {
         UI.modal('Verschlüsselung aktiv', [
-          h('p', {}, 'Alle Daten auf diesem Gerät sind jetzt verschlüsselt.'),
-          h('p.hint', {}, 'Empfehlung: Sobald Sie Schüler und Noten erfasst haben, sichern Sie Ihre Daten über „Einstellungen → Backup-Datei jetzt speichern“. Bewahren Sie Zugangsdaten und Backup an einem sicheren Ort auf (z. B. in einem Passwort-Manager).')
+          h('p', {}, 'Alle Daten der App sind jetzt auf diesem Gerät verschlüsselt. Bewahren Sie Ihre Zugangsdaten (PIN / Passwort) an einem sicheren Ort auf (z. B. in einem Passwort-Manager).'),
+          h('p', {},
+            h('strong', {}, 'Backup-Empfehlung:'),
+            h('br'),
+            'Sobald Sie Schüler/innen und Noten erfasst haben, sichern Sie Ihre Daten über „Einstellungen → Backup-Datei jetzt speichern“. Diese Backups sind ebenfalls verschlüsselt. Sichern Sie die Backup-Dateien regelmäßig, beispielsweise auf einem externen Datenträger.')
         ], [{ label: 'Verstanden', value: true, primary: true }]).then(function () {
           if (onDone) onDone();
         });

@@ -357,6 +357,9 @@ button:focus-visible, .input:focus-visible, select:focus-visible {
   padding: 12px 16px; border-bottom: 1px solid var(--line);
 }
 .review-row:last-child { border-bottom: none; }
+.tappable-name { cursor: pointer; border-radius: 10px; margin: -4px; padding: 4px; transition: background 0.12s; }
+.tappable-name:hover { background: var(--paper); }
+.tappable-name:focus-visible { outline: 2px solid var(--teal); outline-offset: 1px; }
 .review-grades { display: flex; gap: 10px; align-items: stretch; }
 .review-cell {
   flex: 1; background: var(--paper); border-radius: 10px; padding: 8px 10px;
