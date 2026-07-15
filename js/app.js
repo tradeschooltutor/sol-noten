@@ -17,7 +17,7 @@
 
   /* ================= App-Start ================= */
 
-  var APP_VERSION = '0.16.0';
+  var APP_VERSION = '0.16.1';
 
   Store.init().then(function () {
     if ('serviceWorker' in navigator) {
@@ -1108,7 +1108,7 @@
           weights: { sl: Number(wSl.value), obt: Number(wObt.value), ka: Number(wKa.value) },
           maxPoints: { 1: Calc.DEFAULT_MAX.slice(), 2: Calc.DEFAULT_MAX.slice(), 3: Calc.DEFAULT_MAX.slice(), 4: Calc.DEFAULT_MAX.slice() },
           currentQuarter: Quarters.quarterForDate(Store.todayISO(), year.quarters),
-          portfolio: {}, quarterOverrides: null, dismissedQuarterHint: {},
+          portfolio: {}, quarterOverrides: null, completed: false,
           uploadCriterion: Number(upCritSel.value)
         };
         st.courses.push(course);
@@ -1221,10 +1221,14 @@
     var course = Store.courseById(p.id);
     if (!course) return views.home({});
     var cls = Store.classById(course.classId);
-    var q = course.currentQuarter;
     var quarters = courseQuarters(course);
+    /* Anzeige-Quartal automatisch aus dem heutigen Datum: „wo stehe ich gerade“.
+       Ersetzt die früheren manuellen „ins nächste Quartal wechseln“-Buttons. */
+    var todayQ = Quarters.quarterForDate(Store.todayISO(), quarters);
+    if (course.currentQuarter !== todayQ) { course.currentQuarter = todayQ; Store.save(); }
+    var q = course.currentQuarter;
     var due = !course.completed &&
-      Quarters.quarterChangeDue(Store.todayISO(), q, quarters) && !course.dismissedQuarterHint[q];
+      Quarters.quarterChangeDue(Store.todayISO(), q, quarters);
 
     var studentRows = pointstandRows(course, cls, q);
 
@@ -1458,15 +1462,12 @@
     var isFinal = q === 4;
     return h('div.banner-info', {},
       h('span', {}, isFinal
-        ? 'Das 4. Quartal ist laut Plan beendet (' + UI.fmtDate(quarters[q - 1].end) + ') – damit endet das Schuljahr. Tragen Sie die Portfolionoten ein und schließen Sie das Schuljahr ab.'
-        : 'Das ' + q + '. Quartal ist laut Plan beendet (' + UI.fmtDate(quarters[q - 1].end) + '). Tragen Sie die Portfolionoten ein und wechseln Sie dann in das ' + (q + 1) + '. Quartal.'),
+        ? 'Das 4. Quartal ist laut Plan beendet (' + UI.fmtDate(quarters[q - 1].end) + ') – tragen Sie die Portfolionoten ein und schließen Sie anschließend das Schuljahr ab.'
+        : 'Das ' + q + '. Quartal ist laut Plan beendet (' + UI.fmtDate(quarters[q - 1].end) + '). Tragen Sie die Portfolionoten für dieses Quartal ein.'),
       h('div.banner-actions',
         h('button.btn-small.btn-primary', { onclick: function () {
-          go('quarterReview', { id: course.id, quarter: q, advance: true });
-        } }, isFinal ? 'Schuljahr abschließen' : 'Quartal abschließen'),
-        h('button.btn-small.btn-plain', { onclick: function () {
-          course.dismissedQuarterHint[q] = true; Store.save(); render();
-        } }, 'Später')
+          go('quarterReview', { id: course.id, quarter: q });
+        } }, 'Zu den SoLei-Quartalsnoten')
       )
     );
   }
@@ -1593,7 +1594,7 @@
       qSel.appendChild(h('option', { value: n, selected: n === q }, n + '. Quartal'));
     });
     qSel.addEventListener('change', function () {
-      go('quarterReview', { id: course.id, quarter: Number(qSel.value), advance: p.advance });
+      go('quarterReview', { id: course.id, quarter: Number(qSel.value) });
     });
 
     var inputs = {}; /* studentId -> input */
@@ -1643,13 +1644,13 @@
           title: 'SoLei-Punktestand dieser Person mit Kriteriendetails anzeigen',
           onclick: function () {
             go('protokoll', { courseId: course.id, studentId: stu.id, quarter: q,
-              back: { name: 'quarterReview', params: { id: course.id, quarter: q, advance: p.advance } } });
+              back: { name: 'quarterReview', params: { id: course.id, quarter: q } } });
           },
           onkeydown: function (ev) {
             if (ev.key === 'Enter' || ev.key === ' ') {
               ev.preventDefault();
               go('protokoll', { courseId: course.id, studentId: stu.id, quarter: q,
-                back: { name: 'quarterReview', params: { id: course.id, quarter: q, advance: p.advance } } });
+                back: { name: 'quarterReview', params: { id: course.id, quarter: q } } });
             }
           }
         },
@@ -1707,23 +1708,23 @@
         students.length ? rows : h('div.empty', h('p', {}, 'Diese Klasse hat noch keine Schüler/innen.'))),
       h('div.actions-col',
         h('button.btn-primary.btn-block', { onclick: saveAll }, 'Portfolionoten speichern'),
-        p.advance && q < 4 && q === course.currentQuarter
+        q === 4 && !course.completed
           ? h('button.btn-plain.btn-block', { onclick: function () {
               if (!saveAll()) return;
-              course.currentQuarter = q + 1;
-              Store.save();
-              toast('Der Kurs ist jetzt im ' + (q + 1) + '. Quartal.');
-              go('maxPoints', { id: course.id, intro: true });
-            } }, 'Speichern und ins ' + (q + 1) + '. Quartal wechseln')
+              UI.confirmDialog('Schuljahr abschließen?',
+                'Der Kurs wird als „Schuljahr abgeschlossen“ markiert. Alle Ansichten, Zeugnisnoten, Drucke und Nachträge bleiben weiterhin möglich; die Markierung lässt sich in den Kurs-Einstellungen jederzeit wieder aufheben.',
+                'Schuljahr abschließen')
+                .then(function (ok) {
+                  if (!ok) return;
+                  course.completed = true;
+                  Store.save();
+                  toast('Das Schuljahr ist für diesen Kurs abgeschlossen.');
+                  go('course', { id: course.id });
+                });
+            } }, 'Schuljahr abschließen')
           : null,
-        p.advance && q === 4 && q === course.currentQuarter && !course.completed
-          ? h('button.btn-plain.btn-block', { onclick: function () {
-              if (!saveAll()) return;
-              course.completed = true;
-              Store.save();
-              toast('Das Schuljahr ist für diesen Kurs abgeschlossen.');
-              go('course', { id: course.id });
-            } }, 'Speichern und Schuljahr abschließen')
+        course.completed
+          ? h('p.hint', {}, 'Dieser Kurs ist als „Schuljahr abgeschlossen“ markiert (in den Kurs-Einstellungen aufhebbar).')
           : null
       )
     );
