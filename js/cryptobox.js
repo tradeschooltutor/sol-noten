@@ -147,25 +147,29 @@
 
   var PRF_SALT = new TextEncoder().encode('sol-noten-prf-v1');
 
-  /* Neues biometrisches Credential anlegen. Rückgabe: {credentialId (b64)} */
-  function bioRegister() {
+  /* Neues biometrisches Credential anlegen. Rückgabe: {credentialId (b64)}.
+     excludeIdB64 (optional): bereits bekannter Passkey dieser App – verhindert,
+     dass der Authenticator ein Duplikat anlegt (F8, Hygiene). */
+  function bioRegister(excludeIdB64) {
     var userId = crypto.getRandomValues(new Uint8Array(16));
     var challenge = crypto.getRandomValues(new Uint8Array(32));
-    return navigator.credentials.create({
-      publicKey: {
-        challenge: challenge,
-        rp: { name: 'SOL-Noten' },
-        user: { id: userId, name: 'SOL-Noten', displayName: 'SOL-Noten' },
-        pubKeyCredParams: [{ type: 'public-key', alg: -7 }, { type: 'public-key', alg: -257 }],
-        authenticatorSelection: {
-          authenticatorAttachment: 'platform',
-          userVerification: 'required',
-          residentKey: 'preferred'  /* Android verträgt 'required' oft nicht */
-        },
-        timeout: 60000,
-        extensions: { prf: {} }
-      }
-    }).then(function (cred) {
+    var publicKey = {
+      challenge: challenge,
+      rp: { name: 'SOL-Noten' },
+      user: { id: userId, name: 'SOL-Noten', displayName: 'SOL-Noten' },
+      pubKeyCredParams: [{ type: 'public-key', alg: -7 }, { type: 'public-key', alg: -257 }],
+      authenticatorSelection: {
+        authenticatorAttachment: 'platform',
+        userVerification: 'required',
+        residentKey: 'preferred'  /* Android verträgt 'required' oft nicht */
+      },
+      timeout: 60000,
+      extensions: { prf: {} }
+    };
+    if (excludeIdB64) {
+      publicKey.excludeCredentials = [{ type: 'public-key', id: unb64(excludeIdB64) }];
+    }
+    return navigator.credentials.create({ publicKey: publicKey }).then(function (cred) {
       if (!cred) throw new Error('Es wurde kein biometrischer Schlüssel erstellt.');
       var ext = cred.getClientExtensionResults ? cred.getClientExtensionResults() : {};
       if (!ext || !ext.prf || !ext.prf.enabled) {

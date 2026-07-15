@@ -42,10 +42,29 @@
   function u16(dv, o) { return dv.getUint16(o, true); }
   function u32(dv, o) { return dv.getUint32(o, true); }
 
+  /* Obergrenze für entpackte Daten pro ZIP-Eintrag: schützt vor präparierten
+     Dateien, die klein sind, aber beim Entpacken den Speicher fluten (Zip-Bombe). */
+  var MAX_INFLATED_BYTES = 50 * 1024 * 1024;
+
   function inflateRaw(bytes) {
     var ds = new DecompressionStream('deflate-raw');
-    var stream = new Blob([bytes]).stream().pipeThrough(ds);
-    return new Response(stream).arrayBuffer().then(function (buf) {
+    var reader = new Blob([bytes]).stream().pipeThrough(ds).getReader();
+    var chunks = [], total = 0;
+    function step() {
+      return reader.read().then(function (r) {
+        if (r.done) return null;
+        total += r.value.byteLength;
+        if (total > MAX_INFLATED_BYTES) {
+          reader.cancel();
+          throw new Error('Die Excel-Datei ist nach dem Entpacken ungewöhnlich groß und wurde aus Sicherheitsgründen abgelehnt.');
+        }
+        chunks.push(r.value);
+        return step();
+      });
+    }
+    return step().then(function () {
+      var buf = new Uint8Array(total), o = 0;
+      chunks.forEach(function (c) { buf.set(c, o); o += c.byteLength; });
       return new TextDecoder('utf-8').decode(buf);
     });
   }

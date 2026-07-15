@@ -17,7 +17,7 @@
 
   /* ================= App-Start ================= */
 
-  var APP_VERSION = '0.15.5';
+  var APP_VERSION = '0.15.6';
 
   Store.init().then(function () {
     if ('serviceWorker' in navigator) {
@@ -534,6 +534,10 @@
     fileInput.addEventListener('change', function () {
       var f = fileInput.files[0]; fileInput.value = '';
       if (!f) return;
+      if (f.size > 50 * 1024 * 1024) {
+        UI.modal('Import fehlgeschlagen', h('p', {}, 'Die Datei ist zu groß für eine SOL-Noten-Foto-Sicherung (Limit 50 MB) und wurde abgelehnt.'));
+        return;
+      }
       f.text().then(function (text) {
         var parsed = Store.parsePhotoBackup(text);
         var getData = parsed.encrypted
@@ -3517,6 +3521,10 @@
       var f = fileInput.files[0];
       fileInput.value = '';
       if (!f) return;
+      if (f.size > 10 * 1024 * 1024) {
+        UI.modal('Import fehlgeschlagen', h('p', {}, 'Die Datei ist zu groß für ein SOL-Noten-Backup (Limit 10 MB) und wurde abgelehnt.'));
+        return;
+      }
       f.text().then(function (text) {
         var parsed = Store.parseBackup(text);
         var getData;
@@ -3893,7 +3901,12 @@
         host.appendChild(h('div.row-between',
           h('span', {}, 'Biometrische Entsperrung ist aktiv.'),
           h('button.btn-small.btn-plain.danger-text', { onclick: function () {
-            Store.disableBiometrics().then(function () { toast('Biometrie deaktiviert.'); draw(true); });
+            Store.disableBiometrics().then(function () {
+              draw(true);
+              UI.modal('Biometrie deaktiviert',
+                h('p', {}, 'Die biometrische Entsperrung ist in SOL-Noten abgeschaltet. Der zugehörige Passkey verbleibt in den Einstellungen Ihres Geräts (Passwörter / Passkeys) und kann dort bei Bedarf gelöscht werden – für die App ist er ohne Funktion.'),
+                [{ label: 'Verstanden', value: true, primary: true }]);
+            });
           } }, 'Deaktivieren')));
       } else {
         host.appendChild(h('div.actions-col',

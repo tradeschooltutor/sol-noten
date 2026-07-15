@@ -199,7 +199,9 @@
       : CryptoBox.unwrapMaster(pin, security.wrapped);
     return ensureMaster.then(function (raw) {
       masterRaw = raw;
-      return CryptoBox.bioRegister();
+      /* Bekannten Passkey ausschließen, damit der Authenticator kein Duplikat anlegt (F8). */
+      var knownId = security.bio && security.bio.credentialId;
+      return CryptoBox.bioRegister(knownId || null);
     }).then(function (reg) {
       return CryptoBox.bioGetSecretKey(reg.credentialId).then(function (secretKey) {
         return CryptoBox.bioWrapMaster(secretKey, masterRaw).then(function (box) {
@@ -474,6 +476,9 @@
   }
 
   function parsePhotoBackup(text) {
+    if (text.length > PHOTO_IMPORT_MAX_BYTES) {
+      throw new Error('Die Datei ist zu groß für eine SOL-Noten-Foto-Sicherung (Limit 50 MB) und wurde abgelehnt.');
+    }
     var data;
     try { data = JSON.parse(text); }
     catch (e) { throw new Error('Die Datei ist keine gültige Foto-Sicherung (JSON-Fehler).'); }
@@ -486,7 +491,18 @@
 
   /* Fotos aus einer (bereits entschlüsselten) Sicherung übernehmen. */
   function applyPhotoImport(data) {
-    var entries = Object.keys(data.photos || {});
+    if (!data || typeof data !== 'object' || !data.photos ||
+        typeof data.photos !== 'object' || Array.isArray(data.photos)) {
+      throw new Error('Die Datei ist keine SOL-Noten-Foto-Sicherung.');
+    }
+    scanForbiddenKeys(data);
+    var entries = Object.keys(data.photos);
+    entries.forEach(function (studentId) {
+      var url = data.photos[studentId];
+      if (typeof url !== 'string' || url.indexOf('data:image/') !== 0) {
+        throw new Error('Die Foto-Sicherung enthält ungültige Bilddaten und wurde abgelehnt.');
+      }
+    });
     var chain = Promise.resolve();
     entries.forEach(function (studentId) {
       chain = chain.then(function () { return savePhoto(studentId, data.photos[studentId]); });
@@ -548,7 +564,52 @@
     });
   }
 
+  /* ---------- Import-Schutz (F7): Größenlimits und Struktur-Prüfung ---------- */
+
+  var IMPORT_MAX_BYTES = 10 * 1024 * 1024;        /* Noten-Backup: großzügig, echte Dateien liegen weit darunter */
+  var PHOTO_IMPORT_MAX_BYTES = 50 * 1024 * 1024;  /* Foto-Sicherung: Data-URLs vieler Klassen */
+
+  /* Lehnt manipulationsverdächtige Schlüsselnamen im gesamten Objektbaum ab. */
+  function scanForbiddenKeys(node) {
+    if (node === null || typeof node !== 'object') return;
+    if (Array.isArray(node)) { node.forEach(scanForbiddenKeys); return; }
+    Object.keys(node).forEach(function (k) {
+      if (k === '__proto__' || k === 'constructor' || k === 'prototype') {
+        throw new Error('Die Datei enthält unzulässige Feldnamen und wurde aus Sicherheitsgründen abgelehnt.');
+      }
+      scanForbiddenKeys(node[k]);
+    });
+  }
+
+  /* Struktur-Prüfung vor der Übernahme eines Backups: erwartete Bereiche und
+     Grundtypen, keine Voll-Schemaprüfung (bleibt vorwärtskompatibel zu neueren
+     Backups mit zusätzlichen Feldern). */
+  function validateImport(data) {
+    var bad = new Error('Die Datei ist keine SOL-Noten-Backup-Datei oder hat nicht den erwarteten Aufbau.');
+    if (!data || typeof data !== 'object' || Array.isArray(data)) throw bad;
+    if (data.app !== 'SOL-Noten') throw bad;
+    if (!data.settings || typeof data.settings !== 'object' || Array.isArray(data.settings)) throw bad;
+    ['courses', 'schoolYears', 'classes', 'soleiEntries'].forEach(function (k) {
+      if (!Array.isArray(data[k])) throw bad;
+    });
+    ['absences', 'uploadTallies'].forEach(function (k) { /* fehlen in Alt-Backups; migrate() ergänzt sie */
+      if (data[k] !== undefined && !Array.isArray(data[k])) throw bad;
+    });
+    ['courses', 'schoolYears', 'classes', 'soleiEntries', 'absences', 'uploadTallies'].forEach(function (k) {
+      (data[k] || []).forEach(function (el) {
+        if (!el || typeof el !== 'object' || Array.isArray(el)) throw bad;
+        ['id', 'courseId', 'studentId', 'yearId', 'classId'].forEach(function (idKey) {
+          if (el[idKey] !== undefined && typeof el[idKey] !== 'string') throw bad;
+        });
+      });
+    });
+    scanForbiddenKeys(data);
+  }
+
   function parseBackup(text) {
+    if (text.length > IMPORT_MAX_BYTES) {
+      throw new Error('Die Datei ist zu groß für ein SOL-Noten-Backup (Limit 10 MB) und wurde abgelehnt.');
+    }
     var data;
     try { data = JSON.parse(text); }
     catch (e) { throw new Error('Die Datei ist keine gültige Backup-Datei (JSON-Fehler).'); }
@@ -561,9 +622,7 @@
   }
 
   function applyImport(data) {
-    if (!data || data.app !== 'SOL-Noten' || !Array.isArray(data.courses)) {
-      throw new Error('Die Datei ist keine SOL-Noten-Backup-Datei.');
-    }
+    validateImport(data);
     state = migrate(data);
     save();
   }
