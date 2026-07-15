@@ -443,9 +443,12 @@
     return idbGet('photos', studentId).then(function (r) { return !!r; });
   }
 
-  /* Alle Fotos als eine Sicherungsdatei exportieren (Data-URLs im Klartext-JSON;
-     wird beim verschlüsselten Manuellexport zusätzlich passwortgeschützt). */
+  /* Alle Fotos als eine Sicherungsdatei exportieren; immer mit Passwort
+     verschlüsselt (AES-256-GCM). Ein Klartext-Export ist bewusst nicht möglich. */
   function exportPhotos(password) {
+    if (!password) {
+      return Promise.reject(new Error('Für die Foto-Sicherung ist ein Passwort erforderlich.'));
+    }
     return photoKeys().then(function (keys) {
       var chain = Promise.resolve();
       var out = {};
@@ -462,13 +465,10 @@
           state.settings.lastPhotoExport = new Date().toISOString();
           save();
         };
-        if (password) {
-          return CryptoBox.encrypt(JSON.stringify(payload), password).then(function (env) {
-            env.kind = 'photos';
-            finish(JSON.stringify(env));
-          });
-        }
-        finish(JSON.stringify(payload, null, 0));
+        return CryptoBox.encrypt(JSON.stringify(payload), password).then(function (env) {
+          env.kind = 'photos';
+          finish(JSON.stringify(env));
+        });
       });
     });
   }

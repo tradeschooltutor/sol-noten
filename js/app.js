@@ -17,7 +17,7 @@
 
   /* ================= App-Start ================= */
 
-  var APP_VERSION = '0.15.4';
+  var APP_VERSION = '0.15.5';
 
   Store.init().then(function () {
     if ('serviceWorker' in navigator) {
@@ -56,10 +56,42 @@
 
   function doLock() {
     if (!Store.isEncrypted() || Store.isLocked()) return;
+    lockThisTab();
+    broadcastLock(); /* alle anderen offenen Tabs ebenfalls sperren */
+  }
+
+  /* Nur diesen Tab sperren (ohne Signal an andere Tabs — vermeidet Echo-Schleifen). */
+  function lockThisTab() {
     Store.lock();
     photoCache = {}; /* entschlüsselte Fotos nicht im Speicher belassen */
     go('lock');
   }
+
+  /* Tab-übergreifende Sperre: Sperrt ein Tab (Timer, Menü, Verlassen der App),
+     erhalten alle anderen Tabs ein Signal und sperren sich selbst. Ohne dies
+     bliebe auf einem geteilten Gerät ein "vergessener" zweiter Tab entsperrt.
+     Primär BroadcastChannel; Fallback: storage-Event (feuert nur in fremden Tabs). */
+  var lockChannel = null;
+  var LOCK_LS_KEY = 'sol-noten-lock';
+  function onRemoteLock() {
+    if (!Store.isEncrypted() || Store.isLocked()) return;
+    lockThisTab();
+  }
+  function initLockSync() {
+    if ('BroadcastChannel' in window) {
+      lockChannel = new BroadcastChannel('sol-noten-lock');
+      lockChannel.onmessage = onRemoteLock;
+    } else {
+      window.addEventListener('storage', function (e) {
+        if (e.key === LOCK_LS_KEY && e.newValue) onRemoteLock();
+      });
+    }
+  }
+  function broadcastLock() {
+    if (lockChannel) { try { lockChannel.postMessage('lock'); } catch (e) {} return; }
+    try { localStorage.setItem(LOCK_LS_KEY, String(Date.now())); } catch (e) {}
+  }
+  initLockSync();
 
   /* Automatische Sperre: bei Inaktivität bzw. beim Verlassen der App ("sofort") */
   var lastActivity = Date.now();
