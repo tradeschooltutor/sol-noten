@@ -111,8 +111,10 @@
 
   /* Vorschlag "Quartal abschließen?": heute liegt hinter dem Ende von Quartal q,
      das im Kurs noch als aktuell markiert ist. */
+  /* Meldet, dass das laufende Quartal laut Plan beendet ist. Für Q1–Q3 heißt
+     das „Wechsel fällig“, für Q4 „Schuljahresende erreicht“ – die Unterscheidung
+     (und der Abschluss-Status eines Kurses) liegt beim Aufrufer. */
   function quarterChangeDue(todayISO, currentQuarter, quarters) {
-    if (currentQuarter >= 4) return false;
     var q = quarters[currentQuarter - 1];
     return !!(q && q.end && todayISO >= q.end);
   }

@@ -135,6 +135,11 @@ button { font: inherit; cursor: pointer; }
   background: var(--red); color: #fff; border: none;
   border-radius: 12px; padding: 12px 18px; font-weight: 650; min-height: 48px;
 }
+.input-flash { outline: 2px solid var(--red); outline-offset: -1px; background: var(--red-soft); }
+.danger-zone {
+  margin-top: 18px; padding-top: 12px; border-top: 1px solid var(--line);
+}
+.danger-zone .hint { margin: 0 0 6px; color: var(--red); font-weight: 600; }
 .btn-block { width: 100%; }
 .btn-big { font-size: 1.1rem; min-height: 58px; }
 .btn-small { min-height: 36px; padding: 6px 12px; border-radius: 9px; font-size: 0.85rem; }
@@ -158,6 +163,7 @@ button { font: inherit; cursor: pointer; }
 }
 .quarter-chip.big { font-size: 0.95rem; padding: 5px 14px; }
 .quarter-chip.due { background: var(--amber-soft); color: var(--amber); }
+.quarter-chip.completed { background: var(--green-soft); color: var(--green); }
 .btn-capture {
   background: var(--teal); color: #fff; border: none; border-radius: 11px;
   padding: 12px; font-weight: 650; min-height: 48px;
@@ -213,6 +219,7 @@ button { font: inherit; cursor: pointer; }
 
 /* ---------- SoLei-Erfassung ---------- */
 .capture-bar { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: nowrap; }
+.capture-qnote { margin: 0 0 8px; }
 .date-field { display: inline-flex; align-items: center; flex-shrink: 1; min-width: 0; }
 
 /* Ansicht-Umschalter (Kriterium/Schüler bzw. Datum/Schüler) */

@@ -17,7 +17,7 @@
 
   /* ================= App-Start ================= */
 
-  var APP_VERSION = '0.15.7';
+  var APP_VERSION = '0.16.0';
 
   Store.init().then(function () {
     if ('serviceWorker' in navigator) {
@@ -937,12 +937,15 @@
 
     function courseTile(c) {
       var cls = Store.classById(c.classId);
-      var due = Quarters.quarterChangeDue(Store.todayISO(), c.currentQuarter, courseQuarters(c));
+      var due = !c.completed && Quarters.quarterChangeDue(Store.todayISO(), c.currentQuarter, courseQuarters(c));
+      var chipText = c.completed
+        ? 'Schuljahr abgeschlossen'
+        : c.currentQuarter + '. Quartal' + (due ? (c.currentQuarter === 4 ? ' · Schuljahresende' : ' · Wechsel fällig') : '');
       return h('div.course-tile', { onclick: function () { go('course', { id: c.id }); } },
         h('div.course-tile-class', {}, cls ? cls.name : '?'),
         h('div.course-tile-subject', {}, c.subject),
         h('div.course-tile-meta', {},
-          h('span.quarter-chip' + (due ? '.due' : ''), {}, c.currentQuarter + '. Quartal' + (due ? ' · Wechsel fällig' : '')),
+          h('span.quarter-chip' + (due ? '.due' : '') + (c.completed ? '.completed' : ''), {}, chipText),
           h('span.hint', {}, (cls ? cls.students.length : 0) + ' Schüler/innen')
         ),
         h('button.btn-capture', { onclick: function (e) { e.stopPropagation(); go('capture', { id: c.id }); } },
@@ -1117,21 +1120,46 @@
       go('course', { id: course.id });
     }
 
+    function reopenYear() {
+      course.completed = false;
+      Store.save();
+      toast('Das Schuljahr ist wieder geöffnet.');
+      go('editCourse', { id: course.id });
+    }
+
     function delCourseFromSettings() {
       var cls = Store.classById(course.classId);
-      UI.confirmDialog('Kurs löschen?',
-        'Der Kurs „' + cls.name + ' · ' + course.subject + '“ und alle darin vergebenen Punkte werden gelöscht. ' +
-        'Die Klasse und ihre Schülerliste bleiben erhalten.', 'Kurs löschen', true)
-        .then(function (ok) {
-          if (!ok) return;
-          var st2 = S();
-          st2.courses = st2.courses.filter(function (c) { return c.id !== course.id; });
-          st2.soleiEntries = st2.soleiEntries.filter(function (e) { return e.courseId !== course.id; });
-          st2.absences = (st2.absences || []).filter(function (a) { return a.courseId !== course.id; });
-          st2.uploadTallies = (st2.uploadTallies || []).filter(function (t) { return t.courseId !== course.id; });
-          Store.save();
-          go('home');
-        });
+      var label = cls.name + ' · ' + course.subject;
+      var nEntries = S().soleiEntries.filter(function (e) { return e.courseId === course.id; }).length;
+      /* Bewusste Reibung gegen versehentliches Löschen: Der Kursname muss zur
+         Bestätigung abgetippt werden; sonst bleibt der Löschvorgang wirkungslos. */
+      var confirmInput = h('input.input', { type: 'text', autocomplete: 'off',
+        placeholder: label, 'aria-label': 'Kursnamen zur Bestätigung eingeben' });
+      UI.modal('Kurs unwiderruflich löschen',
+        [h('p', {}, 'Der Kurs „' + label + '“ wird mit allen ' + nEntries +
+            ' Punktevergaben, Fehlzeiten und Ergebnis-Uploads gelöscht. Die Klasse und ihre Schülerliste bleiben erhalten.'),
+         h('p', {}, 'Diese Aktion kann nicht rückgängig gemacht werden. Tippen Sie zur Bestätigung den Kursnamen ein:'),
+         h('p.hint', {}, label),
+         h('label.field', {}, confirmInput)],
+        [{ label: 'Abbrechen', value: false },
+         { label: 'Endgültig löschen', value: true, danger: true,
+           validate: function () {
+             if (confirmInput.value.trim() === label) return true;
+             confirmInput.classList.add('input-flash');
+             setTimeout(function () { confirmInput.classList.remove('input-flash'); }, 600);
+             return false;
+           } }]
+      ).then(function (ok) {
+        if (!ok) return;
+        var st2 = S();
+        st2.courses = st2.courses.filter(function (c) { return c.id !== course.id; });
+        st2.soleiEntries = st2.soleiEntries.filter(function (e) { return e.courseId !== course.id; });
+        st2.absences = (st2.absences || []).filter(function (a) { return a.courseId !== course.id; });
+        st2.uploadTallies = (st2.uploadTallies || []).filter(function (t) { return t.courseId !== course.id; });
+        Store.save();
+        toast('Kurs gelöscht.');
+        go('home');
+      });
     }
 
     var managementSection = course
@@ -1144,7 +1172,12 @@
               'Maximalpunkte der Kriterien (' + course.currentQuarter + '. Quartal)'),
             h('button.btn-plain.btn-block', { onclick: function () { go('quarterDates', { id: course.id }); } },
               'Quartalszeiträume dieses Kurses'),
-            h('button.btn-plain.btn-block.danger-text', { onclick: delCourseFromSettings }, 'Kurs löschen')
+            course.completed
+              ? h('button.btn-plain.btn-block', { onclick: reopenYear }, 'Schuljahr wieder öffnen')
+              : null,
+            h('div.danger-zone',
+              h('p.hint', {}, 'Gefahrenbereich'),
+              h('button.btn-plain.btn-block.danger-text', { onclick: delCourseFromSettings }, 'Kurs löschen …'))
           )
         ]
       : null;
@@ -1190,7 +1223,8 @@
     var cls = Store.classById(course.classId);
     var q = course.currentQuarter;
     var quarters = courseQuarters(course);
-    var due = Quarters.quarterChangeDue(Store.todayISO(), q, quarters) && !course.dismissedQuarterHint[q];
+    var due = !course.completed &&
+      Quarters.quarterChangeDue(Store.todayISO(), q, quarters) && !course.dismissedQuarterHint[q];
 
     var studentRows = pointstandRows(course, cls, q);
 
@@ -1199,7 +1233,8 @@
       due ? quarterHint(course, quarters) : null,
       h('div.card.card-tight',
         h('div.row-between',
-          h('span.quarter-chip.big', {}, q + '. Quartal'),
+          h('span.quarter-chip.big' + (course.completed ? '.completed' : ''), {},
+            q + '. Quartal' + (course.completed ? ' · Schuljahr abgeschlossen' : '')),
           h('span.hint', {}, UI.fmtDate(quarters[q - 1].start) + ' – ' + UI.fmtDate(quarters[q - 1].end))
         )
       ),
@@ -1420,12 +1455,15 @@
 
   function quarterHint(course, quarters) {
     var q = course.currentQuarter;
+    var isFinal = q === 4;
     return h('div.banner-info', {},
-      h('span', {}, 'Das ' + q + '. Quartal ist laut Plan beendet (' + UI.fmtDate(quarters[q - 1].end) + '). Tragen Sie die Portfolionoten ein und wechseln Sie dann in das ' + (q + 1) + '. Quartal.'),
+      h('span', {}, isFinal
+        ? 'Das 4. Quartal ist laut Plan beendet (' + UI.fmtDate(quarters[q - 1].end) + ') – damit endet das Schuljahr. Tragen Sie die Portfolionoten ein und schließen Sie das Schuljahr ab.'
+        : 'Das ' + q + '. Quartal ist laut Plan beendet (' + UI.fmtDate(quarters[q - 1].end) + '). Tragen Sie die Portfolionoten ein und wechseln Sie dann in das ' + (q + 1) + '. Quartal.'),
       h('div.banner-actions',
         h('button.btn-small.btn-primary', { onclick: function () {
           go('quarterReview', { id: course.id, quarter: q, advance: true });
-        } }, 'Quartal abschließen'),
+        } }, isFinal ? 'Schuljahr abschließen' : 'Quartal abschließen'),
         h('button.btn-small.btn-plain', { onclick: function () {
           course.dismissedQuarterHint[q] = true; Store.save(); render();
         } }, 'Später')
@@ -1677,6 +1715,15 @@
               toast('Der Kurs ist jetzt im ' + (q + 1) + '. Quartal.');
               go('maxPoints', { id: course.id, intro: true });
             } }, 'Speichern und ins ' + (q + 1) + '. Quartal wechseln')
+          : null,
+        p.advance && q === 4 && q === course.currentQuarter && !course.completed
+          ? h('button.btn-plain.btn-block', { onclick: function () {
+              if (!saveAll()) return;
+              course.completed = true;
+              Store.save();
+              toast('Das Schuljahr ist für diesen Kurs abgeschlossen.');
+              go('course', { id: course.id });
+            } }, 'Speichern und Schuljahr abschließen')
           : null
       )
     );
@@ -2121,8 +2168,15 @@
       '.grades-table tr:nth-child(2) th,.report-table th{background:#f2f2f2;color:#000;}' +
       '.report-table .row-label{text-align:left;color:#333;}' +
       '.report-table .val.strong{font-weight:750;background:#f6f8f7;}' +
-      '.report-table .val.up{background:#e4f2e8;}' +
-      '.report-table .val.down{background:#f9e9e7;}' +
+      /* Entwicklung zum Vorquartal farbig wie am Bildschirm; print-color-adjust
+         erzwingt die Hintergrundfarben auch ohne „Hintergrundgrafiken drucken“.
+         Die farbige Schrift druckt zusätzlich in jedem Fall. */
+      '.report-table .val.up{background:' + cssVar('--green-soft', '#e9f4ec') + ';' +
+        'color:' + cssVar('--green', '#2e7d46') + ';font-weight:700;' +
+        '-webkit-print-color-adjust:exact;print-color-adjust:exact;}' +
+      '.report-table .val.down{background:' + cssVar('--red-soft', '#fbecea') + ';' +
+        'color:' + cssVar('--red', '#b4382f') + ';font-weight:700;' +
+        '-webkit-print-color-adjust:exact;print-color-adjust:exact;}' +
       '.report-table .tend-cell{font-weight:750;}' +
       '.table-scroll{overflow:visible;box-shadow:none;}' +
       '.report{font-size:8.5pt;}' +
@@ -2898,8 +2952,17 @@
     var course = Store.courseById(p.id);
     var cls = Store.classById(course.classId);
     var names = S().settings.criteriaNames;
-    var q = course.currentQuarter;
+    var quarters = courseQuarters(course);
+    /* Schuljahresgrenzen: Anfang Q1 bis Ende Q4 – Einträge außerhalb sind nicht
+       zuordenbar und werden per min/max am Datumsfeld verhindert. */
+    var yearStart = (quarters[0] && quarters[0].start) || null;
+    var yearEnd = (quarters[3] && quarters[3].end) || null;
     if (!captureState.date) captureState.date = Store.todayISO();
+    /* Datum in das Schuljahr klemmen (z. B. wenn „heute“ nach Schuljahresende liegt). */
+    if (yearEnd && captureState.date > yearEnd) captureState.date = yearEnd;
+    if (yearStart && captureState.date < yearStart) captureState.date = yearStart;
+    /* Das Quartal ergibt sich AUS dem gewählten Datum, nicht aus course.currentQuarter. */
+    var q = Quarters.quarterForDate(captureState.date, quarters);
     if (captureState.kbCourse !== course.id) {
       captureState.kbCourse = course.id;
       captureState.kbActive = null; captureState.kbBuffer = '';
@@ -2919,8 +2982,24 @@
       );
     }
 
-    var dateInput = h('input.input.date-inline', { type: 'date', value: captureState.date });
-    dateInput.addEventListener('change', function () { captureState.date = dateInput.value; });
+    var dateProps = { type: 'date', value: captureState.date };
+    if (yearStart) dateProps.min = yearStart;
+    if (yearEnd) dateProps.max = yearEnd;
+    var dateInput = h('input.input.date-inline', dateProps);
+    dateInput.addEventListener('change', function () {
+      var v = dateInput.value;
+      if (!v) { dateInput.value = captureState.date; return; }
+      if (yearEnd && v > yearEnd) {
+        v = yearEnd; dateInput.value = v;
+        toast('Das Datum wurde auf das Schuljahresende (' + UI.fmtDate(yearEnd) + ') begrenzt.');
+      } else if (yearStart && v < yearStart) {
+        v = yearStart; dateInput.value = v;
+        toast('Das Datum wurde auf den Schuljahresbeginn (' + UI.fmtDate(yearStart) + ') begrenzt.');
+      }
+      captureState.date = v;
+      captureState.kbActive = null; captureState.kbBuffer = '';
+      render(); /* Quartal, Titel und Punktestände an das neue Datum anpassen */
+    });
 
     var viewToggle = h('div.view-toggle',
       h('button.view-btn' + (captureState.mode === 'criterion' ? '.active' : ''), {
@@ -2951,6 +3030,9 @@
       header('SoLei-Punkte vergeben: ' + q + '. Quartal', backTarget,
         h('span')),
       courseBox(course),
+      h('p.hint.capture-qnote', {},
+        'Das Quartal ergibt sich aus dem gewählten Datum (' +
+        UI.fmtDate(quarters[q - 1].start) + ' – ' + UI.fmtDate(quarters[q - 1].end) + ').'),
       h('div.capture-bar',
         h('label.date-field', {}, dateInput),
         viewToggle

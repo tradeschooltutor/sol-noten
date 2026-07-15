@@ -94,6 +94,7 @@
       if (!Array.isArray(s.uploadTallies)) s.uploadTallies = [];
       if (Array.isArray(s.courses)) s.courses.forEach(function (c) {
         if (typeof c.uploadCriterion !== 'number') c.uploadCriterion = 2; /* Standard: 3. Kriterium (Arbeitsergebnisse) */
+        if (typeof c.completed !== 'boolean') c.completed = false; /* Schuljahr abgeschlossen (Q4-Abschluss) */
       });
     }
     return s;
