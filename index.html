@@ -2,6 +2,13 @@
 <html lang="de">
 <head>
   <meta charset="UTF-8">
+  <!-- CSP (F3): GitHub Pages erlaubt keine HTTP-Header, daher als Meta-Tag.
+       WICHTIG für das Druckfenster: about:blank-Fenster ERBEN diese Richtlinie.
+       style-src 'unsafe-inline' deckt die <style>-Blöcke des Druckfensters und
+       Inline-Styles ab; img-src data: die Schülerfotos. frame-ancestors ist per
+       Meta-Tag wirkungslos und daher bewusst weggelassen. -->
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://openholidaysapi.org; object-src 'none'; base-uri 'none'; form-action 'none'">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>SOL-Noten – Notenverwaltung zum selbstorganisierten Lernen</title>
   <meta name="description" content="Notenverwaltung zum selbstorganisierten Lernen (SOL). Alle Daten bleiben lokal auf Ihrem Gerät.">
