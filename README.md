@@ -1,4 +1,4 @@
-# SOL-Noten (Version 0.16.3 – Beta)
+# SOL-Noten (Version 0.16.4 – Beta)
 
 Notenverwaltung zum selbstorganisierten Lernen (SOL) als Progressive Web App (PWA).
 Basierend auf der Excel-Notenverwaltung V8.0 von Andreas Vandelaar.
@@ -6,7 +6,7 @@ Basierend auf der Excel-Notenverwaltung V8.0 von Andreas Vandelaar.
 ## Was die App kann
 
 - **Schuljahre und Kurse verwalten** – ein Kurs ist eine Klasse in einem Fach; die Schülerliste gehört zur Klasse und wird zwischen den Kursen geteilt.
-- **Einrichtung mit Ferienabruf** – Bundesland wählen, erster Schultag, Quartale (je 10 Schulwochen ohne Ferien) werden automatisch berechnet (OpenHolidays-API). Die Kursseite gruppiert ihre Funktionen in drei Blöcke: „SoLei-Note“ (getönte Karte mit Punktevergabe, Sitzplan, Punktestand, Ergebnis-Uploads, Fehlzeiten und Quartalsnoten), „Weitere Prüfungsleistungen“ (Open Book Tests, Klausuren) und „Auswertung“ (Notenübersicht & Zeugnisnoten); die Kurs-Einstellungen stehen separat darunter. Quartalszeiträume sind je Kurs anpassbar. Das aktuelle Quartal eines Kurses ergibt sich automatisch aus dem heutigen Datum; nach Quartalsende weist ein Hinweis auf der Kursseite darauf hin, die Portfolionoten einzutragen, nach dem Ende des 4. Quartals zusätzlich auf den möglichen Schuljahresabschluss.
+- **Einrichtung mit Ferienabruf** – Bundesland wählen, erster Schultag, Quartale (je 10 Schulwochen ohne Ferien) werden automatisch berechnet (OpenHolidays-API). Die Kursseite gruppiert ihre Funktionen in drei Blöcke: „Sonstige Leistungen“ (getönte Karte mit Punktevergabe, Sitzplan, Punktestand, Ergebnis-Uploads, Fehlzeiten und Quartalsnoten), „Weitere Prüfungsleistungen“ (gleich gestaltete Karte mit Open Book Tests und Klausuren) und „Auswertung“ (Notenübersicht & Zeugnisnoten); die Kurs-Einstellungen stehen separat darunter. Quartalszeiträume sind je Kurs anpassbar. Das aktuelle Quartal eines Kurses ergibt sich automatisch aus dem heutigen Datum; nach Quartalsende weist ein Hinweis auf der Kursseite darauf hin, die Portfolionoten einzutragen, nach dem Ende des 4. Quartals zusätzlich auf den möglichen Schuljahresabschluss.
 - **SoLei-Erfassung im Unterricht** (Herzstück):
   - Kriterium-Modus (ein Kriterium, alle Schüler/innen) und Schüler-Modus (eine Person, alle fünf Kriterien),
   - große Tipp-Buttons mit den Stufen Maximum / ⅔ / ⅓ / 0,

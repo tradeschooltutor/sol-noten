@@ -698,8 +698,12 @@ button:focus-visible, .input:focus-visible, select:focus-visible {
 .course-actions-grid {
   display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 4px 0 8px;
 }
-/* Gruppierte Blöcke auf der Kursseite: getönte Karte = SoLei-Bausteine */
+/* Gruppierte Blöcke auf der Kursseite: getönte Karten für die Leistungs-Bausteine.
+   Die Tönung wird aus der Theme-Akzentfarbe abgeleitet (etwas kräftiger als
+   --teal-soft, damit sie sich vom grauen Seitenhintergrund abhebt); die erste
+   Zeile ist der Fallback für Browser ohne color-mix. */
 .solei-card { background: var(--teal-soft); }
+.solei-card { background: color-mix(in srgb, var(--teal) 14%, var(--card)); }
 .card .course-actions-grid { margin: 0; }
 .course-settings-btn { margin-top: 14px; }
 .grid-btn {

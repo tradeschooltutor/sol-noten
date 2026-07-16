@@ -17,7 +17,7 @@
 
   /* ================= App-Start ================= */
 
-  var APP_VERSION = '0.16.3';
+  var APP_VERSION = '0.16.4';
 
   Store.init().then(function () {
     if ('serviceWorker' in navigator) {
@@ -1247,8 +1247,6 @@
     var due = !course.completed &&
       Quarters.quarterChangeDue(Store.todayISO(), q, quarters);
 
-    var studentRows = pointstandRows(course, cls, q);
-
     return h('div.screen',
       header(cls.name + ' · ' + course.subject, { name: 'home' }),
       due ? quarterHint(course, quarters) : null,
@@ -1259,7 +1257,7 @@
           h('span.hint', {}, UI.fmtDate(quarters[q - 1].start) + ' – ' + UI.fmtDate(quarters[q - 1].end))
         )
       ),
-      h('div.section-head', {}, 'SoLei-Note'),
+      h('div.section-head', {}, 'Sonstige Leistungen'),
       h('div.card.card-tight.solei-card',
         h('div.course-actions-grid',
           h('button.btn-primary.grid-btn', { onclick: function () { go('capture', { id: course.id }); } },
@@ -1277,11 +1275,11 @@
         )
       ),
       h('div.section-head', {}, 'Weitere Prüfungsleistungen'),
-      h('div.card.card-tight',
+      h('div.card.card-tight.solei-card',
         h('div.course-actions-grid',
-          h('button.btn-plain.grid-btn', { onclick: function () { go('obt', { id: course.id }); } },
+          h('button.btn-primary.grid-btn', { onclick: function () { go('obt', { id: course.id }); } },
             'Open Book Tests'),
-          h('button.btn-plain.grid-btn', { onclick: function () { go('klausuren', { id: course.id }); } },
+          h('button.btn-primary.grid-btn', { onclick: function () { go('klausuren', { id: course.id }); } },
             'Klausuren')
         )
       ),
@@ -1290,12 +1288,14 @@
         'Notenübersicht & Zeugnisnoten'),
       h('button.btn-plain.btn-block.course-settings-btn', { onclick: function () { go('editCourse', { id: course.id }); } },
         'Kurs-Einstellungen'),
-      h('div.section-head', {}, 'SoLei-Punktestand im ' + q + '. Quartal'),
+      /* Punktestand-Liste bewusst nicht mehr auf der Kursseite (über den Button
+         „SoLei-Punktestand“ erreichbar). Nur bei leerer Klasse bleibt der
+         Schnellzugang zur Schülerliste erhalten. */
       cls.students.length === 0
         ? h('div.empty', h('p', {}, 'Diese Klasse hat noch keine Schüler/innen.'),
             h('button.btn-primary', { onclick: function () { go('students', { classId: cls.id, courseId: course.id }); } },
               'Schüler/innen hinzufügen'))
-        : h('div.card.card-list', {}, studentRows)
+        : null
     );
   };
 
