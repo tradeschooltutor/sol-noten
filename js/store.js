@@ -650,44 +650,69 @@
 
   function removeBackupFolder() {
     backupDirHandle = null;
+    backupPermissionNeeded = false;
     state.settings.autoBackupFolder = false;
     return idb('handles', 'readwrite', function (st) { st.delete('backupDir'); })
       .then(function () { save(); });
   }
 
   var lastFolderBackup = 0;
+  var backupPermissionNeeded = false;
   function autoBackupToFolder() {
     if (!backupDirHandle) return Promise.resolve();
     var now = Date.now();
     if (now - lastFolderBackup < 30000) return Promise.resolve(); /* höchstens alle 30 s */
     lastFolderBackup = now;
+    /* Nur STILL prüfen (queryPermission). requestPermission würde mitten in der
+       Arbeit den Browser-Dialog „Darf diese Website Dateien bearbeiten?“ öffnen –
+       die Nachfrage geschieht stattdessen bewusst per Klick (regrantBackupPermission). */
     return backupDirHandle.queryPermission({ mode: 'readwrite' })
       .then(function (p) {
-        if (p !== 'granted') return backupDirHandle.requestPermission({ mode: 'readwrite' });
-        return p;
-      })
-      .then(function (p) {
-        if (p !== 'granted') return;
-        /* Nur verschlüsselt sichern. Ohne aktive Verschlüsselung entsteht bewusst
-           kein Auto-Backup (kein Klartext auf der Platte). In der Praxis erzwingt
-           die App ohnehin die PIN, bevor Daten erfasst werden. */
-        if (!(isEncrypted() && masterKey)) return;
-        return CryptoBox.encryptWithKey(masterKey, JSON.stringify(state)).then(function (box) {
-          return JSON.stringify({
-            app: 'SOL-Noten', encrypted: true, v: 2, mode: 'pin-master',
-            wrapped: security.wrapped, iv: box.iv, data: box.data
-          });
-        }).then(function (text) {
-          return backupDirHandle.getFileHandle('SOL-Noten-Backup-' + todayISO() + '.json', { create: true })
-            .then(function (fh) { return fh.createWritable(); })
-            .then(function (w) {
-              return w.write(text).then(function () { return w.close(); });
-            });
-        }).then(function () {
-          state.settings.lastExport = new Date().toISOString();
-        });
+        if (p !== 'granted') { backupPermissionNeeded = true; return; }
+        backupPermissionNeeded = false;
+        return writeFolderBackup();
       })
       .catch(function (e) { console.warn('Auto-Backup nicht möglich:', e); });
+  }
+
+  function writeFolderBackup() {
+    /* Nur verschlüsselt sichern. Ohne aktive Verschlüsselung entsteht bewusst
+       kein Auto-Backup (kein Klartext auf der Platte). In der Praxis erzwingt
+       die App ohnehin die PIN, bevor Daten erfasst werden. */
+    if (!(isEncrypted() && masterKey)) return Promise.resolve();
+    return CryptoBox.encryptWithKey(masterKey, JSON.stringify(state)).then(function (box) {
+      return JSON.stringify({
+        app: 'SOL-Noten', encrypted: true, v: 2, mode: 'pin-master',
+        wrapped: security.wrapped, iv: box.iv, data: box.data
+      });
+    }).then(function (text) {
+      return backupDirHandle.getFileHandle('SOL-Noten-Backup-' + todayISO() + '.json', { create: true })
+        .then(function (fh) { return fh.createWritable(); })
+        .then(function (w) {
+          return w.write(text).then(function () { return w.close(); });
+        });
+    }).then(function () {
+      state.settings.lastExport = new Date().toISOString();
+    });
+  }
+
+  /* Vom UI abfragbar: Wartet das Ordner-Backup auf eine Freigabe? */
+  function backupFolderNeedsPermission() {
+    return !!(backupPermissionNeeded && backupDirHandle && state &&
+      state.settings && state.settings.autoBackupFolder);
+  }
+
+  /* Freigabe bewusst anfordern (muss aus einer Nutzeraktion heraus aufgerufen
+     werden, sonst verweigert der Browser den Dialog). Bei Erfolg wird sofort
+     ein Backup geschrieben. */
+  function regrantBackupPermission() {
+    if (!backupDirHandle) return Promise.resolve(false);
+    return backupDirHandle.requestPermission({ mode: 'readwrite' }).then(function (p) {
+      if (p !== 'granted') return false;
+      backupPermissionNeeded = false;
+      lastFolderBackup = Date.now();
+      return writeFolderBackup().then(function () { return true; });
+    }).catch(function () { return false; });
   }
 
   function daysSinceExport() {
@@ -828,6 +853,7 @@
     disableBiometrics: disableBiometrics, unlockBiometric: unlockBiometric,
     getLockWait: getLockWait, failedAttempts: failedAttempts, factoryReset: factoryReset,
     folderBackupSupported: folderBackupSupported, chooseBackupFolder: chooseBackupFolder,
+    backupFolderNeedsPermission: backupFolderNeedsPermission, regrantBackupPermission: regrantBackupPermission,
     removeBackupFolder: removeBackupFolder, daysSinceExport: daysSinceExport,
     hasBackupFolder: function () { return !!backupDirHandle; }
   };

@@ -17,7 +17,7 @@
 
   /* ================= App-Start ================= */
 
-  var APP_VERSION = '0.16.1';
+  var APP_VERSION = '0.16.2';
 
   Store.init().then(function () {
     if ('serviceWorker' in navigator) {
@@ -921,6 +921,7 @@
     var screen = h('div.screen',
       header('SOL-Noten', null),
       backupBanner(),
+      folderPermissionBanner(),
       h('div.row-between',
         h('label.year-label', {}, 'Schuljahr ', yearSel),
         h('button.btn-plain.btn-small', { onclick: addYear }, '+ Schuljahr')
@@ -1043,6 +1044,22 @@
       h('span', {}, never ? 'Ihre Daten wurden noch nie gesichert.'
         : 'Ihr letztes Backup ist ' + days + ' Tage alt.'),
       h('button.btn-small.btn-primary', { onclick: function () { exportDialog(); } }, 'Jetzt sichern')
+    );
+  }
+
+  /* Der Browser vergibt die Ordner-Freigabe nur je Sitzung; statt den Dialog
+     mitten in der Arbeit aufpoppen zu lassen, wird hier bewusst gefragt. */
+  function folderPermissionBanner() {
+    if (!Store.backupFolderNeedsPermission()) return null;
+    return h('div.banner-info', {},
+      h('span', {}, 'Das automatische Ordner-Backup wartet auf Ihre Freigabe (der Browser verlangt sie einmal je Sitzung).'),
+      h('div.banner-actions',
+        h('button.btn-small.btn-primary', { onclick: function () {
+          Store.regrantBackupPermission().then(function (ok) {
+            if (ok) { toast('Ordner-Backup wieder aktiv.'); render(); }
+            else { toast('Freigabe nicht erteilt – das Ordner-Backup bleibt pausiert.'); }
+          });
+        } }, 'Freigeben'))
     );
   }
 
@@ -1266,7 +1283,9 @@
       ),
       h('div.section-head', {}, 'SoLei-Punktestand im ' + q + '. Quartal'),
       cls.students.length === 0
-        ? h('div.empty', h('p', {}, 'Diese Klasse hat noch keine Schüler/innen.'))
+        ? h('div.empty', h('p', {}, 'Diese Klasse hat noch keine Schüler/innen.'),
+            h('button.btn-primary', { onclick: function () { go('students', { classId: cls.id, courseId: course.id }); } },
+              'Schüler/innen hinzufügen'))
         : h('div.card.card-list', {}, studentRows)
     );
   };
@@ -2826,7 +2845,7 @@
       h('div.card.card-list', {}, list.length ? list : h('div.empty', h('p', {}, 'Noch keine Schüler/innen.'))),
       h('div.actions-col',
         h('button.btn-primary.btn-block', { onclick: function () { editStudent(null); } }, '+ Schüler/in hinzufügen'),
-        h('button.btn-plain.btn-block', { onclick: importStudents }, 'Aus Excel einfügen (Kopieren & Einfügen)')
+        h('button.btn-primary.btn-block', { onclick: importStudents }, 'Aus Excel einfügen (Kopieren & Einfügen)')
       )
     );
 
@@ -3332,7 +3351,10 @@
       go('protokoll', { courseId: course.id, studentId: stu.id, quarter: Number(qSel.value), back: p.back });
     });
     var shownQ = p.quarter || q;
-    var filterCrit = (p.crit != null) ? p.crit : null;
+    /* Standard: erstes Kriterium (Zeitmanagement) ist ausgewählt und sein
+       Diagramm sichtbar, damit die Filter-/Diagrammfunktion entdeckbar ist.
+       'none' = bewusst abgewählt (Unterscheidung von „nicht gesetzt“). */
+    var filterCrit = p.crit === 'none' ? null : (p.crit != null ? p.crit : 0);
 
     var viewToggle = h('div.view-toggle',
       h('button.view-btn', {
@@ -3351,7 +3373,7 @@
 
     function setFilter(ci) {
       go('protokoll', { courseId: course.id, studentId: stu.id, quarter: shownQ,
-        crit: (filterCrit === ci ? null : ci), back: p.back });
+        crit: (filterCrit === ci ? 'none' : ci), back: p.back });
     }
 
     var critSummary = h('div.crit-summary', {}, names.map(function (n, ci) {
@@ -3424,7 +3446,7 @@
       var upNote = (upTally && (upTally.done > 0 || upTally.missed > 0))
         ? h('p.hint', {}, upTally.done + ' mal Ergebnisse hochgeladen, ' + upTally.missed + ' Ergebnisse fehlen')
         : null;
-      chartCard = h('div.card.card-tight',
+      chartCard = h('div.card.card-tight.chart-card-slot',
         h('div.row-between',
           h('strong', {}, names[filterCrit] + ' im ' + shownQ + '. Quartal'),
           h('button.btn-small.btn-plain', { onclick: function () { setFilter(filterCrit); } }, 'Filter aufheben')),
@@ -3532,15 +3554,17 @@
           )
         )
       ),
-      h('div.card.card-tight',
-        h('p.hint', {}, 'Tipp: Ein Kriterium antippen filtert die Vergaben und zeigt die Entwicklung als Diagramm.'),
-        critSummary,
-        gradeLine,
-        stat.rated > 0 && stat.rated < 5
-          ? h('p.hint', {}, 'Erst ' + stat.rated + ' von 5 Kriterien bewertet – der Notenstand ist ein Zwischenstand.')
-          : null
+      h('div.protokoll-stack',
+        h('div.card.card-tight',
+          h('p.hint', {}, 'Tipp: Ein Kriterium antippen filtert die Vergaben und zeigt die Entwicklung als Diagramm.'),
+          critSummary,
+          gradeLine,
+          stat.rated > 0 && stat.rated < 5
+            ? h('p.hint', {}, 'Erst ' + stat.rated + ' von 5 Kriterien bewertet – der Notenstand ist ein Zwischenstand.')
+            : null
+        ),
+        chartCard
       ),
-      chartCard,
       h('div.section-head', {}, filterCrit != null
         ? 'Vergaben · ' + names[filterCrit] + ' (' + shownEntries.length + ')'
         : 'Alle Punktevergaben (' + (shownEntries.length + absences.length) + ')'),

@@ -454,6 +454,15 @@ button:focus-visible, .input:focus-visible, select:focus-visible {
 }
 .report-table th:first-child, .report-table td:first-child { width: 3.6rem; }
 @media (max-width: 480px) { .report-table { font-size: 0.62rem; } }
+
+/* Schüleransicht: Auf schmalen Bildschirmen (Smartphones) steht das
+   Liniendiagramm über den Kriterien-Buttons, damit es ohne Scrollen sichtbar
+   ist; auf Tablets/PCs bleibt es darunter. */
+.protokoll-stack { display: flex; flex-direction: column; }
+.protokoll-stack > * { min-width: 0; }
+@media (max-width: 480px) {
+  .protokoll-stack .chart-card-slot { order: -1; }
+}
 .report-table th { background: var(--teal-soft); color: var(--teal-dark); font-weight: 650; }
 .report-table .row-label { text-align: left; color: var(--ink-soft); }
 .report-table .val.strong { font-weight: 750; background: #f6f8f7; }
