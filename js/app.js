@@ -17,7 +17,7 @@
 
   /* ================= App-Start ================= */
 
-  var APP_VERSION = '0.16.2';
+  var APP_VERSION = '0.16.3';
 
   Store.init().then(function () {
     if ('serviceWorker' in navigator) {
@@ -1259,28 +1259,37 @@
           h('span.hint', {}, UI.fmtDate(quarters[q - 1].start) + ' – ' + UI.fmtDate(quarters[q - 1].end))
         )
       ),
-      h('div.course-actions-grid',
-        h('button.btn-primary.grid-btn', { onclick: function () { go('capture', { id: course.id }); } },
-          'SoLei-Punkte vergeben'),
-        h('button.btn-primary.grid-btn', { onclick: function () { go('seating', { id: course.id }); } },
-          'Sitzplan'),
-        h('button.btn-primary.grid-btn', { onclick: function () { go('pointstand', { id: course.id }); } },
-          'SoLei-Punktestand'),
-        h('button.btn-primary.grid-btn', { onclick: function () { go('uploads', { id: course.id }); } },
-          'Ergebnis-Uploads'),
-        h('button.btn-primary.grid-btn', { onclick: function () { go('absences', { id: course.id }); } },
-          'Unentschuldigte Fehlzeiten'),
-        h('button.btn-primary.grid-btn', { onclick: function () { go('quarterReview', { id: course.id, quarter: q }); } },
-          'SoLei-Quartalsnoten'),
-        h('button.btn-primary.grid-btn', { onclick: function () { go('obt', { id: course.id }); } },
-          'Open Book Tests'),
-        h('button.btn-primary.grid-btn', { onclick: function () { go('klausuren', { id: course.id }); } },
-          'Klausuren'),
-        h('button.btn-primary.grid-btn', { onclick: function () { gradesState.mode = 'class'; gradesState.studentIdx = 0; go('grades', { id: course.id }); } },
-          'Notenübersicht & Zeugnisnoten'),
-        h('button.btn-primary.grid-btn', { onclick: function () { go('editCourse', { id: course.id }); } },
-          'Kurs-Einstellungen')
+      h('div.section-head', {}, 'SoLei-Note'),
+      h('div.card.card-tight.solei-card',
+        h('div.course-actions-grid',
+          h('button.btn-primary.grid-btn', { onclick: function () { go('capture', { id: course.id }); } },
+            'SoLei-Punkte vergeben'),
+          h('button.btn-primary.grid-btn', { onclick: function () { go('seating', { id: course.id }); } },
+            'Sitzplan'),
+          h('button.btn-primary.grid-btn', { onclick: function () { go('pointstand', { id: course.id }); } },
+            'SoLei-Punktestand'),
+          h('button.btn-primary.grid-btn', { onclick: function () { go('uploads', { id: course.id }); } },
+            'Ergebnis-Uploads'),
+          h('button.btn-primary.grid-btn', { onclick: function () { go('absences', { id: course.id }); } },
+            'Unentschuldigte Fehlzeiten'),
+          h('button.btn-primary.grid-btn', { onclick: function () { go('quarterReview', { id: course.id, quarter: q }); } },
+            'SoLei-Quartalsnoten')
+        )
       ),
+      h('div.section-head', {}, 'Weitere Prüfungsleistungen'),
+      h('div.card.card-tight',
+        h('div.course-actions-grid',
+          h('button.btn-plain.grid-btn', { onclick: function () { go('obt', { id: course.id }); } },
+            'Open Book Tests'),
+          h('button.btn-plain.grid-btn', { onclick: function () { go('klausuren', { id: course.id }); } },
+            'Klausuren')
+        )
+      ),
+      h('div.section-head', {}, 'Auswertung'),
+      h('button.btn-primary.btn-block.grid-btn', { onclick: function () { gradesState.mode = 'class'; gradesState.studentIdx = 0; go('grades', { id: course.id }); } },
+        'Notenübersicht & Zeugnisnoten'),
+      h('button.btn-plain.btn-block.course-settings-btn', { onclick: function () { go('editCourse', { id: course.id }); } },
+        'Kurs-Einstellungen'),
       h('div.section-head', {}, 'SoLei-Punktestand im ' + q + '. Quartal'),
       cls.students.length === 0
         ? h('div.empty', h('p', {}, 'Diese Klasse hat noch keine Schüler/innen.'),

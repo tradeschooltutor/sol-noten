@@ -698,6 +698,10 @@ button:focus-visible, .input:focus-visible, select:focus-visible {
 .course-actions-grid {
   display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 4px 0 8px;
 }
+/* Gruppierte Blöcke auf der Kursseite: getönte Karte = SoLei-Bausteine */
+.solei-card { background: var(--teal-soft); }
+.card .course-actions-grid { margin: 0; }
+.course-settings-btn { margin-top: 14px; }
 .grid-btn {
   min-height: 64px; border-radius: 12px; padding: 12px 14px;
   display: flex; align-items: center; justify-content: center; text-align: center;
