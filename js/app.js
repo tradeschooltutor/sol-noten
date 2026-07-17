@@ -70,7 +70,7 @@
 
   /* ================= App-Start ================= */
 
-  var APP_VERSION = '0.18.0';
+  var APP_VERSION = '0.19.0';
 
   Store.init().then(function () {
     if ('serviceWorker' in navigator) {
@@ -2505,6 +2505,43 @@
 
   var gradesState = { mode: 'class', studentIdx: 0 };
 
+  /* Notenübersicht eines Kurses als Zeilenmatrix (für Excel-Export; auch vom
+     Schuljahres-Export genutzt, daher unabhängig vom grades-View). */
+  function gradeExportRows(course) {
+    var cls = Store.classById(course.classId);
+    var year = Store.yearById(course.yearId);
+    var nObt = Math.max(1, course.numOBT || 4);
+    var nKa = Math.max(1, course.numKA || 2);
+    var students = cls.students.slice().sort(function (a, b) {
+      return (a.lastName + a.firstName).localeCompare(b.lastName + b.firstName, 'de');
+    });
+    var rowsData = students.map(function (stu) { return studentGradeRow(course, stu); });
+
+    var head = ['Name', 'SoLei 1. Q', 'SoLei 2. Q', 'SoLei 3. Q', 'SoLei 4. Q',
+      'SoLei ø 1. HJ', 'SoLei ø 2. HJ', 'SoLei ø SJ'];
+    for (var hj = 1; hj <= 2; hj++) for (var i = 0; i < nObt; i++) head.push('OBT' + (i + 1) + ' ' + hj + '.HJ');
+    head.push('OBT ø 1. HJ', 'OBT ø 2. HJ', 'OBT ø SJ');
+    for (var hj2 = 1; hj2 <= 2; hj2++) for (var k = 0; k < nKa; k++) head.push('K' + (k + 1) + ' ' + hj2 + '.HJ');
+    head.push('KA ø 1. HJ', 'KA ø 2. HJ', 'KA ø SJ',
+      'Zeugnisnote ø 1. HJ', 'Zeugnisnote ø 2. HJ', 'Zeugnisnote ø SJ', 'Tendenz', 'HJ-Zeugnis', 'Jahreszeugnis');
+    var out = [
+      ['Notenübersicht', cls.name + ' · ' + course.subject + ' · ' + year.name + ' · Stand: ' + UI.fmtDate(Store.todayISO())],
+      [],
+      head
+    ];
+    rowsData.forEach(function (r) {
+      var row = [r.stu.lastName + ', ' + r.stu.firstName];
+      r.soleiQ.forEach(function (v) { row.push(v); });
+      row.push(r.slHJ1, r.slHJ2, r.slSJ);
+      [1, 2].forEach(function (hjx) { r.obtG[hjx].forEach(function (v) { row.push(v); }); });
+      row.push(r.obtHJ1, r.obtHJ2, r.obtSJ);
+      [1, 2].forEach(function (hjx) { r.kaG[hjx].forEach(function (v) { row.push(v); }); });
+      row.push(r.kaHJ1, r.kaHJ2, r.kaSJ, r.zHJ1, r.zHJ2, r.zSJ, r.tendenz || null, r.zeugnisHJ, r.zeugnisJahr);
+      out.push(row);
+    });
+    return out;
+  }
+
   views.grades = function (p) {
     var course = Store.courseById(p.id);
     var cls = Store.classById(course.classId);
@@ -2604,31 +2641,7 @@
     }
 
     /* --- Exporte --- */
-    function exportRows() {
-      var head = ['Name', 'SoLei 1. Q', 'SoLei 2. Q', 'SoLei 3. Q', 'SoLei 4. Q',
-        'SoLei ø 1. HJ', 'SoLei ø 2. HJ', 'SoLei ø SJ'];
-      for (var hj = 1; hj <= 2; hj++) for (var i = 0; i < nObt; i++) head.push('OBT' + (i + 1) + ' ' + hj + '.HJ');
-      head.push('OBT ø 1. HJ', 'OBT ø 2. HJ', 'OBT ø SJ');
-      for (var hj2 = 1; hj2 <= 2; hj2++) for (var k = 0; k < nKa; k++) head.push('K' + (k + 1) + ' ' + hj2 + '.HJ');
-      head.push('KA ø 1. HJ', 'KA ø 2. HJ', 'KA ø SJ',
-        'Zeugnisnote ø 1. HJ', 'Zeugnisnote ø 2. HJ', 'Zeugnisnote ø SJ', 'Tendenz', 'HJ-Zeugnis', 'Jahreszeugnis');
-      var out = [
-        ['Notenübersicht', cls.name + ' · ' + course.subject + ' · ' + year.name + ' · Stand: ' + UI.fmtDate(Store.todayISO())],
-        [],
-        head
-      ];
-      rowsData.forEach(function (r) {
-        var row = [r.stu.lastName + ', ' + r.stu.firstName];
-        r.soleiQ.forEach(function (v) { row.push(v); });
-        row.push(r.slHJ1, r.slHJ2, r.slSJ);
-        [1, 2].forEach(function (hj) { r.obtG[hj].forEach(function (v) { row.push(v); }); });
-        row.push(r.obtHJ1, r.obtHJ2, r.obtSJ);
-        [1, 2].forEach(function (hj) { r.kaG[hj].forEach(function (v) { row.push(v); }); });
-        row.push(r.kaHJ1, r.kaHJ2, r.kaSJ, r.zHJ1, r.zHJ2, r.zSJ, r.tendenz || null, r.zeugnisHJ, r.zeugnisJahr);
-        out.push(row);
-      });
-      return out;
-    }
+    function exportRows() { return gradeExportRows(course); }
 
     function doExcel() {
       var name = ('Notenuebersicht_' + cls.name + '_' + course.subject + '_' + year.name)
@@ -3832,6 +3845,135 @@
 
   /* ================= Einstellungen ================= */
 
+  /* ---------- Schuljahr-Export (Excel / Druck) ---------- */
+
+  function yearSelect(preferOld) {
+    var st = S();
+    var sel = h('select.input');
+    var years = st.schoolYears.slice().sort(function (a, b) {
+      return (b.startDate || '').localeCompare(a.startDate || '');
+    });
+    if (preferOld) years = years.slice().reverse(); /* ältestes zuerst anbieten */
+    years.forEach(function (y) {
+      var n = st.courses.filter(function (c) { return c.yearId === y.id; }).length;
+      sel.appendChild(h('option', { value: y.id }, y.name + ' (' + n + ' Kurs' + (n === 1 ? '' : 'e') + ')'));
+    });
+    return sel;
+  }
+
+  function sanitizeFilename(s) {
+    return s.replace(/[^\wäöüÄÖÜß-]+/g, '_');
+  }
+
+  function yearExportDialog() {
+    var sel = yearSelect(false);
+    var err = h('p.hint.error-text');
+    UI.modal('Schuljahr-Export', [
+      h('p.hint', {}, 'Exportiert alle Kurse des gewählten Schuljahres mit ihren vollständigen Notenübersichten & Zeugnisnoten – als Excel-Datei (ein Tabellenblatt je Kurs) oder als Druckansicht (dort als PDF speicherbar).'),
+      h('label.field', h('span.field-label', {}, 'Schuljahr'), sel),
+      err
+    ], [
+      { label: 'Abbrechen', value: false },
+      { label: 'Drucken / PDF', value: 'print',
+        validate: function () { return yearHasCourses(sel.value, err); } },
+      { label: 'Excel-Datei', value: 'xlsx', primary: true,
+        validate: function () { return yearHasCourses(sel.value, err); } }
+    ]).then(function (choice) {
+      if (!choice) return;
+      var year = Store.yearById(sel.value);
+      var courses = S().courses.filter(function (c) { return c.yearId === year.id; });
+      if (choice === 'xlsx') {
+        var sheets = courses.map(function (c) {
+          var cls = Store.classById(c.classId);
+          return { name: (cls ? cls.name : '?') + ' ' + c.subject, rows: gradeExportRows(c) };
+        });
+        XlsxWrite.downloadMulti(sanitizeFilename('SOL-Noten_' + year.name + '_Notenuebersichten') + '.xlsx', sheets);
+        toast('Excel-Datei mit ' + sheets.length + ' Tabellenblättern wird gespeichert.');
+      } else {
+        printYear(year, courses);
+      }
+    });
+  }
+
+  function yearHasCourses(yearId, err) {
+    var n = S().courses.filter(function (c) { return c.yearId === yearId; }).length;
+    if (n === 0) { err.textContent = 'Dieses Schuljahr enthält keine Kurse.'; return false; }
+    return true;
+  }
+
+  /* Druck-Export: je Kurs eine Seite mit der Notenübersicht als Tabelle. */
+  function printYear(year, courses) {
+    var wrap = h('div');
+    courses.forEach(function (c) {
+      var rows = gradeExportRows(c);
+      var head = rows[2];
+      var body = rows.slice(3);
+      var table = h('table.report-table',
+        h('thead', h('tr', {}, head.map(function (t) { return h('th', {}, t); }))),
+        h('tbody', {}, body.map(function (r) {
+          return h('tr', {}, r.map(function (v) {
+            return h('td', {}, (v === null || v === undefined) ? '' : String(v));
+          }));
+        })));
+      wrap.appendChild(h('div.print-page', { style: { pageBreakAfter: 'always' } },
+        h('h2', {}, 'Notenübersicht'),
+        h('p.print-sub', {}, String(rows[0][1] || '')),
+        table));
+    });
+    printNode(wrap, true, sanitizeFilename('SOL-Noten_' + year.name + '_Notenuebersichten'));
+  }
+
+  /* ---------- Schuljahr löschen (Gefahrenbereich) ---------- */
+
+  function yearDeleteDialog() {
+    var st = S();
+    if (st.schoolYears.length <= 1) {
+      UI.modal('Schuljahr löschen', h('p', {}, 'Das letzte verbliebene Schuljahr kann nicht gelöscht werden.'));
+      return;
+    }
+    var sel = yearSelect(true);
+    var pwInput = h('input.input', { type: 'password', autocomplete: 'current-password',
+      placeholder: 'PIN / Passwort der App' });
+    var err = h('p.hint.error-text');
+    var secured = Store.isEncrypted();
+    UI.modal('Schuljahr unwiderruflich löschen', [
+      h('p', {}, 'Das gewählte Schuljahr wird mit allen Klassen, Kursen, Punktevergaben, Fehlzeiten und Noten gelöscht. Fotos werden nur entfernt, wenn die Schüler/innen in keinem anderen Schuljahr mehr vorkommen.'),
+      h('p', {}, 'Diese Aktion kann nicht rückgängig gemacht werden. Erstellen Sie im Zweifel vorher ein Backup oder einen Schuljahr-Export.'),
+      h('label.field', h('span.field-label', {}, 'Schuljahr'), sel),
+      secured
+        ? h('label.field', h('span.field-label', {}, 'Zur Bestätigung: PIN / Passwort der App'), pwInput)
+        : null,
+      err
+    ], [
+      { label: 'Abbrechen', value: false },
+      { label: 'Endgültig löschen', value: true, danger: true,
+        validate: function () {
+          if (secured && !pwInput.value) {
+            err.textContent = 'Bitte geben Sie zur Bestätigung Ihre PIN bzw. Ihr Passwort ein.';
+            return false;
+          }
+          return true;
+        } }
+    ]).then(function (ok) {
+      if (!ok) return;
+      var yearId = sel.value;
+      var yearName = (Store.yearById(yearId) || {}).name || '';
+      Store.verifySecret(pwInput.value).then(function (valid) {
+        if (!valid) {
+          UI.modal('Löschen abgebrochen', h('p', {}, 'Die eingegebene PIN bzw. das Passwort ist nicht korrekt. Das Schuljahr wurde nicht gelöscht.'));
+          return;
+        }
+        Store.deleteYear(yearId).then(function (removed) {
+          toast('Schuljahr „' + yearName + '“ gelöscht (' + removed.courses + ' Kurse, ' +
+            removed.classes + ' Klassen' + (removed.photos ? ', ' + removed.photos + ' Fotos' : '') + ').');
+          render();
+        }).catch(function (e) {
+          UI.modal('Löschen nicht möglich', h('p', {}, e && e.message ? e.message : 'Unbekannter Fehler.'));
+        });
+      });
+    });
+  }
+
   views.settings = function (p) {
     var st = S();
     var back = p.back || { name: 'home' };
@@ -3978,6 +4120,16 @@
           : null,
         fileInput,
         snapHost
+      ),
+
+      h('div.section-head', {}, 'Schuljahre'),
+      h('div.card',
+        h('p.hint', {}, 'Alte Schuljahre lassen sich als Excel-Datei (ein Tabellenblatt je Kurs mit der vollständigen Notenübersicht) oder als Druck/PDF archivieren und anschließend löschen, um Speicherplatz freizugeben.'),
+        h('div.actions-col',
+          h('button.btn-plain.btn-block', { onclick: yearExportDialog }, 'Schuljahr-Export (Excel / Druck)')),
+        h('div.danger-zone',
+          h('p.hint', {}, 'Gefahrenbereich'),
+          h('button.btn-plain.btn-block.danger-text', { onclick: yearDeleteDialog }, 'Schuljahr löschen …'))
       ),
 
       h('div.section-head', {}, 'Foto-Sicherung (alle Klassen)'),

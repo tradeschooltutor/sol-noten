@@ -696,6 +696,51 @@
     return copied;
   }
 
+  /* PIN/Passwort prüfen, ohne den Sitzungszustand zu verändern (für
+     Bestätigungen kritischer Aktionen wie „Schuljahr löschen“). */
+  function verifySecret(secret) {
+    if (!security || !security.enabled || !security.wrapped) return Promise.resolve(true);
+    return CryptoBox.unwrapMaster(secret, security.wrapped)
+      .then(function () { return true; })
+      .catch(function () { return false; });
+  }
+
+  /* Schuljahr mit allen Klassen, Kursen und deren Bewertungsdaten löschen.
+     Fotos werden nur entfernt, wenn die Schüler-ID in KEINER verbliebenen
+     Klasse mehr vorkommt – nach einem Schuljahreswechsel behalten Schüler ihre
+     IDs, ihre Fotos müssen das Löschen des Altjahres also überleben. */
+  function deleteYear(yearId) {
+    if (state.schoolYears.length <= 1) {
+      return Promise.reject(new Error('Das letzte verbliebene Schuljahr kann nicht gelöscht werden.'));
+    }
+    var courseIds = {};
+    state.courses.forEach(function (c) { if (c.yearId === yearId) courseIds[c.id] = true; });
+    var removed = {
+      courses: Object.keys(courseIds).length,
+      classes: state.classes.filter(function (k) { return k.yearId === yearId; }).length,
+      entries: state.soleiEntries.filter(function (e) { return courseIds[e.courseId]; }).length
+    };
+    state.courses = state.courses.filter(function (c) { return c.yearId !== yearId; });
+    state.soleiEntries = state.soleiEntries.filter(function (e) { return !courseIds[e.courseId]; });
+    state.absences = (state.absences || []).filter(function (a) { return !courseIds[a.courseId]; });
+    state.uploadTallies = (state.uploadTallies || []).filter(function (t) { return !courseIds[t.courseId]; });
+    state.classes = state.classes.filter(function (k) { return k.yearId !== yearId; });
+    state.schoolYears = state.schoolYears.filter(function (y) { return y.id !== yearId; });
+    save();
+    var keep = {};
+    state.classes.forEach(function (k) {
+      (k.students || []).forEach(function (s) { keep[s.id] = true; });
+    });
+    return photoKeys().then(function (keys) {
+      var chain = Promise.resolve();
+      var photos = 0;
+      keys.forEach(function (id) {
+        if (!keep[id]) { photos++; chain = chain.then(function () { return deletePhoto(id); }); }
+      });
+      return chain.then(function () { removed.photos = photos; return removed; });
+    }).catch(function () { removed.photos = 0; return removed; });
+  }
+
   function removeBackupFolder() {
     backupDirHandle = null;
     backupPermissionNeeded = false;
@@ -890,6 +935,7 @@
     addAbsence: addAbsence, removeAbsence: removeAbsence, absencesFor: absencesFor,
     exportJSON: exportJSON, importJSON: importJSON, parseBackup: parseBackup, applyImport: applyImport,
     listSnapshots: listSnapshots, restoreSnapshot: restoreSnapshot, transferYear: transferYear,
+    verifySecret: verifySecret, deleteYear: deleteYear,
     savePhoto: savePhoto, getPhoto: getPhoto, deletePhoto: deletePhoto,
     hasPhoto: hasPhoto, photoKeys: photoKeys,
     exportPhotos: exportPhotos, parsePhotoBackup: parsePhotoBackup, applyPhotoImport: applyPhotoImport,

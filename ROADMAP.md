@@ -37,7 +37,7 @@ Bewusst an letzter Stelle; wird vorerst nicht umgesetzt.
 
 ---
 
-Umgesetzt: Schuljahreswechsel-Assistent (v0.18.0) – Klassen (Schülerlisten samt Fotos), Kurseinstellungen, Maximalpunkte und Sitzpläne aus einem früheren Schuljahr übernehmen; Bewertungsdaten bleiben im alten Jahr. Schuljahresbeginn automatisch vorschlagen (v0.17.1) – erster Werktag nach den Sommerferien als Vorschlag, manuell änderbar.
+Umgesetzt: Schuljahr-Archiv & -Löschung (v0.19.0) – Excel-/Druck-Export je Schuljahr, Löschen mit PIN-Bestätigung und Foto-Schonung übernommener Schüler/innen. Schuljahreswechsel-Assistent (v0.18.0) – Klassen (Schülerlisten samt Fotos), Kurseinstellungen, Maximalpunkte und Sitzpläne aus einem früheren Schuljahr übernehmen; Bewertungsdaten bleiben im alten Jahr. Schuljahresbeginn automatisch vorschlagen (v0.17.1) – erster Werktag nach den Sommerferien als Vorschlag, manuell änderbar.
 
 Bewusst verworfen: Undo für die letzte Punktevergabe (Korrektur erfolgt direkt
 durch Antippen des richtigen Werts), native App-Store-Versionen (die App bleibt

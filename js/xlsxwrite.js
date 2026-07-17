@@ -90,7 +90,8 @@
 
   /* rows: Array von Zeilen; Zelle = null | number | string.
      Rückgabe: Uint8Array der fertigen .xlsx-Datei. */
-  function build(sheetName, rows) {
+  /* Ein Tabellenblatt-XML aus Zeilen erzeugen. */
+  function sheetXml(rows) {
     var sheetRows = rows.map(function (row, r) {
       var cells = row.map(function (v, c) {
         if (v === null || v === undefined || v === '') return '';
@@ -102,20 +103,51 @@
       }).join('');
       return '<row r="' + (r + 1) + '">' + cells + '</row>';
     }).join('');
-
-    var sheet = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+    return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
       '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">' +
       '<sheetData>' + sheetRows + '</sheetData></worksheet>';
+  }
+
+  /* Blattnamen für Excel zulässig machen: verbotene Zeichen raus, max. 31
+     Zeichen, eindeutig innerhalb der Mappe. */
+  function safeSheetNames(names) {
+    var used = {};
+    return names.map(function (n) {
+      var s = String(n || 'Blatt').replace(/[\[\]:*?\/\\]/g, ' ').replace(/\s+/g, ' ').trim();
+      if (!s) s = 'Blatt';
+      s = s.slice(0, 31);
+      var base = s, i = 2;
+      while (used[s.toLowerCase()]) {
+        var suffix = ' (' + i + ')';
+        s = base.slice(0, 31 - suffix.length) + suffix;
+        i++;
+      }
+      used[s.toLowerCase()] = true;
+      return s;
+    });
+  }
+
+  /* Arbeitsmappe mit mehreren Blättern: sheets = [{name, rows}] */
+  function buildMulti(sheets) {
+    var names = safeSheetNames(sheets.map(function (s) { return s.name; }));
+    var files = [];
+    var sheetEntries = '', relEntries = '', typeOverrides = '';
+    sheets.forEach(function (s, i) {
+      var n = i + 1;
+      files.push({ name: 'xl/worksheets/sheet' + n + '.xml', text: sheetXml(s.rows) });
+      sheetEntries += '<sheet name="' + esc(names[i]) + '" sheetId="' + n + '" r:id="rId' + n + '"/>';
+      relEntries += '<Relationship Id="rId' + n + '" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet' + n + '.xml"/>';
+      typeOverrides += '<Override PartName="/xl/worksheets/sheet' + n + '.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>';
+    });
 
     var workbook = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
       '<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" ' +
       'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">' +
-      '<sheets><sheet name="' + esc(sheetName).slice(0, 31) + '" sheetId="1" r:id="rId1"/></sheets></workbook>';
+      '<sheets>' + sheetEntries + '</sheets></workbook>';
 
     var wbRels = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
       '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
-      '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>' +
-      '</Relationships>';
+      relEntries + '</Relationships>';
 
     var rootRels = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
       '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
@@ -127,20 +159,22 @@
       '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>' +
       '<Default Extension="xml" ContentType="application/xml"/>' +
       '<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>' +
-      '<Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>' +
-      '</Types>';
+      typeOverrides + '</Types>';
 
     return buildZip([
       { name: '[Content_Types].xml', text: contentTypes },
       { name: '_rels/.rels', text: rootRels },
       { name: 'xl/workbook.xml', text: workbook },
-      { name: 'xl/_rels/workbook.xml.rels', text: wbRels },
-      { name: 'xl/worksheets/sheet1.xml', text: sheet }
-    ]);
+      { name: 'xl/_rels/workbook.xml.rels', text: wbRels }
+    ].concat(files));
   }
 
-  function download(filename, sheetName, rows) {
-    var bytes = build(sheetName, rows);
+  /* Ein Blatt (bisherige API, unverändert nutzbar). */
+  function build(sheetName, rows) {
+    return buildMulti([{ name: sheetName, rows: rows }]);
+  }
+
+  function downloadBytes(filename, bytes) {
     var blob = new Blob([bytes], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
     var a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
@@ -150,5 +184,13 @@
     setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 500);
   }
 
-  return { build: build, download: download };
+  function download(filename, sheetName, rows) {
+    downloadBytes(filename, build(sheetName, rows));
+  }
+
+  function downloadMulti(filename, sheets) {
+    downloadBytes(filename, buildMulti(sheets));
+  }
+
+  return { build: build, buildMulti: buildMulti, download: download, downloadMulti: downloadMulti };
 });
