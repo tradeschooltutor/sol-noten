@@ -4,8 +4,30 @@
   var h = UI.h, clear = UI.clear, toast = UI.toast;
   var route = { name: 'loading', params: {} };
 
+  /* ---- Browser-History / Android-Zurück-Geste ----
+     Jeder Seitenwechsel erzeugt einen History-Eintrag; die Wischgeste (bzw. der
+     Zurück-Button) navigiert damit innerhalb der App zurück und schließt sie
+     erst von der Startansicht aus. Parameterwechsel auf derselben Seite
+     (z. B. Diagramm-Filter, Quartalswahl) ERSETZEN den Eintrag, damit die Geste
+     seitenweise zurückführt und nicht durch jeden Klick. */
+  var histFirst = true;   /* erste Navigation ersetzt den Basis-Eintrag */
+  var histPopping = false; /* Navigation stammt aus popstate → nichts schreiben */
+
+  function histWrite(replace) {
+    try {
+      var entry = { name: route.name, params: route.params };
+      if (replace) history.replaceState(entry, '');
+      else history.pushState(entry, '');
+    } catch (e) { /* nicht-serialisierbare Params o. Ä. – Navigation geht vor */ }
+  }
+
   function go(name, params) {
+    var sameView = route.name === name;
     route = { name: name, params: params || {} };
+    if (!histPopping) {
+      histWrite(histFirst || sameView);
+      histFirst = false;
+    }
     render();
     /* Neue Seite immer oben beginnen, damit der Titel sichtbar ist. */
     window.scrollTo(0, 0);
@@ -13,11 +35,42 @@
     if (appEl) appEl.scrollTop = 0;
   }
 
+  window.addEventListener('popstate', function (ev) {
+    /* 1) Offenes Modal: Die Geste schließt zuerst das Modal; der konsumierte
+       History-Eintrag wird wiederhergestellt, die Seite bleibt. Pflicht-Dialoge
+       (z. B. PIN-Einrichtung) bleiben offen. */
+    if (UI.hasOpenModal()) {
+      UI.closeTopModal();
+      histWrite(false);
+      return;
+    }
+    /* 2) Gesperrt: Keine Rückkehr in geschützte Ansichten per Geste. */
+    if (Store.isEncrypted && Store.isEncrypted() && Store.isLocked()) {
+      route = { name: 'lock', params: {} };
+      histWrite(false);
+      render();
+      return;
+    }
+    /* 3) Normale Rück-Navigation zum gespeicherten Eintrag. */
+    var st = ev.state;
+    histPopping = true;
+    if (st && st.name && views[st.name] && st.name !== 'lock' && st.name !== 'setup') {
+      route = { name: st.name, params: st.params || {} };
+    } else {
+      route = { name: 'home', params: {} };
+    }
+    render();
+    window.scrollTo(0, 0);
+    var appEl = document.getElementById('app');
+    if (appEl) appEl.scrollTop = 0;
+    histPopping = false;
+  });
+
   function S() { return Store.getState(); }
 
   /* ================= App-Start ================= */
 
-  var APP_VERSION = '0.16.5';
+  var APP_VERSION = '0.17.0';
 
   Store.init().then(function () {
     if ('serviceWorker' in navigator) {
@@ -3755,6 +3808,9 @@
                   } }, 'Automatisches Backup: Ordner wählen'))
             : h('p.hint', {}, 'Automatisches Backup in einen Ordner wird von diesem Browser nicht unterstützt (z. B. auf iPad/iPhone). Die App erinnert Sie stattdessen alle 7 Tage an ein Backup.')
         ),
+        Store.folderBackupSupported()
+          ? h('p.hint', {}, 'Tipp: Wählen Sie als Backup-Ziel einen Ordner, der von der OneDrive- oder Google-Drive-App synchronisiert wird – dann liegt Ihr (verschlüsseltes) Backup automatisch zusätzlich in der Cloud.')
+          : null,
         fileInput,
         snapHost
       ),

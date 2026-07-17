@@ -51,11 +51,23 @@
   }
 
   /* ---------- Modale ---------- */
+  /* Offene Modals werden verfolgt, damit die Android-Zurück-Geste zuerst das
+     Modal schließt statt die Seite zu wechseln. Die App öffnet Modals nur
+     sequenziell (nie gestapelt); der Stack ist dennoch korrekt geführt. */
+  var modalStack = [];
+
   function modal(title, bodyNodes, buttons, opts) {
     opts = opts || {};
     return new Promise(function (resolve) {
       var host = document.getElementById('modal-host');
-      function close(val) { clear(host); resolve(val); }
+      var entry = { mandatory: !!opts.mandatory, close: null };
+      function close(val) {
+        var i = modalStack.indexOf(entry);
+        if (i > -1) modalStack.splice(i, 1);
+        clear(host);
+        resolve(val);
+      }
+      entry.close = close;
       var box = h('div.modal',
         h('h2.modal-title', {}, title),
         h('div.modal-body', {}, bodyNodes),
@@ -73,7 +85,18 @@
         onclick: function (e) { if (e.target === back && !opts.mandatory) close(null); }
       }, box);
       host.appendChild(back);
+      modalStack.push(entry);
     });
+  }
+
+  function hasOpenModal() { return modalStack.length > 0; }
+
+  /* Oberstes (nicht verpflichtendes) Modal schließen; true = geschlossen. */
+  function closeTopModal() {
+    var e = modalStack[modalStack.length - 1];
+    if (!e || e.mandatory) return false;
+    e.close(null);
+    return true;
   }
 
   function confirmDialog(title, text, okLabel, danger) {
@@ -89,5 +112,6 @@
     return p[2] + '.' + p[1] + '.' + p[0];
   }
 
-  root.UI = { h: h, clear: clear, toast: toast, modal: modal, confirmDialog: confirmDialog, fmtDate: fmtDate };
+  root.UI = { h: h, clear: clear, toast: toast, modal: modal, confirmDialog: confirmDialog, fmtDate: fmtDate,
+    hasOpenModal: hasOpenModal, closeTopModal: closeTopModal };
 })(self);
