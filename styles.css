@@ -140,6 +140,12 @@ button { font: inherit; cursor: pointer; }
   margin-top: 18px; padding-top: 12px; border-top: 1px solid var(--line);
 }
 .danger-zone .hint { margin: 0 0 6px; color: var(--red); font-weight: 600; }
+.transfer-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 4px; min-height: 44px; cursor: pointer;
+}
+.transfer-row + .transfer-row { border-top: 1px solid var(--line); }
+.transfer-row input[type="checkbox"] { width: 20px; height: 20px; flex-shrink: 0; }
 .btn-block { width: 100%; }
 .btn-big { font-size: 1.1rem; min-height: 58px; }
 .btn-small { min-height: 36px; padding: 6px 12px; border-radius: 9px; font-size: 0.85rem; }

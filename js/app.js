@@ -70,7 +70,7 @@
 
   /* ================= App-Start ================= */
 
-  var APP_VERSION = '0.17.1';
+  var APP_VERSION = '0.18.0';
 
   Store.init().then(function () {
     if ('serviceWorker' in navigator) {
@@ -1011,7 +1011,11 @@
       courses.length === 0
         ? h('div.empty',
             h('p', {}, 'Noch kein Kurs in diesem Schuljahr.'),
-            h('p.hint', {}, 'Ein Kurs ist eine Klasse in einem Fach – z. B. „AK 2026 · Fahrzeugvertriebsprozesse“.'))
+            h('p.hint', {}, 'Ein Kurs ist eine Klasse in einem Fach – z. B. „AK 2026 · Fahrzeugvertriebsprozesse“.'),
+            st.courses.length > 0
+              ? h('button.btn-plain', { onclick: function () { go('yearTransfer', { toId: year.id }); } },
+                  'Aus einem früheren Schuljahr übernehmen')
+              : null)
         : h('div.course-grid', {}, courses.map(courseTile)),
       h('button.btn-primary.btn-block', { onclick: function () { go('editCourse', {}); } }, '+ Kurs anlegen'),
       h('button.btn-plain.btn-block', { onclick: function () { go('settings', { back: { name: 'home' } }); } }, 'Globale Einstellungen')
@@ -1106,9 +1110,114 @@
         st.schoolYears.push(y);
         _activeYearId = y.id;
         Store.save();
-        go('home');
+        /* Gibt es ein früheres Schuljahr mit Kursen, direkt die Übernahme anbieten. */
+        var hasSource = st.schoolYears.filter(function (o) {
+          if (o.id === y.id) return false;
+          return st.courses.filter(function (c) { return c.yearId === o.id; }).length > 0;
+        }).length > 0;
+        if (hasSource) {
+          UI.confirmDialog('Klassen und Kurse übernehmen?',
+            'Möchten Sie Klassen und Kurse aus einem früheren Schuljahr in „' + y.name + '“ übernehmen? Schülerlisten, Fotos, Kurseinstellungen und Sitzpläne werden kopiert; Punkte und Noten bleiben im alten Schuljahr.',
+            'Zum Assistenten')
+            .then(function (ok) {
+              if (ok) go('yearTransfer', { toId: y.id });
+              else go('home');
+            });
+        } else {
+          go('home');
+        }
       }
     }
+  };
+
+  /* ================= Schuljahreswechsel-Assistent ================= */
+
+  views.yearTransfer = function (p) {
+    var st = S();
+    var toYear = Store.yearById(p.toId);
+    if (!toYear) return views.home({});
+
+    /* Quelljahre: alle anderen Jahre, die Kurse haben; jüngstes zuerst. */
+    var sourceYears = st.schoolYears.filter(function (y) {
+      if (y.id === toYear.id) return false;
+      return st.courses.filter(function (c) { return c.yearId === y.id; }).length > 0;
+    }).sort(function (a, b) { return (b.startDate || '').localeCompare(a.startDate || ''); });
+
+    if (sourceYears.length === 0) {
+      return h('div.screen',
+        header('Schuljahreswechsel', { name: 'home' }),
+        h('div.empty', h('p', {}, 'Es gibt kein früheres Schuljahr mit Kursen, aus dem übernommen werden könnte.')));
+    }
+
+    var fromId = p.fromId || sourceYears[0].id;
+    var fromYear = Store.yearById(fromId) || sourceYears[0];
+    var srcSel = h('select.input');
+    sourceYears.forEach(function (y) {
+      srcSel.appendChild(h('option', { value: y.id, selected: y.id === fromId }, y.name));
+    });
+    srcSel.addEventListener('change', function () {
+      go('yearTransfer', { toId: toYear.id, fromId: srcSel.value }); /* gleiche Seite → History-Eintrag wird ersetzt */
+    });
+
+    var srcCourses = st.courses.filter(function (c) { return c.yearId === fromId; });
+    var courseChecks = []; /* {course, cb} */
+    var classInputs = {};  /* Quell-Klassen-ID -> Namensfeld */
+
+    var courseRows = srcCourses.map(function (c) {
+      var cls = Store.classById(c.classId);
+      var cb = h('input', { type: 'checkbox' });
+      cb.checked = true;
+      courseChecks.push({ course: c, cb: cb });
+      return h('label.transfer-row', {}, cb,
+        h('span', {}, (cls ? cls.name : '?') + ' · ' + c.subject +
+          (c.completed ? ' (Schuljahr abgeschlossen)' : '')));
+    });
+
+    var classBlocks = [];
+    var seenClasses = {};
+    srcCourses.forEach(function (c) {
+      if (seenClasses[c.classId]) return;
+      seenClasses[c.classId] = true;
+      var cls = Store.classById(c.classId);
+      if (!cls) return;
+      var inp = h('input.input', { type: 'text', value: cls.name });
+      classInputs[c.classId] = inp;
+      classBlocks.push(h('label.field',
+        h('span.field-label', {}, 'Neuer Name für Klasse „' + cls.name + '“ (' + cls.students.length + ' Schüler/innen)'),
+        inp));
+    });
+
+    var status = h('p.hint.error-text');
+
+    function execute() {
+      var ids = [];
+      courseChecks.forEach(function (e) { if (e.cb.checked) ids.push(e.course.id); });
+      if (ids.length === 0) { status.textContent = 'Bitte mindestens einen Kurs auswählen.'; return; }
+      var names = {};
+      Object.keys(classInputs).forEach(function (clsId) {
+        var v = classInputs[clsId].value.trim();
+        if (v) names[clsId] = v;
+      });
+      var res = Store.transferYear(fromId, toYear.id, ids, names);
+      setActiveYear(toYear.id);
+      toast(res.courses + ' Kurs(e), ' + res.classes + ' Klasse(n) mit ' + res.students +
+        ' Schüler/innen nach ' + toYear.name + ' übernommen.');
+      go('home');
+    }
+
+    return h('div.screen',
+      header('Schuljahreswechsel', { name: 'home' }),
+      h('div.card',
+        h('p.hint', {}, 'Übernimmt Klassen (samt Schülerlisten und Fotos) und Kurse (Einstellungen, Maximalpunkte, Sitzplan) in das Schuljahr „' + toYear.name + '“. Punktevergaben, Noten und Fehlzeiten des alten Schuljahres bleiben dort erhalten und werden nicht übernommen.'),
+        h('label.field', h('span.field-label', {}, 'Übernehmen aus'), srcSel)
+      ),
+      h('div.section-head', {}, 'Kurse'),
+      h('div.card.card-tight', {}, courseRows),
+      classBlocks.length ? h('div.section-head', {}, 'Klassennamen im neuen Schuljahr') : null,
+      classBlocks.length ? h('div.card.card-tight', {}, classBlocks) : null,
+      status,
+      h('button.btn-primary.btn-block', { onclick: execute }, 'Übernehmen')
+    );
   };
 
   /* Backup speichern – immer mit Passwort verschlüsselt (kein Klartext-Export). */

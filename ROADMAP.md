@@ -3,11 +3,6 @@
 Geplante Funktionen in grober Reihenfolge. Nicht terminiert; Reihenfolge und
 Zuschnitt werden vor der Umsetzung jeweils gemeinsam festgelegt.
 
-## 2. Schuljahreswechsel-Assistent
-Am Schuljahresende: Klassen/Schülerlisten ins neue Schuljahr übernehmen, neue
-Kurse anlegen, alte Kurse als abgeschlossen stehen lassen – als geführter
-Ablauf statt Handarbeit.
-
 ## 3. Kursnotiz-Funktion
 Kurze Notizen je Schüler/in (mitverschlüsselt). **Platzierung noch zu
 besprechen:** eigener Button vs. Textfeld auf „SoLei-Punkte vergeben“;
@@ -42,7 +37,7 @@ Bewusst an letzter Stelle; wird vorerst nicht umgesetzt.
 
 ---
 
-Umgesetzt: Schuljahresbeginn automatisch vorschlagen (v0.17.1) – erster Werktag nach den Sommerferien als Vorschlag, manuell änderbar.
+Umgesetzt: Schuljahreswechsel-Assistent (v0.18.0) – Klassen (Schülerlisten samt Fotos), Kurseinstellungen, Maximalpunkte und Sitzpläne aus einem früheren Schuljahr übernehmen; Bewertungsdaten bleiben im alten Jahr. Schuljahresbeginn automatisch vorschlagen (v0.17.1) – erster Werktag nach den Sommerferien als Vorschlag, manuell änderbar.
 
 Bewusst verworfen: Undo für die letzte Punktevergabe (Korrektur erfolgt direkt
 durch Antippen des richtigen Werts), native App-Store-Versionen (die App bleibt

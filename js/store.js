@@ -648,6 +648,54 @@
     }).then(function () { save(); });
   }
 
+  /* ---------- Schuljahreswechsel ----------
+     Kopiert Klassen und Kurse aus einem Quelljahr in ein Zieljahr.
+     Wichtige Eigenschaften:
+     - Schüler/innen behalten ihre IDs → Fotos (an die Schüler-ID geknüpft)
+       wandern automatisch mit. Kollisionsfrei, da alle Bewertungsdaten am
+       (alten) Kurs hängen.
+     - Kurse werden per Konstruktor NUR mit ihren Einstellungen neu aufgebaut
+       (Fach, OBT/KA-Anzahl, Gewichtung, Upload-Kriterium, Maximalpunkte,
+       Sitzplan). Bewertungsdaten (obt, ka, portfolio, Einträge) bleiben damit
+       konstruktionsbedingt zurück.
+     - classNames: optionale neue Klassennamen je Quell-Klassen-ID. */
+  function transferYear(fromYearId, toYearId, courseIds, classNames) {
+    var copied = { classes: 0, courses: 0, students: 0 };
+    var classMap = {}; /* Quell-Klassen-ID -> neue Klassen-ID (dedupliziert) */
+    state.courses.filter(function (c) {
+      return c.yearId === fromYearId && courseIds.indexOf(c.id) > -1;
+    }).forEach(function (c) {
+      var newClassId = classMap[c.classId];
+      if (!newClassId) {
+        var oldCls = state.classes.filter(function (k) { return k.id === c.classId; })[0];
+        if (!oldCls) return;
+        var newCls = {
+          id: uid(), yearId: toYearId,
+          name: (classNames && classNames[c.classId]) || oldCls.name,
+          students: JSON.parse(JSON.stringify(oldCls.students))
+        };
+        state.classes.push(newCls);
+        classMap[c.classId] = newCls.id;
+        newClassId = newCls.id;
+        copied.classes++;
+        copied.students += newCls.students.length;
+      }
+      var nc = {
+        id: uid(), yearId: toYearId, classId: newClassId,
+        subject: c.subject, numOBT: c.numOBT, numKA: c.numKA,
+        weights: JSON.parse(JSON.stringify(c.weights || { sl: 40, obt: 20, ka: 40 })),
+        maxPoints: JSON.parse(JSON.stringify(c.maxPoints || {})),
+        currentQuarter: 1, portfolio: {}, quarterOverrides: null, completed: false,
+        uploadCriterion: typeof c.uploadCriterion === 'number' ? c.uploadCriterion : 2
+      };
+      if (c.seating) nc.seating = JSON.parse(JSON.stringify(c.seating));
+      state.courses.push(nc);
+      copied.courses++;
+    });
+    save();
+    return copied;
+  }
+
   function removeBackupFolder() {
     backupDirHandle = null;
     backupPermissionNeeded = false;
@@ -841,7 +889,7 @@
     uploadTallyFor: uploadTallyFor, setUploadTally: setUploadTally,
     addAbsence: addAbsence, removeAbsence: removeAbsence, absencesFor: absencesFor,
     exportJSON: exportJSON, importJSON: importJSON, parseBackup: parseBackup, applyImport: applyImport,
-    listSnapshots: listSnapshots, restoreSnapshot: restoreSnapshot,
+    listSnapshots: listSnapshots, restoreSnapshot: restoreSnapshot, transferYear: transferYear,
     savePhoto: savePhoto, getPhoto: getPhoto, deletePhoto: deletePhoto,
     hasPhoto: hasPhoto, photoKeys: photoKeys,
     exportPhotos: exportPhotos, parsePhotoBackup: parsePhotoBackup, applyPhotoImport: applyPhotoImport,
