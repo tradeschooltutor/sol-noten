@@ -1,4 +1,4 @@
-# SOL-Noten (Version 0.16.4 – Beta)
+# SOL-Noten (Version 0.16.5 – Beta)
 
 Notenverwaltung zum selbstorganisierten Lernen (SOL) als Progressive Web App (PWA).
 Basierend auf der Excel-Notenverwaltung V8.0 von Andreas Vandelaar.

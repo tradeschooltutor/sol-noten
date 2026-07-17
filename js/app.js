@@ -17,7 +17,7 @@
 
   /* ================= App-Start ================= */
 
-  var APP_VERSION = '0.16.4';
+  var APP_VERSION = '0.16.5';
 
   Store.init().then(function () {
     if ('serviceWorker' in navigator) {
@@ -1284,8 +1284,10 @@
         )
       ),
       h('div.section-head', {}, 'Auswertung'),
-      h('button.btn-primary.btn-block.grid-btn', { onclick: function () { gradesState.mode = 'class'; gradesState.studentIdx = 0; go('grades', { id: course.id }); } },
-        'Notenübersicht & Zeugnisnoten'),
+      h('div.card.card-tight.solei-card',
+        h('button.btn-primary.btn-block.grid-btn', { onclick: function () { gradesState.mode = 'class'; gradesState.studentIdx = 0; go('grades', { id: course.id }); } },
+          'Notenübersicht & Zeugnisnoten')
+      ),
       h('button.btn-plain.btn-block.course-settings-btn', { onclick: function () { go('editCourse', { id: course.id }); } },
         'Kurs-Einstellungen'),
       /* Punktestand-Liste bewusst nicht mehr auf der Kursseite (über den Button
