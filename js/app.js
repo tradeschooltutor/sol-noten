@@ -70,7 +70,7 @@
 
   /* ================= App-Start ================= */
 
-  var APP_VERSION = '0.19.0';
+  var APP_VERSION = '0.20.0';
 
   Store.init().then(function () {
     if ('serviceWorker' in navigator) {
@@ -247,6 +247,7 @@
     );
   }
 
+  var NOTE_SVG = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3h11l3 3v15H5z"/><path d="M9 9h6M9 13h6M9 17h3"/></svg>';
   var HOME_SVG = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l9-8 9 8"/><path d="M5 10v10h5v-6h4v6h5V10"/></svg>';
   var LOCK_SVG = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>';
 
@@ -1391,6 +1392,7 @@
         st2.soleiEntries = st2.soleiEntries.filter(function (e) { return e.courseId !== course.id; });
         st2.absences = (st2.absences || []).filter(function (a) { return a.courseId !== course.id; });
         st2.uploadTallies = (st2.uploadTallies || []).filter(function (t) { return t.courseId !== course.id; });
+        st2.notes = (st2.notes || []).filter(function (n) { return n.courseId !== course.id; });
         Store.save();
         toast('Kurs gelöscht.');
         go('home');
@@ -1831,6 +1833,7 @@
     var course = Store.courseById(p.id);
     if (!course.portfolio) course.portfolio = {};
     var cls = Store.classById(course.classId);
+    var quarters = courseQuarters(course); /* für die Datums-Zuordnung der Kursnotizen */
     var q = p.quarter || course.currentQuarter;
     var grading = S().settings.grading15;
     var students = cls.students.slice().sort(function (a, b) {
@@ -1917,7 +1920,19 @@
             h('strong', {}, slGrade ? Calc.fmt(slGrade.g) : '–')),
           h('div.review-cell', h('span.hint', {}, 'Portfolio/mdl. Prüfung'), inp),
           h('div.review-cell', h('span.hint', {}, 'SoLei-Note'), soleiCell)
-        )
+        ),
+        /* Kursnotizen dieses Quartals als datierte Liste – Entscheidungshilfe
+           für die Quartalsnote. Quartalszuordnung wie überall über das Datum. */
+        (function () {
+          var qNotes = Store.notesFor(course.id, stu.id).filter(function (n) {
+            return Quarters.quarterForDate(n.date, quarters) === q;
+          });
+          if (!qNotes.length) return null;
+          return h('div.review-notes', {}, qNotes.map(function (n) {
+            return h('p.review-note', {},
+              h('span.note-date', {}, UI.fmtDate(n.date) + ': '), n.text);
+          }));
+        })()
       );
       refreshSolei();
       return row;
@@ -3199,7 +3214,7 @@
   /* ================= SoLei-Erfassung (Herzstück) ================= */
 
   var captureState = { mode: 'criterion', criterion: 0, studentIdx: 0, date: null,
-    kbActive: null, kbBuffer: '', kbTimer: null, kbCourse: null };
+    kbActive: null, kbBuffer: '', kbTimer: null, kbCourse: null, noteOpen: null };
 
   /* Tastatur-Erfassung (PC/Mac): globaler Listener, aktiv nur auf der Erfassungsseite.
      Der eigentliche Handler wird bei jedem Aufbau der Seite frisch gesetzt (Closures). */
@@ -3323,8 +3338,35 @@
         });
         var lastToday = todays.length ? todays[todays.length - 1] : null;
 
-        return h('div.tap-row' + (captureState.kbActive === rowIdx ? '.key-active' : ''),
-          photoTile(stu, { small: true }),
+        /* Kursnotiz zum gewählten Datum: Symbol unter dem Foto, Feld darunter. */
+        var note = Store.noteFor(course.id, stu.id, captureState.date);
+        var noteOpen = captureState.noteOpen === stu.id;
+        var noteBtn = h('button.note-btn' + (note ? '.has-note' : '') + (noteOpen ? '.open' : ''), {
+          'aria-label': 'Kursnotiz zu ' + stu.lastName + ', ' + stu.firstName,
+          title: 'Kursnotiz (' + UI.fmtDate(captureState.date) + ')',
+          html: NOTE_SVG,
+          onclick: function () {
+            captureState.noteOpen = noteOpen ? null : stu.id;
+            render();
+          }
+        });
+        var notePanel = null;
+        if (noteOpen) {
+          var ta = h('textarea.input.note-area', {
+            placeholder: 'Kursnotiz für den ' + UI.fmtDate(captureState.date) + ' …', autofocus: true
+          });
+          ta.value = note ? note.text : '';
+          ta.addEventListener('blur', function () {
+            Store.setNote(course.id, stu.id, captureState.date, ta.value);
+            noteBtn.classList.toggle('has-note', !!ta.value.trim());
+          });
+          notePanel = h('div.note-panel', {}, ta);
+        }
+
+        var row = h('div.tap-row' + (captureState.kbActive === rowIdx ? '.key-active' : ''),
+          h('div.avatar-col',
+            photoTile(stu, { small: true }),
+            noteBtn),
           h('div.tap-info',
             h('div.student-name', {}, stu.lastName + ', ' + stu.firstName),
             h('div.tap-substats',
@@ -3340,6 +3382,7 @@
             }, Calc.fmt(v, 1));
           }))
         );
+        return h('div.note-wrap', {}, row, notePanel);
       });
 
       return h('div.capture-body',
@@ -3380,6 +3423,16 @@
         );
       });
 
+      /* Kursnotiz: in der Schüleransicht direkt als volles Feld (mehr Platz). */
+      var note = Store.noteFor(course.id, stu.id, captureState.date);
+      var noteTa = h('textarea.input.note-area', {
+        placeholder: 'Kursnotiz für den ' + UI.fmtDate(captureState.date) + ' …'
+      });
+      noteTa.value = note ? note.text : '';
+      noteTa.addEventListener('blur', function () {
+        Store.setNote(course.id, stu.id, captureState.date, noteTa.value);
+      });
+
       return h('div.capture-body',
         h('div.crit-nav',
           h('button.icon-btn', { onclick: function () { captureState.studentIdx = (si + students.length - 1) % students.length; render(); } }, '‹'),
@@ -3391,7 +3444,11 @@
           ),
           h('button.icon-btn', { onclick: function () { captureState.studentIdx = (si + 1) % students.length; render(); } }, '›')
         ),
-        h('div.card.card-list', {}, rows)
+        h('div.card.card-list', {}, rows),
+        h('div.card.card-tight',
+          h('label.field',
+            h('span.field-label', {}, 'Kursnotiz (' + UI.fmtDate(captureState.date) + ')'),
+            noteTa))
       );
     }
 

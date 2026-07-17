@@ -80,7 +80,8 @@
                              currentQuarter, portfolio:{q:{studentId:grade}},
                              dismissedQuarterHint:{q:true}} */
       soleiEntries: [],  /* {id, courseId, studentId, quarter, criterion, points, date, createdAt} */
-      uploadTallies: []  /* {courseId, studentId, quarter, done, missed} – Ergebnis-Uploads, Zählung am Quartalsende */
+      uploadTallies: [], /* {courseId, studentId, quarter, done, missed} – Ergebnis-Uploads, Zählung am Quartalsende */
+      notes: []          /* {id, courseId, studentId, date, text} – Kursnotizen, eine je Schüler/in und Datum */
     };
   }
 
@@ -92,6 +93,7 @@
       if (!s.settings.theme) s.settings.theme = 'petrol';
       if (!Array.isArray(s.absences)) s.absences = [];
       if (!Array.isArray(s.uploadTallies)) s.uploadTallies = [];
+      if (!Array.isArray(s.notes)) s.notes = []; /* Kursnotizen (ab 0.20) */
       if (Array.isArray(s.courses)) s.courses.forEach(function (c) {
         if (typeof c.uploadCriterion !== 'number') c.uploadCriterion = 2; /* Standard: 3. Kriterium (Arbeitsergebnisse) */
         if (typeof c.completed !== 'boolean') c.completed = false; /* Schuljahr abgeschlossen (Q4-Abschluss) */
@@ -593,10 +595,10 @@
     ['courses', 'schoolYears', 'classes', 'soleiEntries'].forEach(function (k) {
       if (!Array.isArray(data[k])) throw bad;
     });
-    ['absences', 'uploadTallies'].forEach(function (k) { /* fehlen in Alt-Backups; migrate() ergänzt sie */
+    ['absences', 'uploadTallies', 'notes'].forEach(function (k) { /* fehlen in Alt-Backups; migrate() ergänzt sie */
       if (data[k] !== undefined && !Array.isArray(data[k])) throw bad;
     });
-    ['courses', 'schoolYears', 'classes', 'soleiEntries', 'absences', 'uploadTallies'].forEach(function (k) {
+    ['courses', 'schoolYears', 'classes', 'soleiEntries', 'absences', 'uploadTallies', 'notes'].forEach(function (k) {
       (data[k] || []).forEach(function (el) {
         if (!el || typeof el !== 'object' || Array.isArray(el)) throw bad;
         ['id', 'courseId', 'studentId', 'yearId', 'classId'].forEach(function (idKey) {
@@ -724,6 +726,7 @@
     state.soleiEntries = state.soleiEntries.filter(function (e) { return !courseIds[e.courseId]; });
     state.absences = (state.absences || []).filter(function (a) { return !courseIds[a.courseId]; });
     state.uploadTallies = (state.uploadTallies || []).filter(function (t) { return !courseIds[t.courseId]; });
+    state.notes = (state.notes || []).filter(function (n) { return !courseIds[n.courseId]; });
     state.classes = state.classes.filter(function (k) { return k.yearId !== yearId; });
     state.schoolYears = state.schoolYears.filter(function (y) { return y.id !== yearId; });
     save();
@@ -739,6 +742,36 @@
       });
       return chain.then(function () { removed.photos = photos; return removed; });
     }).catch(function () { removed.photos = 0; return removed; });
+  }
+
+  /* ---------- Kursnotizen ----------
+     Eine Notiz je Kurs, Schüler/in und Datum; leerer Text löscht sie.
+     Notizen liegen im Zustand und sind damit mitverschlüsselt und in jedem
+     Backup enthalten. */
+  function noteFor(courseId, studentId, dateISO) {
+    return state.notes.filter(function (n) {
+      return n.courseId === courseId && n.studentId === studentId && n.date === dateISO;
+    })[0] || null;
+  }
+
+  function setNote(courseId, studentId, dateISO, text) {
+    var t = (text || '').trim();
+    var existing = noteFor(courseId, studentId, dateISO);
+    if (existing) {
+      if (!t) state.notes = state.notes.filter(function (n) { return n.id !== existing.id; });
+      else existing.text = t;
+    } else {
+      if (!t) return;
+      state.notes.push({ id: uid(), courseId: courseId, studentId: studentId, date: dateISO, text: t });
+    }
+    save();
+  }
+
+  /* Alle Notizen zu einer Person in einem Kurs, chronologisch. */
+  function notesFor(courseId, studentId) {
+    return state.notes.filter(function (n) {
+      return n.courseId === courseId && n.studentId === studentId;
+    }).sort(function (a, b) { return (a.date || '').localeCompare(b.date || ''); });
   }
 
   function removeBackupFolder() {
@@ -936,6 +969,7 @@
     exportJSON: exportJSON, importJSON: importJSON, parseBackup: parseBackup, applyImport: applyImport,
     listSnapshots: listSnapshots, restoreSnapshot: restoreSnapshot, transferYear: transferYear,
     verifySecret: verifySecret, deleteYear: deleteYear,
+    noteFor: noteFor, setNote: setNote, notesFor: notesFor,
     savePhoto: savePhoto, getPhoto: getPhoto, deletePhoto: deletePhoto,
     hasPhoto: hasPhoto, photoKeys: photoKeys,
     exportPhotos: exportPhotos, parsePhotoBackup: parsePhotoBackup, applyPhotoImport: applyPhotoImport,
