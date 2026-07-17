@@ -70,7 +70,7 @@
 
   /* ================= App-Start ================= */
 
-  var APP_VERSION = '0.17.0';
+  var APP_VERSION = '0.17.1';
 
   Store.init().then(function () {
     if ('serviceWorker' in navigator) {
@@ -900,7 +900,35 @@
     var defYear = now.getMonth() >= 6 ? now.getFullYear() : now.getFullYear() - 1;
     var nameInput = h('input.input', { type: 'text', value: defYear + '/' + String(defYear + 1).slice(2), placeholder: 'z. B. 2026/27' });
     var startInput = h('input.input', { type: 'date', value: defYear + '-08-01' });
+    var startHint = h('p.hint');
     var status = h('p.hint');
+
+    /* Vorschlag: erster Werktag nach den Sommerferien. Eine Handeingabe wird
+       nie überschrieben; der Wert bleibt in jedem Fall änderbar (z. B. bei
+       abweichendem Ausbildungs-/Blockbeginn am Berufskolleg). */
+    var startTouched = false;
+    startInput.addEventListener('change', function () { startTouched = true; });
+    function suggestStart() {
+      if (!landSel.value) return;
+      var targetYear = Number(String(startInput.value || '').slice(0, 4)) || defYear;
+      startHint.textContent = 'Erster Schultag wird aus den Ferienterminen ermittelt …';
+      Quarters.fetchHolidays(landSel.value, targetYear + '-05-01', (targetYear + 1) + '-08-31')
+        .then(function (hol) {
+          var s = Quarters.suggestFirstSchoolDay(hol, targetYear);
+          if (s && !startTouched) {
+            startInput.value = s;
+            startHint.textContent = 'Vorschlag: erster Werktag nach den Sommerferien (' + UI.fmtDate(s) + '). Bitte prüfen und bei Bedarf anpassen.';
+          } else if (s) {
+            startHint.textContent = 'Laut Ferienterminen wäre der erste Werktag nach den Sommerferien der ' + UI.fmtDate(s) + '.';
+          } else {
+            startHint.textContent = 'Kein automatischer Vorschlag möglich – bitte den ersten Schultag von Hand eintragen.';
+          }
+        })
+        .catch(function () {
+          startHint.textContent = 'Ferientermine gerade nicht erreichbar – bitte den ersten Schultag von Hand eintragen.';
+        });
+    }
+    landSel.addEventListener('change', suggestStart);
 
     function finish() {
       if (!landSel.value) { status.textContent = 'Bitte wählen Sie Ihr Bundesland.'; return; }
@@ -952,6 +980,7 @@
           h('p.hint', {}, 'Wird nur einmalig benötigt, um die Schulferien zu laden und daraus die vier Quartale (je 10 Schulwochen) zu berechnen. Ihre Noten bleiben ausschließlich auf diesem Gerät.')),
         h('label.field', h('span.field-label', {}, 'Bezeichnung des Schuljahres'), nameInput),
         h('label.field', h('span.field-label', {}, 'Erster Schultag'), startInput),
+        startHint,
         status,
         h('button.btn-primary.btn-block', { onclick: finish }, 'Schuljahr anlegen')
       )
@@ -1027,12 +1056,39 @@
     var defYear = now.getMonth() >= 6 ? now.getFullYear() : now.getFullYear() - 1;
     var nameInput = h('input.input', { type: 'text', value: defYear + '/' + String(defYear + 1).slice(2) });
     var startInput = h('input.input', { type: 'date', value: defYear + '-08-01' });
+    var startHint = h('p.hint');
     var status = h('p.hint');
+
+    /* Vorschlag wie in der Ersteinrichtung; das Bundesland ist hier bekannt. */
+    var startTouched = false;
+    startInput.addEventListener('change', function () { startTouched = true; });
+    (function suggestStart() {
+      if (!st.settings.bundesland) return;
+      var targetYear = defYear;
+      startHint.textContent = 'Erster Schultag wird aus den Ferienterminen ermittelt …';
+      Quarters.fetchHolidays(st.settings.bundesland, targetYear + '-05-01', (targetYear + 1) + '-08-31')
+        .then(function (hol) {
+          var s = Quarters.suggestFirstSchoolDay(hol, targetYear);
+          if (s && !startTouched) {
+            startInput.value = s;
+            startHint.textContent = 'Vorschlag: erster Werktag nach den Sommerferien (' + UI.fmtDate(s) + '). Bitte prüfen und bei Bedarf anpassen.';
+          } else if (s) {
+            startHint.textContent = 'Laut Ferienterminen wäre der erste Werktag nach den Sommerferien der ' + UI.fmtDate(s) + '.';
+          } else {
+            startHint.textContent = 'Kein automatischer Vorschlag möglich – bitte den ersten Schultag von Hand eintragen.';
+          }
+        })
+        .catch(function () {
+          startHint.textContent = 'Ferientermine gerade nicht erreichbar – bitte den ersten Schultag von Hand eintragen.';
+        });
+    })();
+
     return h('div.screen',
       header('Neues Schuljahr', { name: 'home' }),
       h('div.card',
         h('label.field', h('span.field-label', {}, 'Bezeichnung'), nameInput),
         h('label.field', h('span.field-label', {}, 'Erster Schultag'), startInput),
+        startHint,
         status,
         h('button.btn-primary.btn-block', { onclick: create }, 'Schuljahr anlegen')
       )

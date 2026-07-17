@@ -38,6 +38,23 @@
   function addDays(d, n) { var x = new Date(d); x.setDate(x.getDate() + n); return x; }
   function monday(d) { var x = new Date(d); var wd = (x.getDay() + 6) % 7; return addDays(x, -wd); }
 
+  /* Ersten Schultag vorschlagen: erster Werktag (Mo–Fr) nach dem Ende der
+     Sommerferien des Zieljahres. Liefert 'YYYY-MM-DD' oder null, wenn in den
+     Feriendaten keine passenden Sommerferien zu finden sind. */
+  function suggestFirstSchoolDay(holidays, targetYear) {
+    var summer = null;
+    (holidays || []).forEach(function (hh) {
+      if (!hh || !hh.end) return;
+      if ((hh.name || '').toLowerCase().indexOf('sommer') === -1) return;
+      if (Number(hh.end.slice(0, 4)) !== targetYear) return;
+      if (!summer || hh.end > summer.end) summer = hh;
+    });
+    if (!summer) return null;
+    var d = addDays(parseISO(summer.end), 1);
+    while (d.getDay() === 0 || d.getDay() === 6) d = addDays(d, 1);
+    return iso(d);
+  }
+
   /* Schulferien für ein Schuljahr laden (OpenHolidays-API, kostenlos, ohne Anmeldung).
      Rückgabe: Promise -> [{ start:'YYYY-MM-DD', end:'YYYY-MM-DD', name:'Herbstferien' }] */
   function fetchHolidays(subdivisionCode, fromISO, toISO) {
@@ -124,6 +141,7 @@
     iso: iso,
     parseISO: parseISO,
     fetchHolidays: fetchHolidays,
+    suggestFirstSchoolDay: suggestFirstSchoolDay,
     computeQuarters: computeQuarters,
     quarterForDate: quarterForDate,
     quarterChangeDue: quarterChangeDue,

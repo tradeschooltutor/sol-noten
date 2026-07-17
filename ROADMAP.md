@@ -3,13 +3,6 @@
 Geplante Funktionen in grober Reihenfolge. Nicht terminiert; Reihenfolge und
 Zuschnitt werden vor der Umsetzung jeweils gemeinsam festgelegt.
 
-## 1. Schuljahresbeginn automatisch vorschlagen
-Die App kennt die Ferienzeiten (OpenHolidays, je Bundesland) und kann daraus den
-ersten Schultag nach den Sommerferien als Vorschlag ableiten. Der Wert bleibt
-manuell änderbar, weil der tatsächliche Unterrichtsbeginn abweichen kann
-(z. B. Einschulungs-/Konferenztage, am Berufskolleg abweichender
-Ausbildungs- und Blockbeginn einzelner Klassen).
-
 ## 2. Schuljahreswechsel-Assistent
 Am Schuljahresende: Klassen/Schülerlisten ins neue Schuljahr übernehmen, neue
 Kurse anlegen, alte Kurse als abgeschlossen stehen lassen – als geführter
@@ -48,6 +41,8 @@ Schülerliste neu zu erfassen.
 Bewusst an letzter Stelle; wird vorerst nicht umgesetzt.
 
 ---
+
+Umgesetzt: Schuljahresbeginn automatisch vorschlagen (v0.17.1) – erster Werktag nach den Sommerferien als Vorschlag, manuell änderbar.
 
 Bewusst verworfen: Undo für die letzte Punktevergabe (Korrektur erfolgt direkt
 durch Antippen des richtigen Werts), native App-Store-Versionen (die App bleibt
