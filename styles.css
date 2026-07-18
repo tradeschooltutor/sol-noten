@@ -69,6 +69,20 @@ body {
   padding: 8px 10px; margin-top: 10px;
 }
 
+/* Kursnamen-Box mit rechtsbündigem Button (SoLei-Punktestand, Schüler/in) –
+   kompakter Button, damit die Box nicht höher wird. */
+.course-box-row {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 10px; text-align: left; padding-top: 9px; padding-bottom: 9px;
+}
+.course-box-btn { min-height: 30px; padding: 4px 12px; font-size: 0.8rem; border-radius: 8px; }
+
+/* PWA-Installation: Banner auf dem Startbildschirm und Anleitungsschritte */
+.install-banner { border-left: 3px solid var(--teal); border-radius: 0 var(--radius) var(--radius) 0; }
+.install-banner .row-gap { display: flex; gap: 10px; flex-wrap: wrap; }
+.install-steps { margin: 8px 0; padding-left: 1.3rem; font-size: 0.9rem; color: var(--ink-soft); }
+.install-steps li { margin-bottom: 6px; }
+
 /* ---------- Karten & Abschnitte ---------- */
 .card {
   background: var(--card); border-radius: var(--radius);

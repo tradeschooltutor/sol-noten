@@ -70,7 +70,102 @@
 
   /* ================= App-Start ================= */
 
-  var APP_VERSION = '0.23.2';
+  var APP_VERSION = '0.24.0';
+
+  /* ---------- PWA-Installation ----------
+     Chrome/Edge/Android liefern `beforeinstallprompt`: Event abfangen und
+     aufheben, dann kann ein eigener Button den nativen Dialog auslösen.
+     iOS/iPadOS kennt das Event nicht – dort zeigen wir eine Anleitung
+     (Safari: Teilen → „Zum Home-Bildschirm“). */
+  var deferredInstall = null;
+
+  window.addEventListener('beforeinstallprompt', function (ev) {
+    ev.preventDefault();
+    deferredInstall = ev;
+    if (route && route.name !== 'loading') render();
+  });
+
+  window.addEventListener('appinstalled', function () {
+    deferredInstall = null;
+    toast('SOL-Noten wurde als App installiert. Sie finden sie jetzt bei Ihren Apps bzw. auf dem Home-Bildschirm.');
+    if (route && route.name !== 'loading') render();
+  });
+
+  function isStandalone() {
+    return (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) ||
+      window.navigator.standalone === true;
+  }
+
+  function isIOS() {
+    var ua = navigator.userAgent || '';
+    /* iPadOS meldet sich als „MacIntel“ mit Touch-Unterstützung. */
+    return /iPad|iPhone|iPod/.test(ua) ||
+      (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  }
+
+  function triggerInstall() {
+    if (!deferredInstall) return;
+    var ev = deferredInstall;
+    deferredInstall = null;
+    ev.prompt();
+    ev.userChoice.then(function (res) {
+      /* Bei Abbruch das Event behalten – der Button bleibt nutzbar. */
+      if (!res || res.outcome !== 'accepted') { deferredInstall = ev; }
+      render();
+    });
+  }
+
+  /* Plattformgenaue Installationsanleitung (wenn kein nativer Dialog möglich). */
+  function installInstructions() {
+    if (isIOS()) {
+      return h('div',
+        h('p.hint', {}, 'Auf iPhone und iPad erfolgt die Installation über Safari:'),
+        h('ol.install-steps',
+          h('li', {}, 'SOL-Noten in Safari öffnen.'),
+          h('li', {}, 'Das Teilen-Symbol antippen (Rechteck mit Pfeil nach oben, unten in der Mitte bzw. oben rechts).'),
+          h('li', {}, '„Zum Home-Bildschirm“ wählen und mit „Hinzufügen“ bestätigen.')),
+        h('p.hint', {}, 'Danach startet SOL-Noten wie eine normale App über das Symbol auf dem Home-Bildschirm.'));
+    }
+    return h('div',
+      h('p.hint', {}, 'In Chrome oder Edge lässt sich SOL-Noten so installieren:'),
+      h('ol.install-steps',
+        h('li', {}, 'Auf das Installations-Symbol rechts in der Adressleiste klicken (Monitor mit Pfeil), oder'),
+        h('li', {}, 'über das Browser-Menü (⋮ bzw. …): „SOL-Noten installieren“ / „Apps“ / „Speichern und teilen“ → „Seite installieren“.')),
+      h('p.hint', {}, 'Firefox am PC unterstützt die Installation von Web-Apps leider nicht – dort läuft SOL-Noten einfach im Browser weiter.'));
+  }
+
+  /* Karte für die Einstellungsseite. */
+  function installSection() {
+    if (isStandalone()) {
+      return h('p.hint', {}, 'SOL-Noten läuft bereits als installierte App – alles erledigt.');
+    }
+    if (deferredInstall) {
+      return h('div.actions-col',
+        h('p.hint', {}, 'SOL-Noten lässt sich als App installieren: eigenes Symbol, eigenes Fenster, ohne Browser-Leisten – Daten und Anmeldung bleiben dabei erhalten.'),
+        h('button.btn-primary.btn-block', { onclick: triggerInstall }, 'App installieren'));
+    }
+    return installInstructions();
+  }
+
+  /* Dezente, ausblendbare Einladung auf dem Startbildschirm. */
+  function installBanner() {
+    var st = S();
+    if (isStandalone() || (st.settings && st.settings.installHintDismissed)) return null;
+    if (!deferredInstall && !isIOS()) return null;
+    return h('div.card.card-tight.install-banner',
+      h('p.hint', {}, 'Tipp: SOL-Noten lässt sich als App installieren – mit eigenem Symbol auf dem Startbildschirm.'),
+      h('div.row-gap',
+        deferredInstall
+          ? h('button.btn-small.btn-primary', { onclick: triggerInstall }, 'App installieren')
+          : h('button.btn-small.btn-primary', { onclick: function () {
+              UI.modal('SOL-Noten installieren', installInstructions(), [{ label: 'Schließen', value: true, primary: true }]);
+            } }, 'Anleitung anzeigen'),
+        h('button.btn-small.btn-plain', { onclick: function () {
+          st.settings.installHintDismissed = true;
+          Store.save();
+          render();
+        } }, 'Nicht mehr anzeigen')));
+  }
 
   Store.init().then(function () {
     if ('serviceWorker' in navigator) {
@@ -1008,6 +1103,7 @@
       header('SOL-Noten', null),
       backupBanner(),
       folderPermissionBanner(),
+      installBanner(),
       h('div.row-between',
         h('label.year-label', {}, 'Schuljahr ', yearSel),
         h('button.btn-plain.btn-small', { onclick: addYear }, '+ Schuljahr')
@@ -4069,9 +4165,10 @@
     }
 
     return h('div.screen',
-      header('SoLei-Punktestand', p.back || { name: 'course', params: { id: course.id } },
-        h('button.btn-small.btn-plain', { onclick: printCharts }, 'Diagramme drucken')),
-      courseBox(course),
+      header('SoLei-Punktestand', p.back || { name: 'course', params: { id: course.id } }),
+      h('div.card.card-tight.course-box.course-box-row',
+        h('strong', {}, cls.name + ' - ' + course.subject),
+        h('button.btn-small.btn-primary.course-box-btn', { onclick: printCharts }, 'Diagramme drucken')),
       h('div.capture-bar', qSel, viewToggle),
       h('div.card.card-tight',
         h('div.row-between',
@@ -4535,6 +4632,9 @@
 
       h('div.banner-info', {},
         h('span', {}, 'Maximalpunkte der Kriterien, Quartalszeiträume, Gewichtung sowie die Anzahl der Klausuren und Open Book Tests stellen Sie je Kurs ein: Kurs auf dem Startbildschirm antippen, dann „Kurs-Einstellungen“.')),
+
+      h('div.section-head', {}, 'App-Installation'),
+      h('div.card', {}, installSection()),
 
       h('div.section-head', {}, 'Farbschema'),
       h('div.card',
