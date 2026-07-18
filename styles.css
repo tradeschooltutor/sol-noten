@@ -59,6 +59,15 @@ body {
   display: inline-flex; align-items: center; justify-content: center;
 }
 .icon-btn:active { background: var(--teal-soft); }
+.icon-btn-primary {
+  background: var(--teal); border-color: var(--teal); color: #fff;
+}
+.icon-btn-primary:active { background: var(--teal-dark); border-color: var(--teal-dark); }
+.warn-text {
+  color: var(--ink); background: var(--amber-soft);
+  border-left: 3px solid var(--amber); border-radius: 0;
+  padding: 8px 10px; margin-top: 10px;
+}
 
 /* ---------- Karten & Abschnitte ---------- */
 .card {

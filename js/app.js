@@ -70,7 +70,7 @@
 
   /* ================= App-Start ================= */
 
-  var APP_VERSION = '0.23.1';
+  var APP_VERSION = '0.23.2';
 
   Store.init().then(function () {
     if ('serviceWorker' in navigator) {
@@ -1569,7 +1569,7 @@
               q + '. Quartal' + (course.completed ? ' · Schuljahr abgeschlossen' : '')),
             h('span.hint', {}, UI.fmtDate(quarters[q - 1].start) + ' – ' + UI.fmtDate(quarters[q - 1].end))
           ),
-          h('button.icon-btn', {
+          h('button.icon-btn.icon-btn-primary', {
             onclick: function () { go('lessonContents', { id: course.id }); },
             'aria-label': 'Stundeninhalte', title: 'Stundeninhalte', html: BOOK_SVG
           })
@@ -2807,7 +2807,8 @@
         h('div.card', {}, reportContent),
         h('div.actions-col',
           h('button.btn-plain.btn-block', { onclick: function () { printNode(reportContent.cloneNode(true), false, yearShort(year) + ' ' + stu.lastName + ' ' + stu.firstName + ' Notenübersicht'); } },
-            'Drucken / als PDF speichern'))
+            'Drucken / als PDF speichern'),
+          exportWarning())
       );
     }
 
@@ -2823,7 +2824,8 @@
       h('div.actions-col',
         h('button.btn-primary.btn-block', { onclick: saveZeugnis }, 'Zeugnisnoten speichern'),
         h('button.btn-plain.btn-block', { onclick: doExcel }, 'Als Excel-Datei exportieren'),
-        h('button.btn-plain.btn-block', { onclick: doPrint }, 'Drucken / als PDF speichern')
+        h('button.btn-plain.btn-block', { onclick: doPrint }, 'Drucken / als PDF speichern'),
+        exportWarning()
       )
     );
   };
@@ -2957,7 +2959,8 @@
       ),
       h('div.card', {}, reportContent),
       h('button.btn-primary.btn-block', { onclick: doReportPrint },
-        'Drucken / als PDF speichern (für das Notengespräch)')
+        'Drucken / als PDF speichern (für das Notengespräch)'),
+      exportWarning()
     );
   };
 
@@ -4150,7 +4153,7 @@
     return s.replace(/[^\wäöüÄÖÜß-]+/g, '_');
   }
 
-  /* ---------- Export aller Schuljahresdaten (Rohdaten + Notenübersicht) ---------- */
+  /* ---------- Excel-Export aller Schuljahresdaten (Rohdaten + Notenübersicht) ---------- */
 
   /* Ein Tabellenblatt je Kurs: Kopf, Notenübersicht und alle Rohdaten-Abschnitte
      im langen Format (eine Zeile = ein Ereignis), Abschnitte fett überschrieben. */
@@ -4269,12 +4272,22 @@
     };
   }
 
+  /* Hinweis für alle Export-/Druckwege: Anders als das Backup sind Exporte
+     unverschlüsselt. Bewusst als eigener Baustein, damit der Wortlaut an
+     allen Stellen identisch ist. */
+  function exportWarning() {
+    return h('p.hint.warn-text', {},
+      'Hinweis: Diese Datei ist – anders als das Backup – nicht verschlüsselt und enthält personenbezogene Daten. ' +
+      'Bitte nur auf geschützten Geräten speichern und nicht ungeschützt weitergeben.');
+  }
+
   function yearFullExportDialog() {
     var sel = yearSelect(false);
     var err = h('p.hint.error-text');
-    UI.modal('Export aller Schuljahresdaten', [
+    UI.modal('Excel-Export aller Schuljahresdaten', [
       h('p.hint', {}, 'Erzeugt eine Excel-Datei mit einem Übersichtsblatt und einem Tabellenblatt je Kurs: Notenübersicht & Zeugnisnoten plus sämtliche Rohdaten (Punktevergaben, Fehlzeiten, Ergebnis-Uploads, OBT- und Klausurnoten, Portfolionoten, Kursnotizen, Stundeninhalte).'),
       h('label.field', h('span.field-label', {}, 'Schuljahr'), sel),
+      exportWarning(),
       err
     ], [
       { label: 'Abbrechen', value: false },
@@ -4289,7 +4302,7 @@
       /* Übersichtsblatt */
       var oRows = [], oBold = [];
       function ob(r) { oBold.push(oRows.length); oRows.push(r); }
-      ob(['SOL-Noten – Export aller Schuljahresdaten']);
+      ob(['SOL-Noten – Excel-Export aller Schuljahresdaten']);
       oRows.push(['Schuljahr', year.name]);
       oRows.push(['Erster Schultag', UI.fmtDate(year.startDate)]);
       oRows.push(['Exportiert am', UI.fmtDate(Store.todayISO())]);
@@ -4321,6 +4334,7 @@
     UI.modal('Nur Notenübersichten exportieren', [
       h('p.hint', {}, 'Exportiert alle Kurse des gewählten Schuljahres mit ihren vollständigen Notenübersichten & Zeugnisnoten – als Excel-Datei (ein Tabellenblatt je Kurs) oder als Druckansicht (dort als PDF speicherbar).'),
       h('label.field', h('span.field-label', {}, 'Schuljahr'), sel),
+      exportWarning(),
       err
     ], [
       { label: 'Abbrechen', value: false },
@@ -4574,9 +4588,9 @@
 
       h('div.section-head', {}, 'Schuljahre'),
       h('div.card',
-        h('p.hint', {}, 'Alte Schuljahre lassen sich vollständig archivieren und anschließend löschen, um Speicherplatz freizugeben: „Export aller Schuljahresdaten“ erzeugt eine Excel-Datei mit Notenübersicht und sämtlichen Rohdaten je Kurs; „Nur Notenübersichten exportieren“ liefert die kompakte Variante als Excel oder Druck/PDF.'),
+        h('p.hint', {}, 'Alte Schuljahre lassen sich vollständig archivieren und anschließend löschen, um Speicherplatz freizugeben: „Excel-Export aller Schuljahresdaten“ erzeugt eine Excel-Datei mit Notenübersicht und sämtlichen Rohdaten je Kurs; „Nur Notenübersichten exportieren“ liefert die kompakte Variante als Excel oder Druck/PDF.'),
         h('div.actions-col',
-          h('button.btn-primary.btn-block', { onclick: yearFullExportDialog }, 'Export aller Schuljahresdaten'),
+          h('button.btn-primary.btn-block', { onclick: yearFullExportDialog }, 'Excel-Export aller Schuljahresdaten'),
           h('button.btn-plain.btn-block', { onclick: yearExportDialog }, 'Nur Notenübersichten exportieren')),
         h('div.danger-zone',
           h('p.hint', {}, 'Gefahrenbereich'),
