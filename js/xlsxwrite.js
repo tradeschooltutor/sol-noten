@@ -90,23 +90,47 @@
 
   /* rows: Array von Zeilen; Zelle = null | number | string.
      Rückgabe: Uint8Array der fertigen .xlsx-Datei. */
-  /* Ein Tabellenblatt-XML aus Zeilen erzeugen. */
-  function sheetXml(rows) {
+  /* Ein Tabellenblatt-XML aus Zeilen erzeugen.
+     boldRows: Menge von Zeilenindizes (0-basiert), die fett gesetzt werden.
+     colWidths: optionale Spaltenbreiten (Zeichen) ab Spalte A. */
+  function sheetXml(rows, boldRows, colWidths) {
+    var boldSet = {};
+    (boldRows || []).forEach(function (i) { boldSet[i] = true; });
     var sheetRows = rows.map(function (row, r) {
+      var styleAttr = boldSet[r] ? ' s="1"' : '';
       var cells = row.map(function (v, c) {
         if (v === null || v === undefined || v === '') return '';
         var ref = colName(c) + (r + 1);
         if (typeof v === 'number' && isFinite(v)) {
-          return '<c r="' + ref + '"><v>' + v + '</v></c>';
+          return '<c r="' + ref + '"' + styleAttr + '><v>' + v + '</v></c>';
         }
-        return '<c r="' + ref + '" t="inlineStr"><is><t xml:space="preserve">' + esc(v) + '</t></is></c>';
+        return '<c r="' + ref + '"' + styleAttr + ' t="inlineStr"><is><t xml:space="preserve">' + esc(v) + '</t></is></c>';
       }).join('');
       return '<row r="' + (r + 1) + '">' + cells + '</row>';
     }).join('');
+    var cols = '';
+    if (colWidths && colWidths.length) {
+      cols = '<cols>' + colWidths.map(function (w, i) {
+        return '<col min="' + (i + 1) + '" max="' + (i + 1) + '" width="' + w + '" customWidth="1"/>';
+      }).join('') + '</cols>';
+    }
     return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
       '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">' +
-      '<sheetData>' + sheetRows + '</sheetData></worksheet>';
+      cols + '<sheetData>' + sheetRows + '</sheetData></worksheet>';
   }
+
+  /* Minimale Stil-Definitionen: Stil 0 = normal, Stil 1 = fett. */
+  var STYLES_XML = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+    '<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">' +
+    '<fonts count="2"><font><sz val="11"/><name val="Calibri"/></font>' +
+    '<font><b/><sz val="11"/><name val="Calibri"/></font></fonts>' +
+    '<fills count="2"><fill><patternFill patternType="none"/></fill>' +
+    '<fill><patternFill patternType="gray125"/></fill></fills>' +
+    '<borders count="1"><border/></borders>' +
+    '<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>' +
+    '<cellXfs count="2"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>' +
+    '<xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/></cellXfs>' +
+    '</styleSheet>';
 
   /* Blattnamen für Excel zulässig machen: verbotene Zeichen raus, max. 31
      Zeichen, eindeutig innerhalb der Mappe. */
@@ -134,7 +158,7 @@
     var sheetEntries = '', relEntries = '', typeOverrides = '';
     sheets.forEach(function (s, i) {
       var n = i + 1;
-      files.push({ name: 'xl/worksheets/sheet' + n + '.xml', text: sheetXml(s.rows) });
+      files.push({ name: 'xl/worksheets/sheet' + n + '.xml', text: sheetXml(s.rows, s.bold, s.colWidths) });
       sheetEntries += '<sheet name="' + esc(names[i]) + '" sheetId="' + n + '" r:id="rId' + n + '"/>';
       relEntries += '<Relationship Id="rId' + n + '" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet' + n + '.xml"/>';
       typeOverrides += '<Override PartName="/xl/worksheets/sheet' + n + '.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>';
@@ -145,9 +169,12 @@
       'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">' +
       '<sheets>' + sheetEntries + '</sheets></workbook>';
 
+    var stylesRid = 'rId' + (sheets.length + 1);
     var wbRels = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
       '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
-      relEntries + '</Relationships>';
+      relEntries +
+      '<Relationship Id="' + stylesRid + '" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>' +
+      '</Relationships>';
 
     var rootRels = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
       '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
@@ -159,12 +186,14 @@
       '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>' +
       '<Default Extension="xml" ContentType="application/xml"/>' +
       '<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>' +
+      '<Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>' +
       typeOverrides + '</Types>';
 
     return buildZip([
       { name: '[Content_Types].xml', text: contentTypes },
       { name: '_rels/.rels', text: rootRels },
       { name: 'xl/workbook.xml', text: workbook },
+      { name: 'xl/styles.xml', text: STYLES_XML },
       { name: 'xl/_rels/workbook.xml.rels', text: wbRels }
     ].concat(files));
   }

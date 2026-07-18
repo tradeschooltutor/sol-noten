@@ -3,10 +3,6 @@
 Geplante Funktionen in grober Reihenfolge. Nicht terminiert; Reihenfolge und
 Zuschnitt werden vor der Umsetzung jeweils gemeinsam festgelegt.
 
-## 4. Excel-Gesamtexport aller Rohdaten
-Eine Excel-Datei mit einem Tabellenblatt je Kurs (Punktevergaben, Fehlzeiten,
-Uploads, OBT/Klausuren, Portfolionoten), als vollständiger Datenauszug.
-
 ## 5. Unterrichtstage je Kurs (optional)
 In den Kurs-Einstellungen die Wochentage hinterlegen, an denen das Fach
 unterrichtet wird (z. B. Mo + Do). „Unentschuldigte Fehlzeiten“ zeigt dann nur
@@ -31,7 +27,7 @@ Bewusst an letzter Stelle; wird vorerst nicht umgesetzt.
 
 ---
 
-Umgesetzt: Kursnotiz-Funktion (v0.20.0) – Notiz-Symbol in der Erfassungsliste, volles Feld in der Schüleransicht, datierte Quartals-Notizen auf „SoLei-Quartalsnoten“; eine Notiz je Schüler/in und Datum, mitverschlüsselt. Schuljahr-Archiv & -Löschung (v0.19.0) – Excel-/Druck-Export je Schuljahr, Löschen mit PIN-Bestätigung und Foto-Schonung übernommener Schüler/innen. Schuljahreswechsel-Assistent (v0.18.0) – Klassen (Schülerlisten samt Fotos), Kurseinstellungen, Maximalpunkte und Sitzpläne aus einem früheren Schuljahr übernehmen; Bewertungsdaten bleiben im alten Jahr. Schuljahresbeginn automatisch vorschlagen (v0.17.1) – erster Werktag nach den Sommerferien als Vorschlag, manuell änderbar.
+Umgesetzt: Export aller Schuljahresdaten (v0.21.0) – Excel-Mappe mit Übersichtsblatt und je Kurs einem Blatt aus Notenübersicht plus sämtlichen Rohdaten (Punktevergaben, Fehlzeiten, Uploads, OBT/Klausuren, Portfolio, Kursnotizen), mit Fettdruck und Spaltenbreiten. Kursnotiz-Funktion (v0.20.0) – Notiz-Symbol in der Erfassungsliste, volles Feld in der Schüleransicht, datierte Quartals-Notizen auf „SoLei-Quartalsnoten“; eine Notiz je Schüler/in und Datum, mitverschlüsselt. Schuljahr-Archiv & -Löschung (v0.19.0) – Excel-/Druck-Export je Schuljahr, Löschen mit PIN-Bestätigung und Foto-Schonung übernommener Schüler/innen. Schuljahreswechsel-Assistent (v0.18.0) – Klassen (Schülerlisten samt Fotos), Kurseinstellungen, Maximalpunkte und Sitzpläne aus einem früheren Schuljahr übernehmen; Bewertungsdaten bleiben im alten Jahr. Schuljahresbeginn automatisch vorschlagen (v0.17.1) – erster Werktag nach den Sommerferien als Vorschlag, manuell änderbar.
 
 Bewusst verworfen: Undo für die letzte Punktevergabe (Korrektur erfolgt direkt
 durch Antippen des richtigen Werts), native App-Store-Versionen (die App bleibt

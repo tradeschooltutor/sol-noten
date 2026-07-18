@@ -70,7 +70,7 @@
 
   /* ================= App-Start ================= */
 
-  var APP_VERSION = '0.20.0';
+  var APP_VERSION = '0.21.0';
 
   Store.init().then(function () {
     if ('serviceWorker' in navigator) {
@@ -3922,10 +3922,169 @@
     return s.replace(/[^\wäöüÄÖÜß-]+/g, '_');
   }
 
+  /* ---------- Export aller Schuljahresdaten (Rohdaten + Notenübersicht) ---------- */
+
+  /* Ein Tabellenblatt je Kurs: Kopf, Notenübersicht und alle Rohdaten-Abschnitte
+     im langen Format (eine Zeile = ein Ereignis), Abschnitte fett überschrieben. */
+  function courseDataSheet(course) {
+    var st = S();
+    var cls = Store.classById(course.classId);
+    var year = Store.yearById(course.yearId);
+    var quarters = courseQuarters(course);
+    var critNames = st.settings.criteriaNames;
+    var nameOf = {};
+    (cls ? cls.students : []).forEach(function (s) { nameOf[s.id] = s.lastName + ', ' + s.firstName; });
+    function nm(id) { return nameOf[id] || '– unbekannt –'; }
+
+    var rows = [], bold = [];
+    function boldRow(r) { bold.push(rows.length); rows.push(r); }
+    function section(title, head, data) {
+      rows.push([]);
+      boldRow([title]);
+      if (head) boldRow(head);
+      if (!data.length) rows.push(['(keine Einträge)']);
+      else data.forEach(function (r) { rows.push(r); });
+    }
+
+    /* Kopf */
+    boldRow(['Rohdaten & Notenübersicht', (cls ? cls.name : '?') + ' · ' + course.subject + ' · ' + (year ? year.name : '')]);
+    rows.push(['Exportiert am', UI.fmtDate(Store.todayISO())]);
+    rows.push(['Gewichtung SoLei / OBT / Klausuren',
+      course.weights.sl + ' / ' + course.weights.obt + ' / ' + course.weights.ka]);
+    rows.push([]);
+    boldRow(['Maximalpunkte'].concat(critNames));
+    [1, 2, 3, 4].forEach(function (q) {
+      rows.push([q + '. Quartal'].concat((course.maxPoints && course.maxPoints[q]) || []));
+    });
+
+    /* Notenübersicht (berechnete Durchschnitte & Zeugnisnoten) */
+    var ge = gradeExportRows(course);
+    section('Notenübersicht & Zeugnisnoten', ge[2], ge.slice(3));
+
+    /* SoLei-Punktevergaben */
+    var entries = st.soleiEntries.filter(function (e) { return e.courseId === course.id; })
+      .sort(function (a, b) {
+        return (nm(a.studentId) + a.date + a.criterion).localeCompare(nm(b.studentId) + b.date + b.criterion, 'de');
+      });
+    section('SoLei-Punktevergaben',
+      ['Datum', 'Quartal', 'Name', 'Kriterium', 'Punkte', 'aus Fehlzeit'],
+      entries.map(function (e) {
+        return [UI.fmtDate(e.date), e.quarter, nm(e.studentId),
+          critNames[e.criterion] || ('Kriterium ' + (e.criterion + 1)), e.points,
+          e.absenceId ? 'ja' : ''];
+      }));
+
+    /* Unentschuldigte Fehlzeiten */
+    var abs = (st.absences || []).filter(function (a) { return a.courseId === course.id; })
+      .sort(function (a, b) { return (nm(a.studentId) + a.date).localeCompare(nm(b.studentId) + b.date, 'de'); });
+    section('Unentschuldigte Fehlzeiten', ['Datum', 'Quartal', 'Name'],
+      abs.map(function (a) { return [UI.fmtDate(a.date), a.quarter, nm(a.studentId)]; }));
+
+    /* Ergebnis-Uploads */
+    var ups = (st.uploadTallies || []).filter(function (t) { return t.courseId === course.id; })
+      .sort(function (a, b) { return (a.quarter + nm(a.studentId)).localeCompare(b.quarter + nm(b.studentId), 'de'); });
+    section('Ergebnis-Uploads', ['Quartal', 'Name', 'hochgeladen', 'versäumt'],
+      ups.map(function (t) { return [t.quarter, nm(t.studentId), t.done, t.missed]; }));
+
+    /* OBT-Noten (Prozentwerte) */
+    var obtRows = [];
+    [1, 2].forEach(function (hj) {
+      for (var i = 0; i < Math.max(1, course.numOBT || 0); i++) {
+        var o = course.obt && course.obt[hj] && course.obt[hj][i];
+        if (!o) continue;
+        Object.keys(o).sort(function (a, b) { return nm(a).localeCompare(nm(b), 'de'); })
+          .forEach(function (sid) { obtRows.push([hj, 'OBT ' + (i + 1), nm(sid), o[sid]]); });
+      }
+    });
+    section('Open Book Tests', ['Halbjahr', 'Nr.', 'Name', 'Prozent'], obtRows);
+
+    /* Klausur-Noten (Punkte) */
+    var kaRows = [];
+    [1, 2].forEach(function (hj) {
+      for (var i = 0; i < Math.max(1, course.numKA || 0); i++) {
+        var k = course.ka && course.ka[hj] && course.ka[hj][i];
+        if (!k || !k.points) continue;
+        Object.keys(k.points).sort(function (a, b) { return nm(a).localeCompare(nm(b), 'de'); })
+          .forEach(function (sid) { kaRows.push([hj, 'Klausur ' + (i + 1), nm(sid), k.points[sid], k.maxPoints]); });
+      }
+    });
+    section('Klausuren', ['Halbjahr', 'Nr.', 'Name', 'Punkte', 'Max. Punkte'], kaRows);
+
+    /* Portfolio / mdl. Prüfung */
+    var pfRows = [];
+    [1, 2, 3, 4].forEach(function (q) {
+      var p = course.portfolio && course.portfolio[q];
+      if (!p) return;
+      Object.keys(p).sort(function (a, b) { return nm(a).localeCompare(nm(b), 'de'); })
+        .forEach(function (sid) { pfRows.push([q, nm(sid), p[sid]]); });
+    });
+    section('Portfolio / mdl. Prüfung', ['Quartal', 'Name', 'Note'], pfRows);
+
+    /* Kursnotizen */
+    var noteRows = (st.notes || []).filter(function (n) { return n.courseId === course.id; })
+      .sort(function (a, b) { return (nm(a.studentId) + a.date).localeCompare(nm(b.studentId) + b.date, 'de'); })
+      .map(function (n) {
+        return [UI.fmtDate(n.date), Quarters.quarterForDate(n.date, quarters), nm(n.studentId), n.text];
+      });
+    section('Kursnotizen', ['Datum', 'Quartal', 'Name', 'Notiz'], noteRows);
+
+    return {
+      name: (cls ? cls.name : '?') + ' ' + course.subject,
+      rows: rows, bold: bold,
+      colWidths: [14, 10, 28, 24, 12, 12]
+    };
+  }
+
+  function yearFullExportDialog() {
+    var sel = yearSelect(false);
+    var err = h('p.hint.error-text');
+    UI.modal('Export aller Schuljahresdaten', [
+      h('p.hint', {}, 'Erzeugt eine Excel-Datei mit einem Übersichtsblatt und einem Tabellenblatt je Kurs: Notenübersicht & Zeugnisnoten plus sämtliche Rohdaten (Punktevergaben, Fehlzeiten, Ergebnis-Uploads, OBT- und Klausurnoten, Portfolionoten, Kursnotizen).'),
+      h('label.field', h('span.field-label', {}, 'Schuljahr'), sel),
+      err
+    ], [
+      { label: 'Abbrechen', value: false },
+      { label: 'Excel-Datei erstellen', value: true, primary: true,
+        validate: function () { return yearHasCourses(sel.value, err); } }
+    ]).then(function (ok) {
+      if (!ok) return;
+      var st = S();
+      var year = Store.yearById(sel.value);
+      var courses = st.courses.filter(function (c) { return c.yearId === year.id; });
+
+      /* Übersichtsblatt */
+      var oRows = [], oBold = [];
+      function ob(r) { oBold.push(oRows.length); oRows.push(r); }
+      ob(['SOL-Noten – Export aller Schuljahresdaten']);
+      oRows.push(['Schuljahr', year.name]);
+      oRows.push(['Erster Schultag', UI.fmtDate(year.startDate)]);
+      oRows.push(['Exportiert am', UI.fmtDate(Store.todayISO())]);
+      oRows.push(['App-Version', APP_VERSION]);
+      oRows.push([]);
+      ob(['SoLei-Kriterien']);
+      st.settings.criteriaNames.forEach(function (n, i) { oRows.push([(i + 1) + '.', n]); });
+      oRows.push([]);
+      ob(['Kurse', 'Punktevergaben', 'Fehlzeiten', 'Uploads', 'Notizen']);
+      courses.forEach(function (c) {
+        var cls = Store.classById(c.classId);
+        oRows.push([(cls ? cls.name : '?') + ' · ' + c.subject,
+          st.soleiEntries.filter(function (e) { return e.courseId === c.id; }).length,
+          (st.absences || []).filter(function (a) { return a.courseId === c.id; }).length,
+          (st.uploadTallies || []).filter(function (t) { return t.courseId === c.id; }).length,
+          (st.notes || []).filter(function (n) { return n.courseId === c.id; }).length]);
+      });
+
+      var sheets = [{ name: 'Übersicht', rows: oRows, bold: oBold, colWidths: [30, 16, 12, 10, 10] }]
+        .concat(courses.map(courseDataSheet));
+      XlsxWrite.downloadMulti(sanitizeFilename('SOL-Noten_' + year.name + '_Gesamtexport') + '.xlsx', sheets);
+      toast('Excel-Datei mit ' + sheets.length + ' Tabellenblättern wird gespeichert.');
+    });
+  }
+
   function yearExportDialog() {
     var sel = yearSelect(false);
     var err = h('p.hint.error-text');
-    UI.modal('Schuljahr-Export', [
+    UI.modal('Nur Notenübersichten exportieren', [
       h('p.hint', {}, 'Exportiert alle Kurse des gewählten Schuljahres mit ihren vollständigen Notenübersichten & Zeugnisnoten – als Excel-Datei (ein Tabellenblatt je Kurs) oder als Druckansicht (dort als PDF speicherbar).'),
       h('label.field', h('span.field-label', {}, 'Schuljahr'), sel),
       err
@@ -4181,9 +4340,10 @@
 
       h('div.section-head', {}, 'Schuljahre'),
       h('div.card',
-        h('p.hint', {}, 'Alte Schuljahre lassen sich als Excel-Datei (ein Tabellenblatt je Kurs mit der vollständigen Notenübersicht) oder als Druck/PDF archivieren und anschließend löschen, um Speicherplatz freizugeben.'),
+        h('p.hint', {}, 'Alte Schuljahre lassen sich vollständig archivieren und anschließend löschen, um Speicherplatz freizugeben: „Export aller Schuljahresdaten“ erzeugt eine Excel-Datei mit Notenübersicht und sämtlichen Rohdaten je Kurs; „Nur Notenübersichten exportieren“ liefert die kompakte Variante als Excel oder Druck/PDF.'),
         h('div.actions-col',
-          h('button.btn-plain.btn-block', { onclick: yearExportDialog }, 'Schuljahr-Export (Excel / Druck)')),
+          h('button.btn-primary.btn-block', { onclick: yearFullExportDialog }, 'Export aller Schuljahresdaten'),
+          h('button.btn-plain.btn-block', { onclick: yearExportDialog }, 'Nur Notenübersichten exportieren')),
         h('div.danger-zone',
           h('p.hint', {}, 'Gefahrenbereich'),
           h('button.btn-plain.btn-block.danger-text', { onclick: yearDeleteDialog }, 'Schuljahr löschen …'))
