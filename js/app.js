@@ -70,7 +70,7 @@
 
   /* ================= App-Start ================= */
 
-  var APP_VERSION = '0.22.0';
+  var APP_VERSION = '0.23.0';
 
   Store.init().then(function () {
     if ('serviceWorker' in navigator) {
@@ -249,6 +249,9 @@
 
   var NOTE_SVG = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3h11l3 3v15H5z"/><path d="M9 9h6M9 13h6M9 17h3"/></svg>';
   var HOME_SVG = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l9-8 9 8"/><path d="M5 10v10h5v-6h4v6h5V10"/></svg>';
+
+  /* Geschlossenes Buch (Stundeninhalte) – gleicher Stil wie HOME_SVG. */
+  var BOOK_SVG = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 3H19v18H6.5A2.5 2.5 0 0 1 4 18.5v-13A2.5 2.5 0 0 1 6.5 3z"/><path d="M4 18.5A2.5 2.5 0 0 1 6.5 16H19"/><path d="M9 7h6"/></svg>';
   var LOCK_SVG = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>';
 
   function header(title, backTo, extra) {
@@ -1557,7 +1560,11 @@
       Quarters.quarterChangeDue(Store.todayISO(), q, quarters);
 
     return h('div.screen',
-      header(cls.name + ' · ' + course.subject, { name: 'home' }),
+      header(cls.name + ' · ' + course.subject, { name: 'home' },
+        h('button.icon-btn', {
+          onclick: function () { go('lessonContents', { id: course.id }); },
+          'aria-label': 'Stundeninhalte', html: BOOK_SVG
+        })),
       due ? quarterHint(course, quarters) : null,
       h('div.card.card-tight',
         h('div.row-between',
@@ -2954,6 +2961,97 @@
 
   /* ================= Unentschuldigte Fehlzeiten ================= */
 
+  /* ================= Stundeninhalte ================= */
+
+  /* Sitzungs-Zustand: Sortierung (aufsteigend = Standard) und ob die
+     Hinweise eingeklappt wurden – bleibt während der Sitzung erhalten. */
+  var lessonState = { desc: false, hintsCollapsed: false };
+
+  views.lessonContents = function (p) {
+    var course = Store.courseById(p.id);
+    if (!course) return views.home({});
+    var quarters = courseQuarters(course);
+    var shownQ = p.quarter || course.currentQuarter;
+
+    var qSel = h('select.input.q-select', { style: { maxWidth: '7.5rem' } });
+    [1, 2, 3, 4].forEach(function (n) {
+      qSel.appendChild(h('option', { value: n, selected: n === shownQ }, n + '. Quartal'));
+    });
+    qSel.addEventListener('change', function () {
+      go('lessonContents', { id: course.id, quarter: Number(qSel.value) });
+    });
+
+    /* Einklappbare Hinweise: zunächst ausgeklappt, Zustand hält die Sitzung. */
+    function hintsCard() {
+      var head = h('button.btn-plain.hints-toggle', {
+        onclick: function () { lessonState.hintsCollapsed = !lessonState.hintsCollapsed; render(); },
+        'aria-expanded': String(!lessonState.hintsCollapsed)
+      }, 'Hinweise ', h('span.hints-arrow', {}, lessonState.hintsCollapsed ? '▸' : '▾'));
+      if (lessonState.hintsCollapsed) return h('div.card.card-tight', head);
+      return h('div.card.card-tight', head,
+        h('div.hint-with-btn',
+          h('p.hint', {}, 'In den Kurs-Einstellungen können Sie die Wochentage festlegen, an denen der Kurs stattfindet – die Liste zeigt dann nur diese Termine.'),
+          h('button.btn-small.btn-plain', { onclick: function () { go('editCourse', { id: course.id }); } },
+            'Zu den Kurs-Einstellungen')),
+        h('div.hint-with-btn',
+          h('p.hint', {}, 'Notizen zu einzelnen Schüler/innen erfassen Sie auf der Seite „SoLei-Punkte vergeben“.'),
+          h('button.btn-small.btn-plain', { onclick: function () { go('capture', { id: course.id }); } },
+            'Zu „SoLei-Punkte vergeben“')));
+    }
+
+    /* Termine des Quartals: nur Unterrichtstage laut Kurs-Einstellungen
+       (segmentgenau je Datum); ohne Konfiguration alle Tage außer Sonntag.
+       Termine mit vorhandenem Eintrag bleiben immer sichtbar. */
+    var qq = quarters[shownQ - 1];
+    var days = weekdaysBetween(qq.start, qq.end).filter(function (iso) {
+      var td = Store.teachingDaysFor(course, iso);
+      if (td === null) return true;
+      return td.indexOf(new Date(iso + 'T12:00:00').getDay()) > -1;
+    });
+    Store.lessonContentsFor(course.id).forEach(function (e) {
+      if (e.date >= qq.start && e.date <= qq.end && days.indexOf(e.date) === -1) days.push(e.date);
+    });
+    days.sort();
+    if (lessonState.desc) days.reverse();
+
+    var WD_SHORT = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
+    var today = Store.todayISO();
+
+    function dayRow(iso) {
+      var entry = Store.lessonContentFor(course.id, iso);
+      var ta = h('textarea.input.lesson-ta', { rows: 1, placeholder: '–' }, entry ? entry.text : '');
+      ta.addEventListener('blur', function () {
+        var before = entry ? entry.text : '';
+        if (ta.value.trim() === before) return;
+        Store.setLessonContent(course.id, iso, ta.value);
+      });
+      var wd = WD_SHORT[new Date(iso + 'T12:00:00').getDay()];
+      return h('div.lesson-row' + (iso === today ? '.today' : ''),
+        h('span.lesson-date', {}, wd + ', ' + UI.fmtDate(iso)),
+        ta);
+    }
+
+    var sortBtn = h('button.icon-btn.sort-btn', {
+      onclick: function () { lessonState.desc = !lessonState.desc; render(); },
+      'aria-label': lessonState.desc ? 'Aufsteigend sortieren' : 'Absteigend sortieren'
+    }, lessonState.desc ? '↓' : '↑');
+
+    return h('div.screen',
+      header('Stundeninhalte', { name: 'course', params: { id: course.id } }),
+      courseBox(course),
+      h('div.card.card-tight', h('div.row-between', h('span.hint', {}, 'Quartal'), qSel)),
+      hintsCard(),
+      h('div.card.card-tight',
+        h('div.lesson-row.lesson-head',
+          h('span.lesson-date', {}, 'Termin ', sortBtn),
+          h('span.lesson-head-label', {}, 'Unterrichtsinhalt')),
+        days.length
+          ? days.map(dayRow)
+          : h('p.hint', {}, 'Im ' + shownQ + '. Quartal liegt laut den hinterlegten Unterrichtstagen kein Kurstag.')
+      )
+    );
+  };
+
   views.absences = function (p) {
     var course = Store.courseById(p.id);
     var cls = Store.classById(course.classId);
@@ -4148,6 +4246,12 @@
       });
     section('Kursnotizen', ['Datum', 'Quartal', 'Name', 'Notiz'], noteRows);
 
+    /* Stundeninhalte (chronologisch aufsteigend) */
+    var lcRows = Store.lessonContentsFor(course.id).map(function (e) {
+      return [UI.fmtDate(e.date), Quarters.quarterForDate(e.date, quarters), e.text];
+    });
+    section('Stundeninhalte', ['Datum', 'Quartal', 'Unterrichtsinhalt'], lcRows);
+
     return {
       name: (cls ? cls.name : '?') + ' ' + course.subject,
       rows: rows, bold: bold,
@@ -4159,7 +4263,7 @@
     var sel = yearSelect(false);
     var err = h('p.hint.error-text');
     UI.modal('Export aller Schuljahresdaten', [
-      h('p.hint', {}, 'Erzeugt eine Excel-Datei mit einem Übersichtsblatt und einem Tabellenblatt je Kurs: Notenübersicht & Zeugnisnoten plus sämtliche Rohdaten (Punktevergaben, Fehlzeiten, Ergebnis-Uploads, OBT- und Klausurnoten, Portfolionoten, Kursnotizen).'),
+      h('p.hint', {}, 'Erzeugt eine Excel-Datei mit einem Übersichtsblatt und einem Tabellenblatt je Kurs: Notenübersicht & Zeugnisnoten plus sämtliche Rohdaten (Punktevergaben, Fehlzeiten, Ergebnis-Uploads, OBT- und Klausurnoten, Portfolionoten, Kursnotizen, Stundeninhalte).'),
       h('label.field', h('span.field-label', {}, 'Schuljahr'), sel),
       err
     ], [

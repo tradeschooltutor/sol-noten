@@ -79,7 +79,8 @@
                              weights:{sl,obt,ka}, maxPoints:{1:[..],2:..,3:..,4:..},
                              currentQuarter, portfolio:{q:{studentId:grade}},
                              dismissedQuarterHint:{q:true},
-                             teachingDays:[{from:null|ISO, days:[1..6]}]}
+                             teachingDays:[{from:null|ISO, days:[1..6]}],
+                             lessonContents:[{id, date, text}]}
                              teachingDays optional: Segmente mit Gültigkeit ab
                              `from` (null = Basis, gilt auch rückwirkend);
                              fehlt das Feld, gelten alle Tage außer Sonntag. */
@@ -697,7 +698,8 @@
       if (c.seating) nc.seating = JSON.parse(JSON.stringify(c.seating));
       /* Unterrichtstage (teachingDays) werden bewusst NICHT übernommen:
          Stundenpläne wechseln zum Schuljahr; die UI weist darauf hin, dass
-         sie in den Kurs-Einstellungen neu festzulegen sind. */
+         sie in den Kurs-Einstellungen neu festzulegen sind. Stundeninhalte
+         (lessonContents) bleiben als Aufzeichnung im alten Schuljahr. */
       state.courses.push(nc);
       copied.courses++;
     });
@@ -779,6 +781,43 @@
     return state.notes.filter(function (n) {
       return n.courseId === courseId && n.studentId === studentId;
     }).sort(function (a, b) { return (a.date || '').localeCompare(b.date || ''); });
+  }
+
+  /* ---------- Stundeninhalte ----------
+     Je Kurs eine eigene Liste am Kursobjekt (course.lessonContents:
+     [{id, date, text}]), ein Eintrag je Datum; leerer Text löscht ihn.
+     Da die Liste am Kurs hängt, räumen Kurs- und Schuljahreslöschung sie
+     automatisch mit auf, und der Schuljahreswechsel übernimmt sie nach dem
+     Konstruktor-Prinzip nicht. */
+  function lessonContentFor(courseId, dateISO) {
+    var c = courseById(courseId);
+    if (!c || !Array.isArray(c.lessonContents)) return null;
+    return c.lessonContents.filter(function (e) { return e.date === dateISO; })[0] || null;
+  }
+
+  function setLessonContent(courseId, dateISO, text) {
+    var c = courseById(courseId);
+    if (!c || !dateISO) return;
+    var t = (text || '').trim();
+    if (!Array.isArray(c.lessonContents)) c.lessonContents = [];
+    var existing = c.lessonContents.filter(function (e) { return e.date === dateISO; })[0];
+    if (existing) {
+      if (!t) c.lessonContents = c.lessonContents.filter(function (e) { return e.id !== existing.id; });
+      else existing.text = t;
+    } else {
+      if (!t) return;
+      c.lessonContents.push({ id: uid(), date: dateISO, text: t });
+    }
+    if (!c.lessonContents.length) delete c.lessonContents;
+    save();
+  }
+
+  /* Alle Stundeninhalte eines Kurses, chronologisch aufsteigend. */
+  function lessonContentsFor(courseId) {
+    var c = courseById(courseId);
+    if (!c || !Array.isArray(c.lessonContents)) return [];
+    return c.lessonContents.slice()
+      .sort(function (a, b) { return (a.date || '').localeCompare(b.date || ''); });
   }
 
   function removeBackupFolder() {
@@ -1000,6 +1039,8 @@
     listSnapshots: listSnapshots, restoreSnapshot: restoreSnapshot, transferYear: transferYear,
     verifySecret: verifySecret, deleteYear: deleteYear,
     noteFor: noteFor, setNote: setNote, notesFor: notesFor,
+    lessonContentFor: lessonContentFor, setLessonContent: setLessonContent,
+    lessonContentsFor: lessonContentsFor,
     savePhoto: savePhoto, getPhoto: getPhoto, deletePhoto: deletePhoto,
     hasPhoto: hasPhoto, photoKeys: photoKeys,
     exportPhotos: exportPhotos, parsePhotoBackup: parsePhotoBackup, applyPhotoImport: applyPhotoImport,
