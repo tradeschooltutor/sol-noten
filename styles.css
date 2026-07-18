@@ -257,9 +257,6 @@ textarea.input.note-area {
   width: 100%; min-height: 72px; resize: vertical; font: inherit; line-height: 1.4;
 }
 .review-notes { margin-top: 6px; padding-top: 6px; border-top: 1px dashed var(--line); }
-.review-notes.no-top-border { margin-top: 0; padding-top: 0; border-top: none; }
-.section-head-inline { font-weight: 700; font-size: 0.9rem; }
-.grades-charts { display: flex; flex-direction: column; gap: 12px; margin-top: 12px; }
 .review-note { margin: 2px 0; font-size: 0.85rem; color: var(--ink); }
 .review-note .note-date { color: var(--ink-soft); font-weight: 600; }
 /* Lange Beschriftungen (z. B. „Neuer Kurs für ein anderes Fach …“) dürfen
