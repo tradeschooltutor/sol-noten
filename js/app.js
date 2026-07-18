@@ -70,7 +70,7 @@
 
   /* ================= App-Start ================= */
 
-  var APP_VERSION = '0.21.0';
+  var APP_VERSION = '0.22.0';
 
   Store.init().then(function () {
     if ('serviceWorker' in navigator) {
@@ -1201,15 +1201,27 @@
       });
       var res = Store.transferYear(fromId, toYear.id, ids, names);
       setActiveYear(toYear.id);
+      var hadTd = courseChecks.some(function (e) {
+        return e.cb.checked && Array.isArray(e.course.teachingDays) && e.course.teachingDays.length;
+      });
       toast(res.courses + ' Kurs(e), ' + res.classes + ' Klasse(n) mit ' + res.students +
-        ' Schüler/innen nach ' + toYear.name + ' übernommen.');
+        ' Schüler/innen nach ' + toYear.name + ' übernommen.' +
+        (hadTd ? ' Unterrichtstage wurden nicht übernommen – bitte in den Kurs-Einstellungen neu festlegen.' : ''));
       go('home');
     }
+
+    /* Unterrichtstage wechseln zum Schuljahr → bewusst nicht übernommen. */
+    var anySrcTd = srcCourses.some(function (c) {
+      return Array.isArray(c.teachingDays) && c.teachingDays.length;
+    });
 
     return h('div.screen',
       header('Schuljahreswechsel', { name: 'home' }),
       h('div.card',
         h('p.hint', {}, 'Übernimmt Klassen (samt Schülerlisten und Fotos) und Kurse (Einstellungen, Maximalpunkte, Sitzplan) in das Schuljahr „' + toYear.name + '“. Punktevergaben, Noten und Fehlzeiten des alten Schuljahres bleiben dort erhalten und werden nicht übernommen.'),
+        anySrcTd
+          ? h('p.hint', {}, 'Hinweis: Hinterlegte Unterrichtstage werden nicht übernommen, da Stundenpläne zum Schuljahr wechseln. Wenn Sie diese Funktion weiter nutzen möchten, legen Sie die Unterrichtstage in den Kurs-Einstellungen der neuen Kurse bitte neu fest.')
+          : null,
         h('label.field', h('span.field-label', {}, 'Übernehmen aus'), srcSel)
       ),
       h('div.section-head', {}, 'Kurse'),
@@ -1316,6 +1328,74 @@
 
     var status = h('p.hint.error-text');
 
+    /* ---- Unterrichtstage (optional): Basis + „Änderung ab Datum“ ---- */
+    var WD_LABELS = { 1: 'Mo', 2: 'Di', 3: 'Mi', 4: 'Do', 5: 'Fr', 6: 'Sa' };
+    var tdSegs = course && Array.isArray(course.teachingDays)
+      ? JSON.parse(JSON.stringify(course.teachingDays))
+      : [];
+    var tdBase = null, tdChanges = [];
+    tdSegs.forEach(function (s) {
+      if (!s || !Array.isArray(s.days)) return;
+      if (!s.from) { if (!tdBase) tdBase = { from: null, days: s.days.slice() }; }
+      else tdChanges.push({ from: s.from, days: s.days.slice() });
+    });
+    if (!tdBase) tdBase = { from: null, days: [] };
+    tdChanges.sort(function (a, b) { return a.from.localeCompare(b.from); });
+
+    var tdArea = h('div');
+    function wdChipRow(seg) {
+      var row = h('div.wd-chip-row');
+      [1, 2, 3, 4, 5, 6].forEach(function (wd) {
+        var chip = h('button.wd-chip' + (seg.days.indexOf(wd) > -1 ? '.selected' : ''),
+          { type: 'button' }, WD_LABELS[wd]);
+        chip.addEventListener('click', function () {
+          var i = seg.days.indexOf(wd);
+          if (i > -1) seg.days.splice(i, 1); else seg.days.push(wd);
+          seg.days.sort();
+          chip.classList.toggle('selected', seg.days.indexOf(wd) > -1);
+        });
+        row.appendChild(chip);
+      });
+      return row;
+    }
+    function renderTdArea() {
+      tdArea.innerHTML = '';
+      tdArea.appendChild(h('div.td-seg',
+        h('span.hint', {}, tdChanges.length ? 'Basis (gilt bis zur ersten Änderung, auch rückwirkend):' : 'Wochentage mit Unterricht:'),
+        wdChipRow(tdBase)));
+      tdChanges.forEach(function (seg, idx) {
+        var dateInp = h('input.input.date-inline', { type: 'date', value: seg.from || '' });
+        dateInp.addEventListener('change', function () { seg.from = dateInp.value; });
+        tdArea.appendChild(h('div.td-seg.td-change',
+          h('div.row-between',
+            h('label.hint', {}, 'Änderung ab ', dateInp),
+            h('button.btn-small.btn-plain.danger-text', { type: 'button', onclick: function () {
+              tdChanges.splice(idx, 1); renderTdArea();
+            } }, 'Entfernen')),
+          wdChipRow(seg)));
+      });
+      tdArea.appendChild(h('button.btn-small.btn-plain', { type: 'button', onclick: function () {
+        tdChanges.push({ from: '', days: [] }); renderTdArea();
+      } }, '+ Änderung ab Datum'));
+    }
+    renderTdArea();
+
+    /* Liefert das zu speichernde teachingDays-Array oder wirft eine
+       Validierungsmeldung als String. Leere Basis ohne Änderungen = Feature aus. */
+    function collectTeachingDays() {
+      if (!tdBase.days.length && !tdChanges.length) return null;
+      if (!tdBase.days.length) throw 'Unterrichtstage: Bitte zuerst die Basis-Wochentage wählen (oder alle Änderungen entfernen).';
+      var out = [{ from: null, days: tdBase.days.slice() }];
+      for (var i = 0; i < tdChanges.length; i++) {
+        var seg = tdChanges[i];
+        if (!seg.from) throw 'Unterrichtstage: Bitte für jede Änderung ein „ab“-Datum angeben.';
+        if (!seg.days.length) throw 'Unterrichtstage: Bitte für die Änderung ab ' + UI.fmtDate(seg.from) + ' mindestens einen Wochentag wählen.';
+        out.push({ from: seg.from, days: seg.days.slice() });
+      }
+      out.sort(function (a, b) { return (a.from || '').localeCompare(b.from || ''); });
+      return out;
+    }
+
     function saveCourse() {
       var classId = classSel.value;
       if (classId === '__new__') {
@@ -1329,6 +1409,9 @@
       if (!subjectInput.value.trim()) { status.textContent = 'Bitte geben Sie das Fach an.'; return; }
       var sum = Number(wSl.value) + Number(wObt.value) + Number(wKa.value);
       if (sum !== 100) { status.textContent = 'Die Gewichtung muss in Summe 100 % ergeben (aktuell ' + sum + ' %).'; return; }
+      var tDays;
+      try { tDays = collectTeachingDays(); }
+      catch (msg) { status.textContent = msg; return; }
 
       if (course) {
         course.classId = classId;
@@ -1336,6 +1419,7 @@
         course.numOBT = Number(obtInput.value); course.numKA = Number(kaInput.value);
         course.weights = { sl: Number(wSl.value), obt: Number(wObt.value), ka: Number(wKa.value) };
         course.uploadCriterion = Number(upCritSel.value);
+        if (tDays) course.teachingDays = tDays; else delete course.teachingDays;
       } else {
         course = {
           id: Store.uid(), yearId: year.id, classId: classId,
@@ -1347,6 +1431,7 @@
           portfolio: {}, quarterOverrides: null, completed: false,
           uploadCriterion: Number(upCritSel.value)
         };
+        if (tDays) course.teachingDays = tDays;
         st.courses.push(course);
         Store.save();
         go('maxPoints', { id: course.id, intro: true });
@@ -1440,6 +1525,10 @@
         ),
         h('label.field', h('span.field-label', {}, 'Kriterium für Ergebnis-Uploads'), upCritSel,
           h('p.hint', {}, 'Auf dieses SoLei-Kriterium werden die auf der Seite „Ergebnis-Uploads“ gezählten Uploads angerechnet.')),
+        h('div.field',
+          h('span.field-label', {}, 'Unterrichtstage (optional)'),
+          tdArea,
+          h('p.hint', {}, 'Wenn Wochentage gewählt sind, zeigt „Unentschuldigte Fehlzeiten“ in der Schüler-Ansicht nur noch diese Tage. Stundenplanänderungen bilden Sie mit „+ Änderung ab Datum“ ab. Ohne Auswahl bleibt das bisherige Verhalten (alle Tage außer Sonntag).')),
         status,
         h('button.btn-primary.btn-block', { onclick: saveCourse }, course ? 'Änderungen speichern' : 'Kurs anlegen')
       ),
@@ -2903,8 +2992,13 @@
         toast('Für ' + stu.lastName + ' ist am ' + UI.fmtDate(d) + ' bereits eine Fehlzeit erfasst.');
         return;
       }
+      /* Hinweis (kein Blockieren): Ausnahmen wie Vertretung/Exkursion bleiben erfassbar. */
+      var td = Store.teachingDaysFor(course, d);
+      var offDay = td !== null && td.indexOf(new Date(d + 'T12:00:00').getDay()) === -1;
       toast(stu.lastName + ': Fehlzeit am ' + UI.fmtDate(d) + ' erfasst – 0 Punkte in allen Kriterien (' +
-        quarter + '. Quartal).', function () { Store.removeAbsence(a.id); render(); });
+        quarter + '. Quartal).' +
+        (offDay ? ' Hinweis: Laut Unterrichtstagen ist dies kein Kurstag.' : ''),
+        function () { Store.removeAbsence(a.id); render(); });
       if (quarter !== shownQ) {
         go('absences', { id: course.id, quarter: quarter, date: d, view: mode });
       } else render();
@@ -2961,14 +3055,28 @@
       );
     }
 
-    /* ---- Ansicht: Schüler/in (alle Werktage des Quartals als Chips) ---- */
+    /* ---- Ansicht: Schüler/in (Unterrichtstage des Quartals als Chips) ---- */
     function studentView() {
       var qq = quarters[shownQ - 1];
-      var days = weekdaysBetween(qq.start, qq.end); /* alle Tage außer Sonntag */
+      var allDays = weekdaysBetween(qq.start, qq.end); /* alle Tage außer Sonntag */
+      /* Sind Unterrichtstage konfiguriert, gilt je Datum das dort gültige
+         Segment – ein Stundenplanwechsel mitten im Quartal bildet sich so
+         von selbst ab. Ohne Konfiguration (null) bleibt alles wie bisher. */
+      var tdConfigured = false;
+      var days = allDays.filter(function (iso) {
+        var td = Store.teachingDaysFor(course, iso);
+        if (td === null) return true;
+        tdConfigured = true;
+        return td.indexOf(new Date(iso + 'T12:00:00').getDay()) > -1;
+      });
 
-      if (!days.length) {
+      if (!allDays.length) {
         return h('div.card', h('p.hint', {}, 'Für das ' + shownQ + '. Quartal ist kein gültiger Zeitraum hinterlegt. ' +
           'Bitte prüfen Sie die Quartalszeiträume in den Kurs-Einstellungen.'));
+      }
+      if (!days.length) {
+        return h('div.card', h('p.hint', {}, 'Im ' + shownQ + '. Quartal liegt laut den hinterlegten Unterrichtstagen kein Kurstag. ' +
+          'Bitte prüfen Sie die Unterrichtstage in den Kurs-Einstellungen.'));
       }
 
       var blocks = students.map(function (stu) {
@@ -2976,7 +3084,16 @@
         Store.absencesFor(course.id, stu.id, shownQ).forEach(function (a) { absSet[a.date] = a.id; });
         var count = Object.keys(absSet).length;
 
-        var chips = days.map(function (iso) {
+        /* Erfasste Fehlzeiten dürfen nie unsichtbar werden – auch wenn ihr
+           Datum (z. B. nach einer rückwirkenden Stundenplanänderung oder
+           einer Ausnahme aus der Datums-Ansicht) kein Unterrichtstag ist. */
+        var stuDays = days;
+        if (tdConfigured) {
+          var extra = Object.keys(absSet).filter(function (d) { return days.indexOf(d) === -1; });
+          if (extra.length) stuDays = days.concat(extra).sort();
+        }
+
+        var chips = stuDays.map(function (iso) {
           var isAbsent = !!absSet[iso];
           var d = iso.split('-');
           var label = d[2] + '.' + d[1] + '.';
@@ -3005,7 +3122,10 @@
       return h('div',
         h('div.card.card-tight',
           h('p.hint', {}, 'Tippen Sie die Tage an, an denen die Person unentschuldigt gefehlt hat ' +
-            '(Sonntage sind ausgelassen). Ein markierter Tag vergibt automatisch 0 Punkte in allen fünf ' +
+            (tdConfigured
+              ? '(angezeigt werden die in den Kurs-Einstellungen hinterlegten Unterrichtstage). '
+              : '(Sonntage sind ausgelassen). ') +
+            'Ein markierter Tag vergibt automatisch 0 Punkte in allen fünf ' +
             'SoLei-Kriterien; erneutes Antippen entfernt die Fehlzeit wieder.')
         ),
         h('div.section-head.section-head-spaced', {}, shownQ + '. Quartal · ' + UI.fmtDate(qq.start) + ' – ' + UI.fmtDate(qq.end)),

@@ -278,6 +278,20 @@ textarea.input.note-area {
   font-variant-numeric: tabular-nums; min-width: 3.6rem;
 }
 .day-chip.absent { background: var(--red); border-color: var(--red); color: #fff; font-weight: 700; }
+
+/* Kurs-Einstellungen – Unterrichtstage: Wochentag-Chips und Änderungs-Segmente */
+.wd-chip-row { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.wd-chip {
+  border: 1px solid var(--line); background: var(--paper); color: var(--ink);
+  border-radius: 8px; padding: 6px 0; min-height: 40px; min-width: 3rem;
+  font-size: 0.85rem; text-align: center;
+}
+.wd-chip.selected { background: var(--teal); border-color: var(--teal); color: #fff; font-weight: 700; }
+.td-seg { margin-bottom: 12px; }
+.td-seg.td-change {
+  border: 1px solid var(--line); border-radius: var(--radius);
+  padding: 10px 12px; background: color-mix(in srgb, var(--teal) 6%, var(--card));
+}
 .crit-tabs { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 2px; }
 .crit-tab {
   flex-shrink: 0; border: 1px solid var(--line); background: var(--card);

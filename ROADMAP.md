@@ -3,13 +3,6 @@
 Geplante Funktionen in grober Reihenfolge. Nicht terminiert; Reihenfolge und
 Zuschnitt werden vor der Umsetzung jeweils gemeinsam festgelegt.
 
-## 5. Unterrichtstage je Kurs (optional)
-In den Kurs-Einstellungen die Wochentage hinterlegen, an denen das Fach
-unterrichtet wird (z. B. Mo + Do). „Unentschuldigte Fehlzeiten“ zeigt dann nur
-diese Tage an. Ohne Eintrag bleibt das bisherige Verhalten (alle Tage außer
-Sonntag). **Wichtig:** Stundenplanänderungen müssen abbildbar sein – geänderte
-Wochentage gelten ab einem bestimmten Datum (Gültigkeitszeiträume).
-
 ## 6. Stundeninhalte eintragen
 Eigener Button mit Kalenderansicht, die nur die tatsächlichen Unterrichtstage
 des Fachs anzeigt (baut auf Nr. 5 auf); je Termin ein kurzer Inhaltseintrag.
@@ -27,7 +20,7 @@ Bewusst an letzter Stelle; wird vorerst nicht umgesetzt.
 
 ---
 
-Umgesetzt: Export aller Schuljahresdaten (v0.21.0) – Excel-Mappe mit Übersichtsblatt und je Kurs einem Blatt aus Notenübersicht plus sämtlichen Rohdaten (Punktevergaben, Fehlzeiten, Uploads, OBT/Klausuren, Portfolio, Kursnotizen), mit Fettdruck und Spaltenbreiten. Kursnotiz-Funktion (v0.20.0) – Notiz-Symbol in der Erfassungsliste, volles Feld in der Schüleransicht, datierte Quartals-Notizen auf „SoLei-Quartalsnoten“; eine Notiz je Schüler/in und Datum, mitverschlüsselt. Schuljahr-Archiv & -Löschung (v0.19.0) – Excel-/Druck-Export je Schuljahr, Löschen mit PIN-Bestätigung und Foto-Schonung übernommener Schüler/innen. Schuljahreswechsel-Assistent (v0.18.0) – Klassen (Schülerlisten samt Fotos), Kurseinstellungen, Maximalpunkte und Sitzpläne aus einem früheren Schuljahr übernehmen; Bewertungsdaten bleiben im alten Jahr. Schuljahresbeginn automatisch vorschlagen (v0.17.1) – erster Werktag nach den Sommerferien als Vorschlag, manuell änderbar.
+Umgesetzt: Unterrichtstage je Kurs (v0.22.0) – optionale Wochentag-Segmente mit „Änderung ab Datum“ (Gültigkeitszeiträume) in den Kurs-Einstellungen; die Fehlzeiten-Schüler-Ansicht zeigt nur noch Unterrichtstage (erfasste Fehlzeiten bleiben immer sichtbar), die Datums-Ansicht weist auf Nicht-Kurstage hin; beim Schuljahreswechsel bewusst keine Übernahme, stattdessen Hinweis. Export aller Schuljahresdaten (v0.21.0) – Excel-Mappe mit Übersichtsblatt und je Kurs einem Blatt aus Notenübersicht plus sämtlichen Rohdaten (Punktevergaben, Fehlzeiten, Uploads, OBT/Klausuren, Portfolio, Kursnotizen), mit Fettdruck und Spaltenbreiten. Kursnotiz-Funktion (v0.20.0) – Notiz-Symbol in der Erfassungsliste, volles Feld in der Schüleransicht, datierte Quartals-Notizen auf „SoLei-Quartalsnoten“; eine Notiz je Schüler/in und Datum, mitverschlüsselt. Schuljahr-Archiv & -Löschung (v0.19.0) – Excel-/Druck-Export je Schuljahr, Löschen mit PIN-Bestätigung und Foto-Schonung übernommener Schüler/innen. Schuljahreswechsel-Assistent (v0.18.0) – Klassen (Schülerlisten samt Fotos), Kurseinstellungen, Maximalpunkte und Sitzpläne aus einem früheren Schuljahr übernehmen; Bewertungsdaten bleiben im alten Jahr. Schuljahresbeginn automatisch vorschlagen (v0.17.1) – erster Werktag nach den Sommerferien als Vorschlag, manuell änderbar.
 
 Bewusst verworfen: Undo für die letzte Punktevergabe (Korrektur erfolgt direkt
 durch Antippen des richtigen Werts), native App-Store-Versionen (die App bleibt

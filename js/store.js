@@ -78,7 +78,11 @@
       courses: [],       /* {id, yearId, classId, subject, numOBT, numKA,
                              weights:{sl,obt,ka}, maxPoints:{1:[..],2:..,3:..,4:..},
                              currentQuarter, portfolio:{q:{studentId:grade}},
-                             dismissedQuarterHint:{q:true}} */
+                             dismissedQuarterHint:{q:true},
+                             teachingDays:[{from:null|ISO, days:[1..6]}]}
+                             teachingDays optional: Segmente mit Gültigkeit ab
+                             `from` (null = Basis, gilt auch rückwirkend);
+                             fehlt das Feld, gelten alle Tage außer Sonntag. */
       soleiEntries: [],  /* {id, courseId, studentId, quarter, criterion, points, date, createdAt} */
       uploadTallies: [], /* {courseId, studentId, quarter, done, missed} – Ergebnis-Uploads, Zählung am Quartalsende */
       notes: []          /* {id, courseId, studentId, date, text} – Kursnotizen, eine je Schüler/in und Datum */
@@ -691,6 +695,9 @@
         uploadCriterion: typeof c.uploadCriterion === 'number' ? c.uploadCriterion : 2
       };
       if (c.seating) nc.seating = JSON.parse(JSON.stringify(c.seating));
+      /* Unterrichtstage (teachingDays) werden bewusst NICHT übernommen:
+         Stundenpläne wechseln zum Schuljahr; die UI weist darauf hin, dass
+         sie in den Kurs-Einstellungen neu festzulegen sind. */
       state.courses.push(nc);
       copied.courses++;
     });
@@ -959,6 +966,28 @@
     }).sort(function (x, y) { return x.date.localeCompare(y.date); });
   }
 
+  /* Unterrichtstage eines Kurses am gegebenen Datum.
+     Liefert ein Array von Wochentagen (getDay(): 1=Mo … 6=Sa) oder null,
+     wenn keine Unterrichtstage konfiguriert sind bzw. kein Segment auf das
+     Datum zutrifft – null bedeutet: bisheriges Verhalten (alle Tage außer
+     Sonntag). Es gilt das letzte Segment, dessen `from` ≤ Datum ist; die
+     Basis (`from: null`) gilt auch rückwirkend. */
+  function teachingDaysFor(course, dateISO) {
+    var segs = course && course.teachingDays;
+    if (!Array.isArray(segs) || !segs.length || !dateISO) return null;
+    var valid = segs.filter(function (s) {
+      return s && Array.isArray(s.days) && s.days.length;
+    });
+    if (!valid.length) return null;
+    var best = null;
+    valid.forEach(function (s) {
+      if (!s.from || s.from <= dateISO) {
+        if (!best || (s.from || '') > (best.from || '')) best = s;
+      }
+    });
+    return best ? best.days.slice() : null;
+  }
+
   root.Store = {
     init: init, save: save, onChange: onChange, uid: uid, todayISO: todayISO,
     getState: getState, freshState: freshState,
@@ -966,6 +995,7 @@
     entriesFor: entriesFor, addEntry: addEntry, updateEntry: updateEntry, deleteEntry: deleteEntry,
     uploadTallyFor: uploadTallyFor, setUploadTally: setUploadTally,
     addAbsence: addAbsence, removeAbsence: removeAbsence, absencesFor: absencesFor,
+    teachingDaysFor: teachingDaysFor,
     exportJSON: exportJSON, importJSON: importJSON, parseBackup: parseBackup, applyImport: applyImport,
     listSnapshots: listSnapshots, restoreSnapshot: restoreSnapshot, transferYear: transferYear,
     verifySecret: verifySecret, deleteYear: deleteYear,
