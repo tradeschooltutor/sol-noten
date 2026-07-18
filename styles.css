@@ -293,9 +293,15 @@ textarea.input.note-area {
   padding: 10px 12px; background: color-mix(in srgb, var(--teal) 6%, var(--card));
 }
 
-/* Stundeninhalte: einklappbare Hinweise und Terminliste */
-.hints-toggle { display: flex; align-items: center; gap: 6px; font-weight: 600; padding: 4px 0; }
-.hints-arrow { font-size: 0.8rem; color: var(--muted); }
+/* Stundeninhalte: Kopfkarte, einklappbare Hinweise und Terminliste */
+.quarter-line { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; min-width: 0; }
+.hints-toggle {
+  display: inline-flex; align-items: center; gap: 6px;
+  border: none; background: none; box-shadow: none;
+  min-height: 32px; padding: 2px 0; font-size: 0.9rem; color: var(--muted);
+}
+.hints-toggle:active { background: none; }
+.hints-arrow { font-size: 0.8rem; }
 .hint-with-btn { display: flex; align-items: flex-start; gap: 10px; margin-top: 10px; }
 .hint-with-btn .hint { flex: 1; margin: 0; }
 .hint-with-btn .btn-small { flex-shrink: 0; }
@@ -305,7 +311,10 @@ textarea.input.note-area {
 }
 .lesson-row:last-child { border-bottom: none; }
 .lesson-row.today { background: color-mix(in srgb, var(--teal) 10%, var(--card)); border-radius: 8px; padding-left: 6px; padding-right: 6px; }
-.lesson-date { flex-shrink: 0; width: 7.2rem; font-size: 0.9rem; padding-top: 8px; display: inline-flex; align-items: center; gap: 6px; }
+.lesson-date {
+  flex-shrink: 0; width: 6.4rem; font-size: 0.9rem; padding-top: 8px;
+  display: inline-flex; align-items: center; gap: 6px; white-space: nowrap;
+}
 .lesson-row.today .lesson-date { font-weight: 700; }
 .lesson-ta { flex: 1; min-height: 40px; resize: vertical; }
 .lesson-row.lesson-head { border-bottom: 2px solid var(--line); padding-bottom: 6px; }
@@ -313,7 +322,8 @@ textarea.input.note-area {
 .sort-btn { width: 30px; height: 30px; border-radius: 8px; font-size: 1rem; }
 @media (max-width: 480px) {
   .hint-with-btn { flex-direction: column; align-items: stretch; }
-  .lesson-date { width: 5.8rem; }
+  .lesson-date { width: 5.4rem; gap: 4px; font-size: 0.85rem; }
+  .lesson-row { gap: 8px; }
 }
 .crit-tabs { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 2px; }
 .crit-tab {

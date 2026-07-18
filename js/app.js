@@ -70,7 +70,7 @@
 
   /* ================= App-Start ================= */
 
-  var APP_VERSION = '0.23.0';
+  var APP_VERSION = '0.23.1';
 
   Store.init().then(function () {
     if ('serviceWorker' in navigator) {
@@ -1560,17 +1560,19 @@
       Quarters.quarterChangeDue(Store.todayISO(), q, quarters);
 
     return h('div.screen',
-      header(cls.name + ' · ' + course.subject, { name: 'home' },
-        h('button.icon-btn', {
-          onclick: function () { go('lessonContents', { id: course.id }); },
-          'aria-label': 'Stundeninhalte', html: BOOK_SVG
-        })),
+      header(cls.name + ' · ' + course.subject, { name: 'home' }),
       due ? quarterHint(course, quarters) : null,
       h('div.card.card-tight',
         h('div.row-between',
-          h('span.quarter-chip.big' + (course.completed ? '.completed' : ''), {},
-            q + '. Quartal' + (course.completed ? ' · Schuljahr abgeschlossen' : '')),
-          h('span.hint', {}, UI.fmtDate(quarters[q - 1].start) + ' – ' + UI.fmtDate(quarters[q - 1].end))
+          h('div.quarter-line',
+            h('span.quarter-chip.big' + (course.completed ? '.completed' : ''), {},
+              q + '. Quartal' + (course.completed ? ' · Schuljahr abgeschlossen' : '')),
+            h('span.hint', {}, UI.fmtDate(quarters[q - 1].start) + ' – ' + UI.fmtDate(quarters[q - 1].end))
+          ),
+          h('button.icon-btn', {
+            onclick: function () { go('lessonContents', { id: course.id }); },
+            'aria-label': 'Stundeninhalte', title: 'Stundeninhalte', html: BOOK_SVG
+          })
         )
       ),
       h('div.section-head', {}, 'Sonstige Leistungen'),
@@ -2981,22 +2983,29 @@
       go('lessonContents', { id: course.id, quarter: Number(qSel.value) });
     });
 
-    /* Einklappbare Hinweise: zunächst ausgeklappt, Zustand hält die Sitzung. */
-    function hintsCard() {
-      var head = h('button.btn-plain.hints-toggle', {
+    /* Kopfkarte: links die Quartalsauswahl, rechts der rahmenlose
+       Hinweise-Umschalter; die Hinweise selbst klappen darunter auf. */
+    function headCard() {
+      var toggle = h('button.btn-plain.hints-toggle', {
         onclick: function () { lessonState.hintsCollapsed = !lessonState.hintsCollapsed; render(); },
         'aria-expanded': String(!lessonState.hintsCollapsed)
       }, 'Hinweise ', h('span.hints-arrow', {}, lessonState.hintsCollapsed ? '▸' : '▾'));
-      if (lessonState.hintsCollapsed) return h('div.card.card-tight', head);
-      return h('div.card.card-tight', head,
-        h('div.hint-with-btn',
-          h('p.hint', {}, 'In den Kurs-Einstellungen können Sie die Wochentage festlegen, an denen der Kurs stattfindet – die Liste zeigt dann nur diese Termine.'),
-          h('button.btn-small.btn-plain', { onclick: function () { go('editCourse', { id: course.id }); } },
-            'Zu den Kurs-Einstellungen')),
-        h('div.hint-with-btn',
-          h('p.hint', {}, 'Notizen zu einzelnen Schüler/innen erfassen Sie auf der Seite „SoLei-Punkte vergeben“.'),
-          h('button.btn-small.btn-plain', { onclick: function () { go('capture', { id: course.id }); } },
-            'Zu „SoLei-Punkte vergeben“')));
+
+      var card = h('div.card.card-tight',
+        h('div.row-between', qSel, toggle));
+      if (lessonState.hintsCollapsed) return card;
+      card.appendChild(h('div.hint-with-btn',
+        h('p.hint', {}, 'In den Kurs-Einstellungen können Sie die Wochentage festlegen, an denen der Kurs stattfindet – die Liste zeigt dann nur diese Termine.'),
+        h('button.btn-small.btn-plain', { onclick: function () { go('editCourse', { id: course.id }); } },
+          'Zu den Kurs-Einstellungen')));
+      card.appendChild(h('div.hint-with-btn',
+        h('p.hint', {}, 'Notizen zu einzelnen Schüler/innen erfassen Sie auf der Seite „SoLei-Punkte vergeben“.'),
+        h('button.btn-small.btn-plain', { onclick: function () {
+          captureState.mode = 'student';
+          captureState.kbActive = null; captureState.kbBuffer = '';
+          go('capture', { id: course.id });
+        } }, 'Zu „SoLei-Punkte vergeben“')));
+      return card;
     }
 
     /* Termine des Quartals: nur Unterrichtstage laut Kurs-Einstellungen
@@ -3026,8 +3035,10 @@
         Store.setLessonContent(course.id, iso, ta.value);
       });
       var wd = WD_SHORT[new Date(iso + 'T12:00:00').getDay()];
+      /* Kurzform „Mo, 02.09.27“ – passt auf Smartphones in eine Zeile. */
+      var short = iso.slice(8, 10) + '.' + iso.slice(5, 7) + '.' + iso.slice(2, 4);
       return h('div.lesson-row' + (iso === today ? '.today' : ''),
-        h('span.lesson-date', {}, wd + ', ' + UI.fmtDate(iso)),
+        h('span.lesson-date', {}, wd + ', ' + short),
         ta);
     }
 
@@ -3039,8 +3050,7 @@
     return h('div.screen',
       header('Stundeninhalte', { name: 'course', params: { id: course.id } }),
       courseBox(course),
-      h('div.card.card-tight', h('div.row-between', h('span.hint', {}, 'Quartal'), qSel)),
-      hintsCard(),
+      headCard(),
       h('div.card.card-tight',
         h('div.lesson-row.lesson-head',
           h('span.lesson-date', {}, 'Termin ', sortBtn),
