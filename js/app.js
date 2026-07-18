@@ -70,7 +70,7 @@
 
   /* ================= App-Start ================= */
 
-  var APP_VERSION = '0.25.1';
+  var APP_VERSION = '0.26.0';
 
   /* ---------- PWA-Installation ----------
      Chrome/Edge/Android liefern `beforeinstallprompt`: Event abfangen und
@@ -4261,6 +4261,21 @@
         ),
         chartCard
       ),
+      /* Kursnotizen des angezeigten Quartals – oberhalb der Punktevergaben,
+         gleiche Darstellung wie auf „SoLei-Quartalsnoten". */
+      (function () {
+        var quarters = courseQuarters(course);
+        var qNotes = Store.notesFor(course.id, stu.id).filter(function (n) {
+          return Quarters.quarterForDate(n.date, quarters) === shownQ;
+        });
+        if (!qNotes.length) return null;
+        return h('div.card.card-tight',
+          h('div.section-head-inline', {}, 'Kursnotizen (' + shownQ + '. Quartal)'),
+          h('div.review-notes.no-top-border', {}, qNotes.map(function (n) {
+            return h('p.review-note', {},
+              h('span.note-date', {}, UI.fmtDate(n.date) + ': '), n.text);
+          })));
+      })(),
       h('div.section-head', {}, filterCrit != null
         ? 'Vergaben · ' + names[filterCrit] + ' (' + shownEntries.length + ')'
         : 'Alle Punktevergaben (' + (shownEntries.length + absences.length) + ')'),
