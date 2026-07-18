@@ -97,11 +97,29 @@ body {
   border: 2px solid var(--teal);
 }
 .ios-guide-arrow {
-  position: absolute; top: -8px; right: 150px; transform: translateY(-100%);
+  position: absolute; top: -8px; right: 88px; transform: translateY(-100%);
   font-size: 2.4rem; line-height: 1; color: var(--teal);
   text-shadow: 0 1px 4px rgba(0,0,0,0.2);
   animation: ios-arrow-bounce 1.2s ease-in-out infinite;
 }
+
+/* iPhone: Safari zeigt das Teilen-Symbol unten in der Mitte – Anleitung
+   dorthin verlagern, mit Abwärtspfeil unterhalb der Karte. */
+.ios-guide-bottom {
+  top: auto; bottom: 88px; right: 10px; left: 10px;
+  width: auto; max-height: calc(100vh - 180px); overflow-y: auto;
+}
+.ios-guide-arrow-down {
+  position: absolute; bottom: -8px; left: 50%; transform: translate(-50%, 100%);
+  font-size: 2.4rem; line-height: 1; color: var(--teal);
+  text-shadow: 0 1px 4px rgba(0,0,0,0.2);
+  animation: ios-arrow-bounce-down 1.2s ease-in-out infinite;
+}
+@keyframes ios-arrow-bounce-down {
+  0%, 100% { transform: translate(-50%, 100%); }
+  50% { transform: translate(-50%, calc(100% + 8px)); }
+}
+@media (prefers-reduced-motion: reduce) { .ios-guide-arrow-down { animation: none; } }
 @keyframes ios-arrow-bounce {
   0%, 100% { transform: translateY(-100%); }
   50% { transform: translateY(calc(-100% - 8px)); }
