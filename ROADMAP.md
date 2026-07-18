@@ -1,43 +1,16 @@
-# SOL-Noten – Roadmap
-
-Geplante Funktionen in grober Reihenfolge. Nicht terminiert; Reihenfolge und
-Zuschnitt werden vor der Umsetzung jeweils gemeinsam festgelegt.
-
-## 7. Notendurchschnitte des Quartals
-Durchschnitt der Klasse anzeigen auf „SoLei-Punktestand" und
-„SoLei-Quartalsnoten".
-
-## 8. Notendurchschnitt & Notenspiegel je Prüfung
-Für jeden Open Book Test und jede Klausur: Durchschnittsnote und
-Notenspiegel (Verteilung der Noten über die Klasse).
-
-## 9. Leistungsverlauf als Liniendiagramm
-Auf „Notenübersicht & Zeugnisnoten":
-- Ansicht Klasse: Entwicklung der Klassendurchschnitte über die Zeit, je
-  Leistung wählbar (SoLei 1.–4. Quartal, Open Book Tests, Klausuren).
-- Ansicht Schüler/in: Verlauf der Einzelperson – Konzept vor der Umsetzung
-  noch gemeinsam ausarbeiten.
-
-## 10. Mehrere Sitzpläne pro Klasse
-Für Raumwechsel: mehr als einen Sitzplan je Kurs hinterlegen und zwischen
-ihnen umschalten.
-
-## 11. Export in die Zwischenablage
-Listen zusätzlich zum Datei-Export direkt in die Zwischenablage kopieren
-(z. B. zum Einfügen in ein bestehendes Excel-Dokument).
-
-## 12. Demo-Modus mit Beispieldaten
-Per Klick aktivierbarer Modus mit fiktiven Klassen/Daten für Fortbildungen und
-Vorführungen, ohne echte Schülerdaten zu zeigen.
-
-## 13. Spenden-Funktion
-Bewusst an letzter Stelle; wird vorerst nicht umgesetzt.
-
----
-
-Umgesetzt: Kursnotizen auf „SoLei-Punktestand" (Ansicht Schüler/in, v0.26.0) oberhalb der Punktevergaben. Bugfixes (v0.25.1) – Kursnotizen auf „SoLei-Quartalsnoten" brechen auf breiten Displays unter die Notenzeile um; „Notenausdruck" und Schüler-Ansicht der Notenübersicht zu einer Seite zusammengeführt (Namensklick öffnet die Person, „Ansicht: Schüler/in" den ersten Namen, Druck-Button in der Kursnamen-Box); Kursnamen-Box-Buttons stehen wieder rechts neben dem Namen. Weiterer Kurs für eine bestehende Klasse (v0.25.0) – Button in „Weitere Kurs-Verwaltung"; Klasse vorbelegt, Einstellungen, Maximalpunkte und Sitzplan übernommen, Fach leer, ohne Bewertungsdaten und Unterrichtstage. Vereinfachte App-Installation (v0.24.0) – „App installieren"-Button via beforeinstallprompt (PC/Android), iOS-Anleitung, Abschnitt in den Einstellungen, ausblendbarer Hinweis auf dem Startbildschirm; Export-Hinweise und Umbenennung „Excel-Export aller Schuljahresdaten" (v0.23.2). Stundeninhalte (v0.23.0, UI-Feinschliff v0.23.1) – Buch-Symbol in der Kopfzeile der Kurs-Hauptansicht; Terminliste je Quartal (nur Unterrichtstage laut Kurs-Einstellungen), Texteintrag je Termin mit Auto-Speichern, auf-/absteigende Sortierung, einklappbare Hinweise, Abschnitt im Export aller Schuljahresdaten. Unterrichtstage je Kurs (v0.22.0) – optionale Wochentag-Segmente mit „Änderung ab Datum“ (Gültigkeitszeiträume) in den Kurs-Einstellungen; die Fehlzeiten-Schüler-Ansicht zeigt nur noch Unterrichtstage (erfasste Fehlzeiten bleiben immer sichtbar), die Datums-Ansicht weist auf Nicht-Kurstage hin; beim Schuljahreswechsel bewusst keine Übernahme, stattdessen Hinweis. Export aller Schuljahresdaten (v0.21.0) – Excel-Mappe mit Übersichtsblatt und je Kurs einem Blatt aus Notenübersicht plus sämtlichen Rohdaten (Punktevergaben, Fehlzeiten, Uploads, OBT/Klausuren, Portfolio, Kursnotizen), mit Fettdruck und Spaltenbreiten. Kursnotiz-Funktion (v0.20.0) – Notiz-Symbol in der Erfassungsliste, volles Feld in der Schüleransicht, datierte Quartals-Notizen auf „SoLei-Quartalsnoten“; eine Notiz je Schüler/in und Datum, mitverschlüsselt. Schuljahr-Archiv & -Löschung (v0.19.0) – Excel-/Druck-Export je Schuljahr, Löschen mit PIN-Bestätigung und Foto-Schonung übernommener Schüler/innen. Schuljahreswechsel-Assistent (v0.18.0) – Klassen (Schülerlisten samt Fotos), Kurseinstellungen, Maximalpunkte und Sitzpläne aus einem früheren Schuljahr übernehmen; Bewertungsdaten bleiben im alten Jahr. Schuljahresbeginn automatisch vorschlagen (v0.17.1) – erster Werktag nach den Sommerferien als Vorschlag, manuell änderbar.
-
-Bewusst verworfen: Undo für die letzte Punktevergabe (Korrektur erfolgt direkt
-durch Antippen des richtigen Werts), native App-Store-Versionen (die App bleibt
-PWA), direkte Cloud-API-Anbindung (stattdessen: Ordner-Backup in einen von
-OneDrive/Google Drive synchronisierten Ordner legen).
+{
+  "name": "SOL-Noten – Notenverwaltung zum selbstorganisierten Lernen",
+  "short_name": "SOL-Noten",
+  "description": "Notenverwaltung für das SOL-Konzept: SoLei-Punkte, Open Book Tests und Klausuren. Alle Daten bleiben lokal auf dem Gerät.",
+  "lang": "de",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f2f4f3",
+  "theme_color": "#0e7c74",
+  "icons": [
+    { "src": "icons/icon-192-v2.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icons/icon-512-v2.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icons/icon-512-maskable-v2.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
