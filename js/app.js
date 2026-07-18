@@ -70,7 +70,7 @@
 
   /* ================= App-Start ================= */
 
-  var APP_VERSION = '0.24.0';
+  var APP_VERSION = '0.24.1';
 
   /* ---------- PWA-Installation ----------
      Chrome/Edge/Android liefern `beforeinstallprompt`: Event abfangen und
@@ -115,17 +115,44 @@
     });
   }
 
+  /* Teilen-Symbol (iOS): Rechteck mit Pfeil nach oben – zur Wiedererkennung. */
+  var SHARE_SVG = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M8 7l4-4 4 4"/><path d="M5 11v9h14v-9"/></svg>';
+
+  /* iOS/iPadOS-Anleitung: als Overlay OBEN RECHTS, weil dort in Safari auf
+     dem iPad das Teilen-Symbol sitzt – der Pfeil zeigt direkt darauf. Die
+     Schritte 3 und 4 werden durch Nachbildungen der iOS-Menüzeilen
+     verdeutlicht. */
+  function showIOSGuide() {
+    var existing = document.querySelector('.ios-guide');
+    if (existing) existing.remove();
+
+    function mockRow(iconHtml, label) {
+      return h('div.ios-mockrow',
+        h('span.ios-mockicon', { html: iconHtml }),
+        h('span', {}, label));
+    }
+    var MORE_ICON = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="5" cy="12" r="1.6" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none"/><circle cx="19" cy="12" r="1.6" fill="currentColor" stroke="none"/></svg>';
+    var ADD_ICON = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="4"/><path d="M12 9v6M9 12h6"/></svg>';
+
+    var box = h('div.ios-guide',
+      h('div.ios-guide-arrow', {}, '⬆'),
+      h('div.ios-guide-head',
+        h('strong', {}, 'SOL-Noten installieren'),
+        h('button.icon-btn.ios-guide-close', { 'aria-label': 'Schließen', onclick: function () { box.remove(); } }, '×')),
+      h('ol.install-steps',
+        h('li', {}, 'SOL-Noten in Safari öffnen.'),
+        h('li', {}, 'Das Teilen-Symbol ', h('span.ios-inline-icon', { html: SHARE_SVG }),
+          ' antippen – oben rechts, dort wo der Pfeil hinzeigt.'),
+        h('li', {}, '„Mehr anzeigen“ antippen:', mockRow(MORE_ICON, 'Mehr anzeigen')),
+        h('li', {}, '„Zum Home-Bildschirm“ wählen und mit „Hinzufügen“ bestätigen:',
+          mockRow(ADD_ICON, 'Zum Home-Bildschirm'),
+          h('div.ios-mockconfirm', {}, 'Hinzufügen'))),
+      h('p.hint', {}, 'Danach startet SOL-Noten über das Symbol auf dem Home-Bildschirm wie eine normale App.'));
+    document.body.appendChild(box);
+  }
+
   /* Plattformgenaue Installationsanleitung (wenn kein nativer Dialog möglich). */
   function installInstructions() {
-    if (isIOS()) {
-      return h('div',
-        h('p.hint', {}, 'Auf iPhone und iPad erfolgt die Installation über Safari:'),
-        h('ol.install-steps',
-          h('li', {}, 'SOL-Noten in Safari öffnen.'),
-          h('li', {}, 'Das Teilen-Symbol antippen (Rechteck mit Pfeil nach oben, unten in der Mitte bzw. oben rechts).'),
-          h('li', {}, '„Zum Home-Bildschirm“ wählen und mit „Hinzufügen“ bestätigen.')),
-        h('p.hint', {}, 'Danach startet SOL-Noten wie eine normale App über das Symbol auf dem Home-Bildschirm.'));
-    }
     return h('div',
       h('p.hint', {}, 'In Chrome oder Edge lässt sich SOL-Noten so installieren:'),
       h('ol.install-steps',
@@ -134,7 +161,9 @@
       h('p.hint', {}, 'Firefox am PC unterstützt die Installation von Web-Apps leider nicht – dort läuft SOL-Noten einfach im Browser weiter.'));
   }
 
-  /* Karte für die Einstellungsseite. */
+  /* Karte für die Einstellungsseite – unabhängig davon, ob der Hinweis auf
+     dem Startbildschirm ausgeblendet wurde, bleibt die Installation hier
+     immer erreichbar. */
   function installSection() {
     if (isStandalone()) {
       return h('p.hint', {}, 'SOL-Noten läuft bereits als installierte App – alles erledigt.');
@@ -143,6 +172,11 @@
       return h('div.actions-col',
         h('p.hint', {}, 'SOL-Noten lässt sich als App installieren: eigenes Symbol, eigenes Fenster, ohne Browser-Leisten – Daten und Anmeldung bleiben dabei erhalten.'),
         h('button.btn-primary.btn-block', { onclick: triggerInstall }, 'App installieren'));
+    }
+    if (isIOS()) {
+      return h('div.actions-col',
+        h('p.hint', {}, 'Auf iPhone und iPad erfolgt die Installation in Safari über das Teilen-Menü. Die Anleitung führt Schritt für Schritt hindurch.'),
+        h('button.btn-primary.btn-block', { onclick: showIOSGuide }, 'Installations-Anleitung anzeigen'));
     }
     return installInstructions();
   }
@@ -158,7 +192,8 @@
         deferredInstall
           ? h('button.btn-small.btn-primary', { onclick: triggerInstall }, 'App installieren')
           : h('button.btn-small.btn-primary', { onclick: function () {
-              UI.modal('SOL-Noten installieren', installInstructions(), [{ label: 'Schließen', value: true, primary: true }]);
+              if (isIOS()) showIOSGuide();
+              else UI.modal('SOL-Noten installieren', installInstructions(), [{ label: 'Schließen', value: true, primary: true }]);
             } }, 'Anleitung anzeigen'),
         h('button.btn-small.btn-plain', { onclick: function () {
           st.settings.installHintDismissed = true;
