@@ -70,7 +70,7 @@
 
   /* ================= App-Start ================= */
 
-  var APP_VERSION = '0.27.0';
+  var APP_VERSION = '0.27.1';
 
   /* ---------- PWA-Installation ----------
      Chrome/Edge/Android liefern `beforeinstallprompt`: Event abfangen und
@@ -3113,11 +3113,12 @@
       return { node: host, hasAbsence: hasAbsence };
     }
 
-    /* Ergebnis-Uploads über alle bisherigen Quartale summiert */
+    /* Ergebnis-Uploads über alle bisherigen Quartale summiert.
+       uploadTallyFor liefert null, wenn im Quartal nichts erfasst wurde. */
     var upDone = 0, upMissed = 0;
     for (var q = 1; q <= lastQ; q++) {
       var t = Store.uploadTallyFor(course.id, stu.id, q);
-      upDone += t.done; upMissed += t.missed;
+      if (t) { upDone += t.done || 0; upMissed += t.missed || 0; }
     }
 
     var rangeLabel = lastQ === 1 ? '1. Quartal' : '1.–' + lastQ + '. Quartal';
