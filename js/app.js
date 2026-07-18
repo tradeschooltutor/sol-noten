@@ -70,7 +70,7 @@
 
   /* ================= App-Start ================= */
 
-  var APP_VERSION = '0.24.1';
+  var APP_VERSION = '0.24.2';
 
   /* ---------- PWA-Installation ----------
      Chrome/Edge/Android liefern `beforeinstallprompt`: Event abfangen und
@@ -126,28 +126,38 @@
     var existing = document.querySelector('.ios-guide');
     if (existing) existing.remove();
 
-    function mockRow(iconHtml, label) {
+    function mockRow(iconHtml, label, device) {
       return h('div.ios-mockrow',
         h('span.ios-mockicon', { html: iconHtml }),
-        h('span', {}, label));
+        h('span', {}, label),
+        device ? h('span.ios-mockdevice', {}, device) : null);
     }
+    /* „Mehr anzeigen": iPad zeigt eine Pfeilspitze nach unten, iPhone drei Punkte. */
+    var CHEVRON_ICON = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 10l6 5 6-5"/></svg>';
     var MORE_ICON = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="5" cy="12" r="1.6" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none"/><circle cx="19" cy="12" r="1.6" fill="currentColor" stroke="none"/></svg>';
     var ADD_ICON = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="4"/><path d="M12 9v6M9 12h6"/></svg>';
 
+    /* iPhone (schmal): Teilen-Symbol sitzt unten in der Mitte – dort keinen
+       nach oben zeigenden Pfeil anzeigen und den Text entsprechend fassen. */
+    var narrow = window.matchMedia && window.matchMedia('(max-width: 600px)').matches;
+
     var box = h('div.ios-guide',
-      h('div.ios-guide-arrow', {}, '⬆'),
+      narrow ? null : h('div.ios-guide-arrow', {}, '⬆'),
       h('div.ios-guide-head',
         h('strong', {}, 'SOL-Noten installieren'),
         h('button.icon-btn.ios-guide-close', { 'aria-label': 'Schließen', onclick: function () { box.remove(); } }, '×')),
       h('ol.install-steps',
         h('li', {}, 'SOL-Noten in Safari öffnen.'),
         h('li', {}, 'Das Teilen-Symbol ', h('span.ios-inline-icon', { html: SHARE_SVG }),
-          ' antippen – oben rechts, dort wo der Pfeil hinzeigt.'),
-        h('li', {}, '„Mehr anzeigen“ antippen:', mockRow(MORE_ICON, 'Mehr anzeigen')),
+          narrow ? ' antippen – unten in der Mitte der Safari-Leiste.'
+                 : ' antippen – oben rechts, dort wo der Pfeil hinzeigt.'),
+        h('li', {}, '„Mehr anzeigen“ antippen:',
+          mockRow(CHEVRON_ICON, 'Mehr anzeigen', 'iPad'),
+          mockRow(MORE_ICON, 'Mehr anzeigen', 'iPhone')),
         h('li', {}, '„Zum Home-Bildschirm“ wählen und mit „Hinzufügen“ bestätigen:',
           mockRow(ADD_ICON, 'Zum Home-Bildschirm'),
           h('div.ios-mockconfirm', {}, 'Hinzufügen'))),
-      h('p.hint', {}, 'Danach startet SOL-Noten über das Symbol auf dem Home-Bildschirm wie eine normale App.'));
+      h('p.hint', {}, 'Danach erscheint SOL-Noten als App auf dem Home-Bildschirm.'));
     document.body.appendChild(box);
   }
 

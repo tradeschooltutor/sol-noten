@@ -84,23 +84,27 @@ body {
 .install-steps { margin: 8px 0; padding-left: 1.3rem; font-size: 0.9rem; color: var(--ink-soft); }
 .install-steps li { margin-bottom: 6px; }
 
-/* iOS-Installationsanleitung: Overlay oben rechts, Pfeil zeigt auf das
-   Teilen-Symbol in der Safari-Leiste (iPad: oben rechts). */
+/* iOS-Installationsanleitung: Overlay oben rechts, aber so weit nach unten
+   versetzt, dass der Pfeil darüber sichtbar bleibt. Der Pfeil sitzt nicht am
+   rechten Kartenrand, sondern unterhalb des Teilen-Symbols – das liegt in
+   der Safari-Leiste des iPads links neben „+“ und Tab-Übersicht, also ein
+   Stück von der rechten Bildschirmkante entfernt. */
 .ios-guide {
-  position: fixed; top: 12px; right: 10px; z-index: 1000;
-  width: min(340px, calc(100vw - 20px));
+  position: fixed; top: 68px; right: 10px; z-index: 1000;
+  width: min(360px, calc(100vw - 20px));
   background: var(--card); border-radius: var(--radius);
   box-shadow: 0 6px 24px rgba(0,0,0,0.25); padding: 14px 16px;
   border: 2px solid var(--teal);
 }
 .ios-guide-arrow {
-  position: absolute; top: -4px; right: 18px; transform: translateY(-100%);
-  font-size: 2rem; line-height: 1; color: var(--teal);
+  position: absolute; top: -8px; right: 150px; transform: translateY(-100%);
+  font-size: 2.4rem; line-height: 1; color: var(--teal);
+  text-shadow: 0 1px 4px rgba(0,0,0,0.2);
   animation: ios-arrow-bounce 1.2s ease-in-out infinite;
 }
 @keyframes ios-arrow-bounce {
   0%, 100% { transform: translateY(-100%); }
-  50% { transform: translateY(calc(-100% - 6px)); }
+  50% { transform: translateY(calc(-100% - 8px)); }
 }
 @media (prefers-reduced-motion: reduce) { .ios-guide-arrow { animation: none; } }
 .ios-guide-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 6px; }
@@ -112,6 +116,7 @@ body {
   padding: 8px 12px; margin-top: 6px; font-size: 0.9rem; color: var(--ink);
 }
 .ios-mockicon { display: inline-flex; color: var(--ink-soft); }
+.ios-mockdevice { margin-left: auto; font-size: 0.75rem; color: var(--muted, var(--ink-soft)); }
 .ios-mockconfirm {
   display: inline-block; margin-top: 6px; padding: 6px 14px;
   background: var(--teal); color: #fff; border-radius: 10px;
