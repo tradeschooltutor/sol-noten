@@ -1,76 +1,889 @@
-# SOL-Noten (Version 0.27.0 – Beta)
+/* SOL-Noten – Gestaltung
+   Palette angelehnt an die SOL-Workshop-Materialien: Charcoal + Teal. */
 
-Notenverwaltung zum selbstorganisierten Lernen (SOL) als Progressive Web App (PWA).
-Basierend auf der Excel-Notenverwaltung V8.0 von Andreas Vandelaar.
+:root {
+  --ink: #22303a;
+  --ink-soft: #5a6b76;
+  --paper: #f2f4f3;
+  --card: #ffffff;
+  --line: #dde3e2;
+  --teal: #0e7c74;
+  --teal-dark: #0a5a54;
+  --teal-soft: #e3f1ef;
+  --amber: #b97514;
+  --amber-soft: #fcf3e3;
+  --red: #b4382f;
+  --red-soft: #fbecea;
+  --green: #2e7d46;
+  --green-soft: #e9f4ec;
+  --radius: 14px;
+  --shadow: 0 1px 3px rgba(34, 48, 58, 0.10);
+  --tap: 52px;
+}
 
-## Was die App kann
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body {
+  font-family: "Segoe UI", "Avenir Next", Seravek, Roboto, "Helvetica Neue", system-ui, sans-serif;
+  background: var(--paper);
+  color: var(--ink);
+  font-size: 16px;
+  line-height: 1.45;
+  -webkit-tap-highlight-color: transparent;
+}
 
-- **Schuljahre und Kurse verwalten** – ein Kurs ist eine Klasse in einem Fach; die Schülerliste gehört zur Klasse und wird zwischen den Kursen geteilt.
-- **Einrichtung mit Ferienabruf** – Bundesland wählen, erster Schultag, Quartale (je 10 Schulwochen ohne Ferien) werden automatisch berechnet (OpenHolidays-API). **Kursnotizen:** Auf „SoLei-Punkte vergeben“ lässt sich je Schüler/in und Datum eine kurze Notiz festhalten – in der Listen-Ansicht über das Notiz-Symbol unter dem Foto (gefüllt, wenn zum gewählten Datum bereits eine Notiz existiert), in der Schüleransicht über ein festes Notizfeld unter den Kriterien; gespeichert wird automatisch beim Verlassen des Feldes, Leeren löscht die Notiz. Auf „SoLei-Quartalsnoten“ und auf „SoLei-Punktestand“ (Ansicht Schüler/in, oberhalb der Punktevergaben) erscheinen die datierten Notizen des angezeigten Quartals als Entscheidungshilfe. In der Schüler-Ansicht der Notenübersicht lassen sich per Umschalt-Button „Diagramme: Ein/Aus" (neben den Ansicht-Buttons, Wahl wird dauerhaft gespeichert) fünf Liniendiagramme der Punkteentwicklung über alle bisherigen Quartale einblenden – Quartalsgrenzen als gestrichelte Linien, Fehlzeiten als rote Punkte, beim Upload-Kriterium mit der Zeile „x mal Ergebnisse hochgeladen, x Ergebnisse fehlen"; sind die Diagramme eingeblendet, druckt „Drucken / PDF" sie auf einer separaten zweiten Seite mit Namens-Kopfzeile. Notizen sind Teil des verschlüsselten Datenbestands und jedes Backups. Die Kursseite gruppiert ihre Funktionen in drei Blöcke: „Sonstige Leistungen“ (getönte Karte mit Punktevergabe, Sitzplan, Punktestand, Ergebnis-Uploads, Fehlzeiten und Quartalsnoten), „Weitere Prüfungsleistungen“ (gleich gestaltete Karte mit Open Book Tests und Klausuren) und „Auswertung“ (Notenübersicht & Zeugnisnoten); die Kurs-Einstellungen stehen separat darunter. In den globalen Einstellungen lassen sich alte Schuljahre archivieren und entfernen: „Export aller Schuljahresdaten“ erzeugt eine Excel-Mappe mit Übersichtsblatt und je Kurs einem Tabellenblatt aus Notenübersicht & Zeugnisnoten plus sämtlichen Rohdaten (Punktevergaben mit Fehlzeit-Kennzeichnung, Fehlzeiten, Ergebnis-Uploads, OBT- und Klausurnoten, Portfolionoten, Kursnotizen); „Nur Notenübersichten exportieren“ liefert die kompakte Excel- oder Druck/PDF-Variante; „Schuljahr löschen“ entfernt ein Schuljahr samt Klassen, Kursen und Bewertungsdaten – abgesichert durch die Eingabe der App-PIN bzw. des Passworts; Fotos bleiben erhalten, solange die Schüler/innen in einem anderen Schuljahr weitergeführt werden, und das letzte verbliebene Schuljahr ist nicht löschbar. Nach dem Anlegen eines weiteren Schuljahres bietet ein Assistent an, Klassen (Schülerlisten samt Fotos), Kurse (Einstellungen, Maximalpunkte, Sitzplan) aus einem früheren Schuljahr zu übernehmen – Punktevergaben und Noten bleiben im alten Schuljahr; Klassennamen sind dabei anpassbar, der Assistent ist auch über die leere Kursübersicht eines Schuljahres erreichbar. Beim Anlegen eines Schuljahres schlägt die App den ersten Schultag automatisch vor (erster Werktag nach den Sommerferien laut Ferienterminen); der Wert bleibt manuell änderbar, etwa bei abweichendem Ausbildungs- oder Blockbeginn. Quartalszeiträume sind je Kurs anpassbar. Das aktuelle Quartal eines Kurses ergibt sich automatisch aus dem heutigen Datum; nach Quartalsende weist ein Hinweis auf der Kursseite darauf hin, die Portfolionoten einzutragen, nach dem Ende des 4. Quartals zusätzlich auf den möglichen Schuljahresabschluss.
-- **SoLei-Erfassung im Unterricht** (Herzstück):
-  - Kriterium-Modus (ein Kriterium, alle Schüler/innen) und Schüler-Modus (eine Person, alle fünf Kriterien),
-  - große Tipp-Buttons mit den Stufen Maximum / ⅔ / ⅓ / 0,
-  - jede Vergabe wird mit Datum gespeichert, Rückgängig-Funktion, nachträglich änderbar,
-  - pro Kriterium und Tag gilt der letzte Tipp (erneutes Tippen korrigiert, gleicher Wert entfernt die Vergabe),
-  - live sichtbar: Kriteriendurchschnitte (auf 1 Nachkommastelle gerundet), Punktesumme (Summe der gerundeten Durchschnitte, selbst ungerundet) und aktuelle Note nach dem 15-Punkte-Bewertungsspiegel (11,9 Punkte → Note 2; 1,75 erst ab vollen 12 Punkten).
-- **Maximalpunkte je Kriterium und Quartal** – wählbar aus 1,5 / 3 / 4,5 / 6, Summe muss 15 ergeben (Live-Prüfung).
-- **Punkteprotokoll je Schüler/in** – jede Einzelvergabe einsehen, ändern, löschen; Kriteriendurchschnitte mit grün/roter Entwicklungsanzeige gegenüber dem Vorquartal; Notenzeile (SL-Bogen, Portfolio, SoLei).
-- **Quartalsabschluss** – Portfolionoten je Schüler/in erfassen (1–6, Komma erlaubt); Note SL-Bogen aus der Punktesumme, Note SoLei = Durchschnitt aus SL-Bogen und Portfolio (ohne Portfolio bleibt sie leer); Punktesummen mit ▲/▼ gegenüber dem Vorquartal; Nach dem Ende des 4. Quartals bietet die SoLei-Quartalsnoten-Seite zusätzlich „Schuljahr abschließen“ an: Nach einer Rückfrage wird der Kurs als „Schuljahr abgeschlossen“ markiert (sichtbar auf Kachel und Kursseite). Der Abschluss ist eine reine Markierung – alle Ansichten, Zeugnisnoten, Drucke und Nachträge bleiben zugänglich – und lässt sich in den Kurs-Einstellungen über „Schuljahr wieder öffnen“ jederzeit aufheben. Bei der SoLei-Erfassung ergibt sich das Quartal automatisch aus dem gewählten Datum; die Datumswahl ist auf das Schuljahr (Beginn 1. Quartal bis Ende 4. Quartal) begrenzt, sodass Nachträge jederzeit im passenden Quartal landen, Einträge außerhalb des Schuljahres aber nicht möglich sind.
-- **Schülerliste** – manuell pflegen oder per Kopieren & Einfügen aus Excel übernehmen (Nachname, Vorname, Telefon, E-Mail, Betrieb, Ausbilder/Eltern mit Telefon und E-Mail).
-- **Open Book Tests** – je Halbjahr die konfigurierte Anzahl OBT; Prozentwerte je Schüler/in eintragen (Note live aus dem Prozent-Bewertungsspiegel, Klassendurchschnitt sichtbar) oder den Moodle-/Logineo-Ergebnisexport direkt einlesen (Excel- oder CSV-Datei). Der Import erkennt die Kopfzeile (Nachname/Vorname/Bewertung), rechnet auch abweichende Maximalpunktzahlen („Bewertung/50,00") in Prozent um, überspringt „Gesamtdurchschnitt" und unbewertete Versuche und ordnet die Namen automatisch zu – nicht zuordenbare Zeilen werden zur manuellen Zuordnung angeboten.
-- **Klausuren** – je Halbjahr die konfigurierte Anzahl; einmal die Maximalpunktzahl der Klausur festlegen, dann je Schüler/in die erreichten Punkte eintragen. Prozent und Note (Prozent-Bewertungsspiegel) berechnet die App live; Punkte über dem Maximum werden rot markiert. Nicht geschriebene Klausuren bleiben einfach leer.
-- **Update-Anzeige** – die App prüft beim Start, ob eine neue Version veröffentlicht wurde, und zeigt dann das Banner „Eine neue Version von SOL-Noten ist geladen" mit einem Aktualisieren-Knopf. So ist immer eindeutig erkennbar, ob ein Update angekommen ist.
-- **Notenübersicht & Zeugnisnoten** (nach dem Excel-Blatt „Noten") – alle Schüler/innen und alle Noten des Schuljahres in einer Tabelle: SoLei-Noten der vier Quartale mit Halbjahres- und Jahresdurchschnitt, alle OBT- und Klausurnoten mit Durchschnitten, gewichtete Zeugnisnote je Halbjahr und Schuljahr (fehlende Bereiche werden automatisch neu normiert), Tendenzpfeil (↑↗→↘↓, 2. HJ gegenüber 1. HJ) sowie die Spalten „HJ-Zeugnis" und „Jahreszeugnis" für die manuelle pädagogische Zeugnisnoten-Entscheidung. Umschalter „Ansicht: Klasse" / „Ansicht: Schüler/in": Die Klassenansicht zeigt die Gesamttabelle, die Einzelansicht die vollständige Notenübersicht einer Person (mit ‹ ›-Blättern und zentrierter „Zeugnisnoten"-Zeile, sobald eine Zeugnisnote eingetragen ist). Export als echte Excel-Datei und Druck/PDF (Querformat).
-- **Notenausdruck je Schüler/in** (nach dem Excel-Blatt „Notenausdruck") – für das Notengespräch: je Quartal die Kriterien mit Maximal- und erreichten Punkten (grün/rot gegenüber dem Vorquartal), Punktesumme, Note SL-Bogen, Portfolio und SoLei-Note; alle OBT- und Klausurnoten; vorläufige Gesamtnote mit Tendenz. Blättern zwischen den Schüler/innen, Druck/PDF (Hochformat).
-- **Punkteprotokoll mit Kriterium-Filter und Diagramm** – ein Tipp auf ein Kriterium filtert alle Vergaben dieses Kriteriums im gewählten Quartal und zeigt die Entwicklung als Liniendiagramm (Rasterlinien auf den Tipp-Stufen, Datumsachse).
-- **Unentschuldigte Fehlzeiten** – je Kurs mit Datum erfassbar; jede Fehlzeit vergibt automatisch 0 Punkte in allen fünf SoLei-Kriterien des Tages (das Quartal ergibt sich aus dem Datum). Löschen einer Fehlzeit entfernt auch die 0-Punkte-Vergaben. Im Punkteprotokoll sind Fehlzeiten gekennzeichnet und nur über die Fehlzeiten-Seite veränderbar. Zwei Ansichten mit Umschalter: „Ansicht: Schüler/in" (Standard, alle Fehlzeiten je Person im gewählten Quartal) und „Ansicht: Datum" (tagesweises Erfassen). **Unterrichtstage je Kurs (optional):** In den Kurs-Einstellungen lassen sich die Wochentage hinterlegen, an denen das Fach unterrichtet wird; die Schüler-Ansicht zeigt dann nur noch diese Tage als Chips. Stundenplanänderungen werden über „+ Änderung ab Datum" abgebildet – jedes Datum wird gegen das an ihm gültige Segment geprüft, ein Wechsel mitten im Quartal stellt sich also korrekt dar, und die Basis gilt auch rückwirkend. Bereits erfasste Fehlzeiten bleiben immer sichtbar, auch wenn ihr Datum kein Unterrichtstag (mehr) ist. In der Datums-Ansicht bleibt das Datum frei wählbar; fällt es auf keinen Unterrichtstag, erscheint ein Hinweis, die Erfassung bleibt aber möglich (Vertretung, Exkursion). Ohne hinterlegte Unterrichtstage verhält sich alles wie bisher (alle Tage außer Sonntag). Beim Schuljahreswechsel werden Unterrichtstage bewusst nicht übernommen, da Stundenpläne wechseln – ein Hinweis erinnert daran, sie in den neuen Kursen neu festzulegen.
-- **Stundeninhalte** – erreichbar über das farbige Buch-Symbol in der weißen Box unterhalb der Titelzeile auf der Kurs-Hauptansicht (rechts neben Quartal und Zeitraum). Zeigt je Quartal die Termine des Kurses (nur die in den Kurs-Einstellungen hinterlegten Unterrichtstage; ohne Konfiguration alle Tage außer Sonntag) mit je einem Textfeld für den Unterrichtsinhalt. Automatisches Speichern beim Verlassen des Feldes, leerer Text löscht den Eintrag; Termine mit Eintrag bleiben immer sichtbar, der heutige Tag ist hervorgehoben. Sortierung standardmäßig chronologisch aufsteigend, per Pfeil-Symbol neben „Termin" umkehrbar; die Datumsangabe ist als „Mo, 02.09.27" verkürzt, damit sie auf Smartphones in eine Zeile passt. Quartalsauswahl und der rahmenlose Umschalter „Hinweise" teilen sich eine Karte; die Hinweise verlinken zu den Kurs-Einstellungen (Unterrichtstage) und zur Schüler/in-Ansicht von „SoLei-Punkte vergeben" (schülerbezogene Notizen). Die Einträge sind im „Excel-Export aller Schuljahresdaten" als eigener Abschnitt je Kurs enthalten; beim Schuljahreswechsel bleiben sie als Aufzeichnung im alten Schuljahr.
-- **Ergebnis-Uploads (Zählung am Quartalsende)** – wenn Schüler/innen ihre Arbeitsergebnisse regelmäßig in das Learning-Management-System der Schule (z. B. Moodle/Logineo, OneNote) hochladen sollen, kann die Lehrkraft statt der täglichen Einzelbewertung am Quartalsende je Person die Anzahl der erledigten und der vergessenen Uploads eintragen. Jeder erledigte Upload zählt mit der Maximalpunktzahl des gewählten SoLei-Kriteriums, jeder vergessene mit 0 Punkten; die Punkte fließen ohne Datum in die Durchschnittsberechnung des Kriteriums ein (und damit in Punktesumme, SoLei-Note und Zeugnisnote). Das Ziel-Kriterium ist je Kurs in den Kurs-Einstellungen wählbar (Standard: Arbeitsergebnisse). Erneutes Speichern ersetzt die Zählung; 0/0 entfernt sie. Im Liniendiagramm erscheinen die Upload-Punkte nicht als Datenpunkte (kein Datum), sondern als Anmerkung darunter („x mal Ergebnisse hochgeladen, x Ergebnisse fehlen") – am Bildschirm und im Diagramme-Druck.
-- **SoLei-Punktestand als eigene Seite** – die Punktestand-Liste des aktuellen Quartals (Punktesumme, Note, Bearbeitungsstand je Schüler/in) ist zusätzlich zur Kursseite über einen eigenen Menüpunkt erreichbar; ein Tipp auf eine Person öffnet ihr Punkteprotokoll. Auch auf der Seite „SoLei-Quartalsnoten“ öffnet ein Tipp auf einen Namen direkt die Schüler-Ansicht des SoLei-Punktestands mit den Kriteriendetails dieser Person; der Zurück-Button führt wieder zu den Quartalsnoten.
-- **Zuverlässiger Druck auf iPad und Android** – Druck/PDF öffnet ein isoliertes Druckfenster, das nur den Druckinhalt enthält. Damit funktionieren Druckvorschau und PDF-Erzeugung auch auf iPadOS (Safari) und Android (Chrome) zuverlässig. Das Druckfenster hat eine Bedienleiste mit „Drucken / als PDF" und „Schließen" (wichtig im iPad-Vollbildmodus, um zur App zurückzukehren); die Leiste erscheint nicht im Ausdruck. Der Einzelausdruck passt auf eine A4-Seite, alle Tabellen in voller Seitenbreite.
-- **Schülerfotos in den Erfassungslisten** – in den Listen der Seiten „SoLei-Punkte vergeben", „Open Book Tests", „Klausuren" und „SoLei-Quartalsabschluss" steht ein kleines Schülerfoto links neben dem Namen (ohne Foto: Initialen) – hilfreich, um Namen und Gesichter sicher zuzuordnen.
-- **Tastatur-Erfassung am PC/Mac** – auf der Seite „SoLei-Punkte vergeben" können Punkte zusätzlich per Tastatur vergeben werden: Enter oder Pfeiltasten bewegen eine farblich hervorgehobene aktive Zeile durch die Liste (in „Ansicht: Kriterium" durch die Schüler/innen, in „Ansicht: Schüler/in" durch die Kriterien), Zifferntasten vergeben die tatsächlichen Punkte (z. B. 3 ↓ 2 ↓ 3 ↓ 1). Kommawerte wie 1,5 lassen sich als „1,5", „15" oder „1," gefolgt von Enter tippen (Komma oder Punkt); bei mehrdeutigen Eingaben entscheidet die nächste Taste, Enter/Pfeil oder eine kurze Wartezeit. Ungültige Eingaben blinken kurz rot. Escape blendet die Markierung aus. Touch- und Mausbedienung bleiben unverändert.
-- **Übersichtliches Kurs-Menü** – die Kursseite ordnet alle Funktionen paarweise an: SoLei-Punkte vergeben / Sitzplan, SoLei-Punktestand / Ergebnis-Uploads, Unentschuldigte Fehlzeiten / SoLei-Quartalsnoten, Open Book Tests / Klausuren, Notenübersicht & Zeugnisnoten / Kurs-Einstellungen. Die Titelzeile aller Einzelseiten führt einheitlich zu den Einstellungen und zur Startseite. Die Startseite bietet unter „+ Kurs anlegen“ zusätzlich einen Button „Globale Einstellungen“.
-- **SoLei-Bewertung direkt aus dem Sitzplan** – der Sitzplan hat zwei Modi (Umschalter oben): Im Modus „Noten geben" (Standard) öffnet ein Tipp auf eine Person direkt die SoLei-Vergabe im Schüler-Modus (eine Person, alle fünf Kriterien, aktuelles Quartal und heutiges Datum); der Zurück-Weg führt wieder zum Sitzplan, die ‹ ›-Pfeile bleiben zum Weiterbewerten erhalten. Im Modus „Sitzplan bearbeiten" (optisch abgegrenzt) verschiebt und platziert ein Tipp die Personen wie zuvor. Kacheln ohne Foto (Initialen) sind ebenso bewertbar.
-- **Kachelbeschriftung** – die Sitzplan-Kacheln zeigen Vorname (ganz) und Nachname (bei Bedarf abgekürzt) in einer Zeile.
-- **Sitzplan mit Fotos** – je Kurs ein Sitzplan auf einem Raster mit einstellbarer Spaltenzahl (Zeilen wachsen nach Bedarf); Personen per Antippen setzen, verschieben, freiräumen, „automatisch anordnen“. Fotoverwaltung je Schüler/in über Kamera oder Galerie; Fotos werden auf 200 × 200 Pixel verkleinert (JPEG) und – bei aktiver Verschlüsselung – mit dem Hauptschlüssel verschlüsselt in einem eigenen Speicherbereich abgelegt. Ein Foto gilt für alle Kurse der Klasse. Beim ersten Öffnen ist ein Datenschutzhinweis (Einwilligungspflicht, rein lokale Speicherung) zu bestätigen.
-- **Getrennte Foto-Sicherung** – Fotos sind nicht Teil des schlanken Noten-Backups; sie werden über „Sitzplan → Fotos verwalten → Fotos jetzt sichern“ als eine einzelne, passwortverschlüsselte Datei gesichert und separat wieder eingespielt.
-- **Verschlüsselte Backups (verpflichtend)** – jedes Backup wird mit einem Passwort (mind. 6 Zeichen) und AES-256-GCM verschlüsselt (Schlüsselableitung PBKDF2/SHA-256, 310.000 Runden). Beim Einspielen fragt die App das Passwort ab. Einen unverschlüsselten Klartext-Export gibt es bewusst nicht. Achtung: Ein vergessenes Passwort ist nicht wiederherstellbar.
-- **Diagramm-Druck** – im Punkteprotokoll lassen sich die Liniendiagramme aller fünf Kriterien eines Quartals gesammelt drucken bzw. als PDF speichern; unentschuldigte Fehlzeiten erscheinen als rote Punkte (auch im Bildschirm-Diagramm), Fehlzeiten-Hinweise sind direkt zur Fehlzeiten-Verwaltung verlinkt.
-- **Acht Farbschemata** – in den globalen Einstellungen wählbar: Petrol (Standard), Ozeanblau, Himmelblau, Orange, Beere, Aubergine, Waldgrün, Schieferblau; die Titelzeile der App und die Browser-Farbleiste übernehmen das gewählte Schema.
-- **Verpflichtender Zugangsschutz & Verschlüsselung ab Ersteinrichtung** – am Ende der Ersteinrichtung bestätigt die nutzende Person einen Haftungshinweis und legt anschließend zwingend eine PIN (4–8 Ziffern) oder ein Passwort (mind. 10 Zeichen, empfohlen bei mobil genutzten Geräten) fest; danach sind alle Daten auf dem Gerät verschlüsselt (AES-256). Der Haftungshinweis ist jederzeit unter „Einstellungen → Über diese App“ nachlesbar. Ein erstes Backup wird empfohlen (die 7-Tage-Erinnerung greift, sobald Daten erfasst sind), aber bei noch leerer Datenbank nicht erzwungen.
-- **Biometrische Entsperrung (Mobilgeräte)** – optional in den Einstellungen aktivierbar, sobald die Verschlüsselung läuft und das Gerät Fingerabdruck/Gesichtserkennung bietet (WebAuthn/PRF). Der Sperrbildschirm bietet dann beim Start die biometrische Entsperrung an; nach drei erfolglosen Versuchen fällt er automatisch auf PIN bzw. Passwort zurück, die jederzeit als gleichwertiger Weg bleiben. Biometrie erhöht den Komfort, nicht die Sicherheit: Sie entsperrt denselben Hauptschlüssel wie PIN/Passwort, ist an das jeweilige Gerät gebunden und wird nach einem Gerätewechsel neu eingerichtet.
-- **Zugangsschutz (PIN oder Passwort) & Datenbank-Verschlüsselung** – in den globalen Einstellungen aktivierbar. Die Datenbank (inkl. der internen Sicherungsstände) wird mit einem zufälligen 256-Bit-Hauptschlüssel verschlüsselt (AES-256-GCM); PIN (4–8 Ziffern) bzw. Passwort (mind. 10 Zeichen, deutlich höherer Schutz bei Geräteverlust) umhüllt nur diesen Hauptschlüssel (PBKDF2, 310.000 Runden). Beim Start erscheint je nach Modus ein Ziffernfeld oder ein Passwortfeld (am Computer ist die PIN-Eingabe auch über die physische Tastatur möglich: Ziffern, Rücktaste, Enter zum Bestätigen, Escape zum Löschen – auf Tablet/Smartphone unverändert per Fingertipp); Schaltfläche „Jetzt sperren“ in den Einstellungen zum manuellen Sperren; automatische Sperre bei Inaktivität (Aus/sofort/1/5/15 Min., Standard 5); jede Sperre wirkt tab-übergreifend – sperrt sich ein Tab (Timer, Menü oder Verlassen der App), sperren sich alle anderen offenen Tabs der App sofort mit. Nach 5 Fehlversuchen Wartezeit 30 s mit Verdopplung je weiterem Fehlversuch, keine Datenlöschung. Die Einrichtung erzwingt zuerst ein frisches Backup; „PIN / Passwort ändern" erlaubt jederzeit auch den Wechsel zwischen beiden Modi. Aus Datenschutzgründen lässt sich die Verschlüsselung bewusst nicht deaktivieren. „PIN/Passwort vergessen" führt ausschließlich über App-Reset + Backup (bewusst keine Hintertür, keine E-Mail-/Sicherheitsfragen-Wiederherstellung). Automatische Ordner-Backups werden bei aktiver Verschlüsselung mit dem Hauptschlüssel verschlüsselt und beim Einspielen per PIN/Passwort entsperrt; manuelle Backups behalten ihr eigenes Passwort.
-- **Datensicherung** – alles bleibt lokal (IndexedDB). Backup-Datei speichern/einspielen, Erinnerung nach 7 Tagen, automatisches Backup in einen freigegebenen Ordner (Chrome/Edge am Computer und Android; die Ordner-Freigabe vergibt der Browser nur je Sitzung – ein Hinweis auf der Startseite fragt sie bei Bedarf per Klick neu an), interne tägliche Sicherungsstände der letzten 14 Tage gegen Fehlbedienung. Importierte Dateien werden vor der Übernahme auf Aufbau und Plausibilität geprüft; ungewöhnlich große Dateien (Backup über 10 MB, Foto-Sicherung über 50 MB, präparierte Excel-Dateien) lehnt die App ab. Tipp: Als Backup-Ziel eignet sich auch ein von OneDrive/Google Drive synchronisierter Ordner – so entsteht ohne Zusatztechnik ein (verschlüsseltes) Cloud-Backup. Eine Content-Security-Policy (Meta-Tag in `index.html`) beschränkt die App auf eigene Skripte und Stile; als einzige externe Verbindung ist die OpenHolidays-Ferien-API zugelassen. Das isolierte Druckfenster erbt diese Richtlinie und ist von ihr abgedeckt.
-- **Einstellungen** – Kriteriennamen (global), Bewertungsspiegel für das 15-Punkte-Schema (SoLei) und für Prozentwerte (OBT/Klausuren); Standardwerte jeweils aus der Excel-Datei.
+#app { max-width: 760px; margin: 0 auto; padding: 0 12px 96px; }
+.screen { display: flex; flex-direction: column; gap: 14px; padding-top: 8px; }
 
-## Hinweis bei Updates
+/* ---------- Kopfzeile ---------- */
+.topbar {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 2px 2px;
+}
+.topbar-title {
+  flex: 1; margin: 0;
+  font-size: 1.25rem; font-weight: 650; letter-spacing: -0.01em;
+  line-height: 1.15;
+}
+.logo-dot {
+  width: 34px; height: 34px; border-radius: 10px;
+  background: linear-gradient(150deg, var(--teal), var(--teal-dark));
+  flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+}
+.logo-dot svg { width: 26px; height: 26px; display: block; }
+.icon-btn {
+  width: 42px; height: 42px; border-radius: 12px;
+  border: 1px solid var(--line); background: var(--card);
+  font-size: 1.4rem; color: var(--ink); cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.icon-btn:active { background: var(--teal-soft); }
+.icon-btn-primary {
+  background: var(--teal); border-color: var(--teal); color: #fff;
+}
+.icon-btn-primary:active { background: var(--teal-dark); border-color: var(--teal-dark); }
+.warn-text {
+  color: var(--ink); background: var(--amber-soft);
+  border-left: 3px solid var(--amber); border-radius: 0;
+  padding: 8px 10px; margin-top: 10px;
+}
 
-Bei jeder neuen Version die Versionsnummer in `sw.js` (Zeile `var CACHE = 'sol-noten-v…'`) erhöhen, damit installierte Apps die neuen Dateien laden.
+/* Kursnamen-Box mit rechtsbündigem Button (SoLei-Punktestand, Schüler/in) –
+   kompakter Button, damit die Box nicht höher wird. */
+/* Wichtig: .card.course-box-row (nicht nur .course-box-row), denn .card
+   setzt flex-direction: column und steht später im Stylesheet – bei gleicher
+   Spezifität würde die Spalten-Regel gewinnen und der Button unter den
+   Namen rutschen. */
+.card.course-box-row {
+  display: flex; flex-direction: row; align-items: center;
+  justify-content: space-between;
+  gap: 10px; text-align: left; padding-top: 9px; padding-bottom: 9px;
+}
+.course-box-btn { min-height: 30px; padding: 4px 12px; font-size: 0.8rem; border-radius: 8px; }
 
-## Datenschutz
+/* PWA-Installation: Banner auf dem Startbildschirm und Anleitungsschritte */
+.install-banner { border-left: 3px solid var(--teal); border-radius: 0 var(--radius) var(--radius) 0; }
+.install-banner .row-gap { display: flex; gap: 10px; flex-wrap: wrap; }
+.install-steps { margin: 8px 0; padding-left: 1.3rem; font-size: 0.9rem; color: var(--ink-soft); }
+.install-steps li { margin-bottom: 6px; }
 
-Es gibt keinen Server und kein Konto. Sämtliche Noten und Schülerdaten bleiben ausschließlich auf dem Gerät. Die einzige Internetverbindung ist der einmalige Abruf der Schulferientermine (openholidaysapi.org) beim Anlegen eines Schuljahres – dabei werden keine personenbezogenen Daten übertragen.
+/* Hinweis im Formular bei Anlage aus einem bestehenden Kurs */
+.info-text {
+  background: var(--teal-soft); border-left: 3px solid var(--teal);
+  padding: 8px 10px; margin: 0;
+}
 
----
-© 2026 Andreas Vandelaar
+/* iOS-Installationsanleitung: Overlay oben rechts, aber so weit nach unten
+   versetzt, dass der Pfeil darüber sichtbar bleibt. Der Pfeil sitzt nicht am
+   rechten Kartenrand, sondern unterhalb des Teilen-Symbols – das liegt in
+   der Safari-Leiste des iPads links neben „+“ und Tab-Übersicht, also ein
+   Stück von der rechten Bildschirmkante entfernt. */
+.ios-guide {
+  position: fixed; top: 68px; right: 10px; z-index: 1000;
+  width: min(360px, calc(100vw - 20px));
+  background: var(--card); border-radius: var(--radius);
+  box-shadow: 0 6px 24px rgba(0,0,0,0.25); padding: 14px 16px;
+  border: 2px solid var(--teal);
+}
+.ios-guide-arrow {
+  position: absolute; top: -8px; right: 88px; transform: translateY(-100%);
+  font-size: 2.4rem; line-height: 1; color: var(--teal);
+  text-shadow: 0 1px 4px rgba(0,0,0,0.2);
+  animation: ios-arrow-bounce 1.2s ease-in-out infinite;
+}
 
-**Zurück-Geste/-Taste (Android):** Wischen vom Rand bzw. die Zurück-Taste navigiert innerhalb der App seitenweise zurück; ein offenes Dialogfenster wird zuerst geschlossen. Erst von der Startansicht aus beendet die Geste die App. Geplante Funktionen: siehe ROADMAP.md.
+/* iPhone: Safari zeigt das Teilen-Symbol unten in der Mitte – Anleitung
+   dorthin verlagern, mit Abwärtspfeil unterhalb der Karte. */
+.ios-guide-bottom {
+  top: auto; bottom: 88px; right: 10px; left: 10px;
+  width: auto; max-height: calc(100vh - 180px); overflow-y: auto;
+}
+.ios-guide-arrow-down {
+  position: absolute; bottom: -8px; left: 50%; transform: translate(-50%, 100%);
+  font-size: 2.4rem; line-height: 1; color: var(--teal);
+  text-shadow: 0 1px 4px rgba(0,0,0,0.2);
+  animation: ios-arrow-bounce-down 1.2s ease-in-out infinite;
+}
+@keyframes ios-arrow-bounce-down {
+  0%, 100% { transform: translate(-50%, 100%); }
+  50% { transform: translate(-50%, calc(100% + 8px)); }
+}
+@media (prefers-reduced-motion: reduce) { .ios-guide-arrow-down { animation: none; } }
+@keyframes ios-arrow-bounce {
+  0%, 100% { transform: translateY(-100%); }
+  50% { transform: translateY(calc(-100% - 8px)); }
+}
+@media (prefers-reduced-motion: reduce) { .ios-guide-arrow { animation: none; } }
+.ios-guide-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 6px; }
+.ios-guide-close { width: 32px; height: 32px; font-size: 1.2rem; border-radius: 8px; }
+.ios-inline-icon { display: inline-flex; vertical-align: -3px; color: var(--teal); }
+.ios-mockrow {
+  display: flex; align-items: center; gap: 10px;
+  background: var(--paper); border: 1px solid var(--line); border-radius: 10px;
+  padding: 8px 12px; margin-top: 6px; font-size: 0.9rem; color: var(--ink);
+}
+.ios-mockicon { display: inline-flex; color: var(--ink-soft); }
+.ios-mockdevice { margin-left: auto; font-size: 0.75rem; color: var(--muted, var(--ink-soft)); }
+.ios-mockconfirm {
+  display: inline-block; margin-top: 6px; padding: 6px 14px;
+  background: var(--teal); color: #fff; border-radius: 10px;
+  font-size: 0.85rem; font-weight: 650;
+}
 
-## Weiterer Kurs für eine bestehende Klasse
+/* ---------- Karten & Abschnitte ---------- */
+.card {
+  background: var(--card); border-radius: var(--radius);
+  box-shadow: var(--shadow); padding: 16px;
+  display: flex; flex-direction: column; gap: 12px;
+}
+.card-tight { gap: 10px; }
+.card-list { padding: 4px 0; gap: 0; }
+.section-head {
+  font-size: 0.8rem; font-weight: 700; letter-spacing: 0.08em;
+  text-transform: uppercase; color: var(--ink-soft);
+  margin: 6px 4px -6px;
+}
+.section-head-spaced { margin-bottom: 12px; }
+.course-box { text-align: center; font-size: 1.05rem; }
+.collapse-head { display: flex; justify-content: space-between; align-items: center; cursor: pointer; min-height: 32px; }
+.collapse-arrow { color: var(--ink-soft); font-size: 1.1rem; }
+.collapse-body > p:first-child { margin-top: 8px; }
+.collapse-body > p:last-child { margin-bottom: 0; }
+.grades-toggle-row { display: flex; justify-content: flex-end; margin: 2px 4px 8px; }
+.grades-hint { margin: 0 4px 8px; }
+.grades-toggle { flex-shrink: 0; }
+.empty { text-align: center; color: var(--ink-soft); padding: 26px 12px; background: var(--card); border-radius: var(--radius); box-shadow: var(--shadow); }
+.hint { color: var(--ink-soft); font-size: 0.85rem; margin: 0; }
+.hint.block { display: block; }
+.error-text { color: var(--red); }
+.danger-text { color: var(--red); }
 
-Unterrichten Sie eine Klasse in mehreren Fächern, legen Sie den zweiten Kurs über „Kurs-Einstellungen → Weitere Kurs-Verwaltung → Neuer Kurs für ein anderes Fach in dieser Klasse" an. Klasse und Schülerliste (samt Fotos) werden weiterverwendet – die Liste gehört ohnehin zur Klasse, nicht zum Kurs. Vorbelegt werden Einstellungen (Anzahl OBT/Klausuren, Gewichtung, Upload-Kriterium), Maximalpunkte und Sitzplan; alle Felder bleiben änderbar. Nicht übernommen werden Bewertungsdaten, Stundeninhalte, Notizen und die Unterrichtstage (ein anderes Fach liegt meist an anderen Wochentagen).
+.row-between { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.row-gap { display: flex; align-items: center; gap: 8px; }
+.actions-col { display: flex; flex-direction: column; gap: 8px; }
 
-## Installation als App
+/* ---------- Formulare ---------- */
+.field { display: flex; flex-direction: column; gap: 5px; flex: 1; }
+.field-label { font-size: 0.85rem; font-weight: 600; color: var(--ink-soft); }
+.field-row { display: flex; gap: 10px; align-items: end; }
+.field-row .field { justify-content: flex-end; }
+/* Gewichtungszeile: Label-Bereich einheitlich hoch, damit die drei Eingabefelder
+   trotz unterschiedlich langer Beschriftungen auf einer Ebene liegen. */
+.weight-row .field .hint {
+  min-height: 2.4em; display: flex; align-items: flex-end;
+}
+.weight-row .field { flex: 1; }
+.weight-row .input-num { max-width: none; width: 100%; }
+.input {
+  font: inherit; padding: 11px 12px; border-radius: 10px;
+  border: 1px solid var(--line); background: #fbfcfc; color: var(--ink);
+  min-height: 46px; width: 100%;
+}
+.input:focus { outline: 2px solid var(--teal); outline-offset: 1px; border-color: var(--teal); }
+.input-num { max-width: 7rem; }
+/* type="date" hat auf iOS/WebKit eine intrinsische Mindestbreite, die width:100%
+   sprengen kann und das Feld über die Box hinauswachsen lässt. min-width:0 zähmt das. */
+.input[type="date"] { min-width: 0; max-width: 100%; -webkit-appearance: none; appearance: none; }
+.import-area { font-family: ui-monospace, Consolas, monospace; font-size: 0.85rem; }
+.date-inline { min-height: 38px; padding: 6px 8px; width: auto; }
 
-SOL-Noten lässt sich als App installieren (eigenes Symbol, eigenes Fenster, offline nutzbar; Daten und Anmeldung bleiben erhalten):
+/* ---------- Buttons ---------- */
+button { font: inherit; cursor: pointer; }
+.btn-primary {
+  background: var(--teal); color: #fff; border: none;
+  border-radius: 12px; padding: 12px 18px; font-weight: 650;
+  min-height: 48px;
+}
+.btn-primary:active { background: var(--teal-dark); }
+.btn-plain {
+  background: var(--card); color: var(--ink);
+  border: 1px solid var(--line); border-radius: 12px;
+  padding: 11px 16px; min-height: 46px;
+}
+.btn-plain:active { background: var(--teal-soft); }
+.btn-danger {
+  background: var(--red); color: #fff; border: none;
+  border-radius: 12px; padding: 12px 18px; font-weight: 650; min-height: 48px;
+}
+.input-flash { outline: 2px solid var(--red); outline-offset: -1px; background: var(--red-soft); }
+.danger-zone {
+  margin-top: 18px; padding-top: 12px; border-top: 1px solid var(--line);
+}
+.danger-zone .hint { margin: 0 0 6px; color: var(--red); font-weight: 600; }
+.transfer-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 4px; min-height: 44px; cursor: pointer;
+}
+.transfer-row + .transfer-row { border-top: 1px solid var(--line); }
+.transfer-row input[type="checkbox"] { width: 20px; height: 20px; flex-shrink: 0; }
 
-- **PC/Android (Chrome, Edge):** Die App bietet einen eigenen Button „App installieren" an – auf dem Startbildschirm (ausblendbarer Hinweis) und in den Globalen Einstellungen unter „App-Installation". Er öffnet den nativen Installationsdialog des Browsers.
-- **iPhone/iPad (Safari):** Apple stellt keinen Installationsdialog bereit; die App zeigt stattdessen eine Schritt-für-Schritt-Anleitung als Overlay oben rechts – in zwei geräteabhängigen Varianten: Auf dem iPad steht sie oben rechts, mit animiertem Pfeil nach oben auf das Teilen-Symbol der Safari-Leiste, und führt über „Mehr anzeigen" (Pfeilspitze nach unten) zum Ziel. Auf dem iPhone steht sie unten mittig, mit Pfeil nach unten auf das dort platzierte Teilen-Symbol; „Mehr anzeigen" entfällt, weil „Zum Home-Bildschirm" direkt im Menü erscheint. Beide Varianten bilden die Menüpunkte „Zum Home-Bildschirm" und „Hinzufügen" nach.
-- **Firefox am PC** unterstützt keine Installation von Web-Apps; SOL-Noten läuft dort normal im Browser.
+/* ---------- Kursnotizen ---------- */
+/* Wrapper übernimmt den Zeilentrenner, damit .tap-row:last-child im Wrapper
+   nicht alle Trennlinien der Liste löscht. */
+.note-wrap { border-bottom: 1px solid var(--line); }
+.note-wrap:last-child { border-bottom: none; }
+.note-wrap .tap-row { border-bottom: none; }
+.avatar-col { display: flex; flex-direction: column; gap: 6px; align-items: center; flex-shrink: 0; }
+.note-btn {
+  width: 40px; height: 40px; border-radius: 9px;
+  border: 1px solid var(--line); background: var(--card); color: var(--ink-soft);
+  display: flex; align-items: center; justify-content: center; padding: 0;
+}
+.note-btn.has-note { background: var(--teal-soft); color: var(--teal-dark); border-color: var(--teal); }
+.note-btn.open { outline: 2px solid var(--teal); outline-offset: -1px; }
+.note-panel { padding: 0 14px 12px; }
+textarea.input.note-area {
+  width: 100%; min-height: 72px; resize: vertical; font: inherit; line-height: 1.4;
+}
+.review-notes { margin-top: 6px; padding-top: 6px; border-top: 1px dashed var(--line); }
+.review-notes.no-top-border { margin-top: 0; padding-top: 0; border-top: none; }
+.section-head-inline { font-weight: 700; font-size: 0.9rem; }
+.grades-charts { display: flex; flex-direction: column; gap: 12px; margin-top: 12px; }
+.review-note { margin: 2px 0; font-size: 0.85rem; color: var(--ink); }
+.review-note .note-date { color: var(--ink-soft); font-weight: 600; }
+/* Lange Beschriftungen (z. B. „Neuer Kurs für ein anderes Fach …“) dürfen
+   auf schmalen Displays umbrechen statt abgeschnitten zu werden. */
+.btn-block { width: 100%; white-space: normal; line-height: 1.3; height: auto; }
+.btn-big { font-size: 1.1rem; min-height: 58px; }
+.btn-small { min-height: 36px; padding: 6px 12px; border-radius: 9px; font-size: 0.85rem; }
 
-Ist die App bereits installiert, zeigen beide Stellen das an und der Hinweis entfällt automatisch. Wurde der Hinweis auf dem Startbildschirm mit „Nicht mehr anzeigen" ausgeblendet, bleibt die Installation über die Globalen Einstellungen jederzeit erreichbar.
+/* ---------- Startbildschirm ---------- */
+.year-label { display: inline-flex; align-items: center; gap: 8px; font-weight: 600; }
+.year-select { font: inherit; border: 1px solid var(--line); border-radius: 9px; padding: 7px 10px; background: var(--card); }
+.course-grid { display: grid; grid-template-columns: 1fr; gap: 12px; }
+@media (min-width: 560px) { .course-grid { grid-template-columns: 1fr 1fr; } }
+.course-tile {
+  background: var(--card); border-radius: var(--radius); box-shadow: var(--shadow);
+  padding: 16px; display: flex; flex-direction: column; gap: 6px; cursor: pointer;
+  border-top: 4px solid var(--teal);
+}
+.course-tile-class { font-weight: 750; font-size: 1.15rem; letter-spacing: -0.01em; }
+.course-tile-subject { color: var(--ink-soft); }
+.course-tile-meta { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 4px 0 8px; }
+.quarter-chip {
+  background: var(--teal-soft); color: var(--teal-dark);
+  border-radius: 999px; padding: 3px 11px; font-size: 0.8rem; font-weight: 700;
+}
+.quarter-chip.big { font-size: 0.95rem; padding: 5px 14px; }
+.quarter-chip.due { background: var(--amber-soft); color: var(--amber); }
+.quarter-chip.completed { background: var(--green-soft); color: var(--green); }
+.btn-capture {
+  background: var(--teal); color: #fff; border: none; border-radius: 11px;
+  padding: 12px; font-weight: 650; min-height: 48px;
+}
+.btn-capture:active { background: var(--teal-dark); }
 
-## Hinweis zu Exporten
+/* ---------- Hinweise / Banner ---------- */
+.banner-warn, .banner-info {
+  border-radius: var(--radius); padding: 12px 14px;
+  display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap;
+  font-size: 0.92rem;
+}
+.banner-warn { background: var(--amber-soft); color: var(--amber); border: 1px solid #efd9b0; }
+.banner-info { background: var(--teal-soft); color: var(--teal-dark); border: 1px solid #c4e0dc; }
+.banner-actions { display: flex; gap: 8px; }
 
-Backups sind mit einem Passwort verschlüsselt (AES-256-GCM). **Exporte und Ausdrucke sind es nicht**: Excel-Dateien und PDFs enthalten personenbezogene Daten im Klartext. Alle Export- und Druckdialoge weisen darauf hin. Exportierte Dateien gehören daher auf ein geschütztes Gerät und nicht in ungeschützte Cloud-Ordner oder E-Mail-Anhänge.
+/* ---------- Setup ---------- */
+.setup-hero { text-align: center; padding: 28px 0 6px; }
+.setup-hero h1 { margin: 10px 0 2px; font-size: 1.7rem; letter-spacing: -0.02em; }
+.setup-hero p { margin: 0; color: var(--ink-soft); }
+.setup-mark {
+  width: 64px; height: 64px; margin: 0 auto; border-radius: 18px;
+  background: linear-gradient(150deg, var(--teal), var(--teal-dark));
+  color: #fff; font-size: 1.7rem; font-weight: 800;
+  display: flex; align-items: center; justify-content: center;
+}
+
+/* ---------- Schüler- und Protokollzeilen ---------- */
+.student-row, .log-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  padding: 12px 16px; border-bottom: 1px solid var(--line);
+}
+.student-row:last-child, .log-row:last-child { border-bottom: none; }
+.student-row { cursor: pointer; }
+.student-name { font-weight: 600; }
+.student-stats { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+
+.sum-pill {
+  background: var(--ink); color: #fff; border-radius: 999px;
+  padding: 3px 11px; font-size: 0.85rem; font-weight: 700; font-variant-numeric: tabular-nums;
+}
+.sum-pill.small { font-size: 0.75rem; padding: 2px 8px; }
+.sum-pill.ok { background: var(--green); }
+.sum-pill.bad { background: var(--red); }
+.grade-pill {
+  border-radius: 999px; padding: 3px 11px; font-size: 0.85rem; font-weight: 700;
+  background: var(--teal-soft); color: var(--teal-dark); font-variant-numeric: tabular-nums;
+}
+.grade-pill.small { font-size: 0.75rem; padding: 2px 8px; }
+.grade-pill.g1, .grade-pill.g2 { background: var(--green-soft); color: var(--green); }
+.grade-pill.g3, .grade-pill.g4 { background: var(--amber-soft); color: var(--amber); }
+.grade-pill.g5, .grade-pill.g6 { background: var(--red-soft); color: var(--red); }
+
+/* ---------- SoLei-Erfassung ---------- */
+.capture-bar { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: nowrap; }
+.capture-qnote { margin: 0 0 8px; }
+.date-field { display: inline-flex; align-items: center; flex-shrink: 1; min-width: 0; }
+
+/* Ansicht-Umschalter (Kriterium/Schüler bzw. Datum/Schüler) */
+.view-toggle { display: inline-flex; gap: 6px; flex-wrap: nowrap; flex-shrink: 0; }
+.view-btn {
+  border: 1px solid var(--line); background: var(--card); color: var(--ink-soft);
+  border-radius: 10px; padding: 8px 12px; min-height: 40px; font-size: 0.85rem; font-weight: 600;
+  white-space: nowrap;
+}
+.view-btn.active { background: var(--teal); border-color: var(--teal); color: #fff; }
+
+/* Auf schmalen Displays Datum/Quartal & Umschalter in einer Zeile halten */
+@media (max-width: 420px) {
+  .capture-bar { gap: 6px; }
+  .date-inline { font-size: 0.8rem; padding: 6px 6px; min-height: 36px; }
+  .q-select { font-size: 0.8rem; padding: 6px 6px; min-height: 36px; max-width: 6.5rem; }
+  .view-btn { padding: 8px 9px; font-size: 0.8rem; }
+}
+
+/* Fehlzeiten – Ansicht Schüler/in: Werktags-Chips */
+.abs-student-block { padding: 10px 14px; border-bottom: 1px solid var(--line); background: var(--card); }
+.abs-student-block:first-child { border-top-left-radius: var(--radius); border-top-right-radius: var(--radius); }
+.abs-student-block:last-child { border-bottom: none; border-bottom-left-radius: var(--radius); border-bottom-right-radius: var(--radius); }
+.day-chip-grid { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.day-chip {
+  border: 1px solid var(--line); background: var(--paper); color: var(--ink);
+  border-radius: 8px; padding: 6px 8px; min-height: 38px; font-size: 0.8rem;
+  font-variant-numeric: tabular-nums; min-width: 3.6rem;
+}
+.day-chip.absent { background: var(--red); border-color: var(--red); color: #fff; font-weight: 700; }
+
+/* Kurs-Einstellungen – Unterrichtstage: Wochentag-Chips und Änderungs-Segmente */
+.wd-chip-row { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.wd-chip {
+  border: 1px solid var(--line); background: var(--paper); color: var(--ink);
+  border-radius: 8px; padding: 6px 0; min-height: 40px; min-width: 3rem;
+  font-size: 0.85rem; text-align: center;
+}
+.wd-chip.selected { background: var(--teal); border-color: var(--teal); color: #fff; font-weight: 700; }
+.td-seg { margin-bottom: 12px; }
+.td-seg.td-change {
+  border: 1px solid var(--line); border-radius: var(--radius);
+  padding: 10px 12px; background: color-mix(in srgb, var(--teal) 6%, var(--card));
+}
+
+/* Stundeninhalte: Kopfkarte, einklappbare Hinweise und Terminliste */
+.quarter-line { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; min-width: 0; }
+.hints-toggle {
+  display: inline-flex; align-items: center; gap: 6px;
+  border: none; background: none; box-shadow: none;
+  min-height: 32px; padding: 2px 0; font-size: 0.9rem; color: var(--muted);
+}
+.hints-toggle:active { background: none; }
+.hints-arrow { font-size: 0.8rem; }
+.hint-with-btn { display: flex; align-items: flex-start; gap: 10px; margin-top: 10px; }
+.hint-with-btn .hint { flex: 1; margin: 0; }
+.hint-with-btn .btn-small { flex-shrink: 0; }
+.lesson-row {
+  display: flex; align-items: flex-start; gap: 10px;
+  padding: 8px 0; border-bottom: 1px solid var(--line);
+}
+.lesson-row:last-child { border-bottom: none; }
+.lesson-row.today { background: color-mix(in srgb, var(--teal) 10%, var(--card)); border-radius: 8px; padding-left: 6px; padding-right: 6px; }
+.lesson-date {
+  flex-shrink: 0; width: 6.4rem; font-size: 0.9rem; padding-top: 8px;
+  display: inline-flex; align-items: center; gap: 6px; white-space: nowrap;
+}
+.lesson-row.today .lesson-date { font-weight: 700; }
+.lesson-ta { flex: 1; min-height: 40px; resize: vertical; }
+.lesson-row.lesson-head { border-bottom: 2px solid var(--line); padding-bottom: 6px; }
+.lesson-row.lesson-head .lesson-date, .lesson-head-label { font-weight: 700; padding-top: 0; font-size: 0.9rem; }
+.sort-btn { width: 30px; height: 30px; border-radius: 8px; font-size: 1rem; }
+@media (max-width: 480px) {
+  .hint-with-btn { flex-direction: column; align-items: stretch; }
+  .lesson-date { width: 5.4rem; gap: 4px; font-size: 0.85rem; }
+  .lesson-row { gap: 8px; }
+}
+.crit-tabs { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 2px; }
+.crit-tab {
+  flex-shrink: 0; border: 1px solid var(--line); background: var(--card);
+  border-radius: 999px; padding: 8px 14px; font-size: 0.85rem; color: var(--ink-soft);
+}
+.crit-tab.active { background: var(--ink); border-color: var(--ink); color: #fff; font-weight: 650; }
+.crit-nav {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  padding: 2px 2px;
+}
+.crit-current { text-align: center; font-weight: 700; font-size: 1.05rem; }
+.capture-body { display: flex; flex-direction: column; gap: 10px; }
+
+.tap-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 10px 14px; border-bottom: 1px solid var(--line);
+}
+.tap-row:last-child { border-bottom: none; }
+/* Tastatur-Erfassung: aktive Zeile und Rückweisung ungültiger Eingaben */
+.tap-row.key-active {
+  outline: 2px solid var(--teal); outline-offset: -2px;
+  border-radius: 10px; background: var(--teal-soft);
+}
+.tap-row.key-invalid {
+  outline-color: var(--red); background: var(--red-soft);
+  transition: none;
+}
+.tap-info { min-width: 0; flex: 1; }
+.tap-row > .photo-avatar { flex-shrink: 0; }
+.tap-substats { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 2px; }
+.tap-btns { display: flex; gap: 7px; flex-shrink: 0; }
+.tap-btn {
+  width: var(--tap); height: var(--tap);
+  border-radius: 50%;
+  border: 2px solid var(--line); background: var(--card); color: var(--ink);
+  font-weight: 750; font-size: 1rem; font-variant-numeric: tabular-nums;
+  transition: transform 0.05s ease;
+}
+.tap-btn:active { transform: scale(0.92); }
+.tap-btn.set {
+  background: var(--teal); border-color: var(--teal); color: #fff;
+  box-shadow: 0 0 0 3px var(--teal-soft);
+}
+@media (max-width: 420px) {
+  :root { --tap: 46px; }
+  .tap-btn { font-size: 0.9rem; }
+}
+
+/* ---------- Maximalpunkte / Segmente ---------- */
+.max-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 6px 0; }
+.max-name { font-weight: 600; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 11px; overflow: hidden; flex-shrink: 0; }
+.seg-btn {
+  border: none; background: var(--card); padding: 10px 0; width: 56px; text-align: center;
+  min-height: 44px; font-weight: 650; color: var(--ink-soft);
+  border-right: 1px solid var(--line);
+}
+@media (max-width: 380px) { .seg-btn { width: 48px; } }
+.seg-btn:last-child { border-right: none; }
+.seg-btn.active { background: var(--teal); color: #fff; }
+
+/* ---------- Protokoll ---------- */
+.crit-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 8px; }
+.crit-summary-item {
+  background: var(--paper); border-radius: 10px; padding: 8px 10px;
+  display: flex; flex-direction: column; gap: 2px;
+}
+
+/* ---------- Tabellen ---------- */
+.grading-table, .preview-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+.grading-table th, .grading-table td, .preview-table th, .preview-table td {
+  text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line);
+}
+.grading-table .input-num { min-height: 38px; padding: 6px 8px; }
+
+/* ---------- Toast & Modal ---------- */
+#toast-host { position: fixed; left: 0; right: 0; bottom: 18px; display: flex; justify-content: center; pointer-events: none; z-index: 50; }
+.toast {
+  background: var(--ink); color: #fff; border-radius: 999px;
+  padding: 11px 18px; box-shadow: 0 4px 16px rgba(34,48,58,0.3);
+  display: flex; align-items: center; gap: 14px; pointer-events: auto;
+  max-width: 92vw; font-size: 0.92rem;
+}
+.toast-undo {
+  background: none; border: none; color: #7fd8cf; font-weight: 750;
+  padding: 4px 2px; font-size: 0.92rem;
+}
+.modal-backdrop {
+  position: fixed; inset: 0; background: rgba(34,48,58,0.45);
+  display: flex; align-items: center; justify-content: center; padding: 16px; z-index: 40;
+}
+.modal {
+  background: var(--card); border-radius: 16px; padding: 18px;
+  max-width: 480px; width: 100%; max-height: 86vh; overflow-y: auto;
+  display: flex; flex-direction: column; gap: 12px;
+}
+.modal-title { margin: 0; font-size: 1.1rem; }
+.modal-body { display: flex; flex-direction: column; gap: 10px; }
+.modal-actions { display: flex; justify-content: flex-end; gap: 8px; }
+
+/* ---------- Fokus & Bewegung ---------- */
+button:focus-visible, .input:focus-visible, select:focus-visible {
+  outline: 2px solid var(--teal); outline-offset: 2px;
+}
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; animation: none !important; }
+}
+
+/* ---------- Quartalsabschluss & Entwicklung ---------- */
+.review-row {
+  display: flex; flex-direction: column; gap: 8px;
+  padding: 12px 16px; border-bottom: 1px solid var(--line);
+}
+.review-row:last-child { border-bottom: none; }
+.tappable-name { cursor: pointer; border-radius: 10px; margin: -4px; padding: 4px; transition: background 0.12s; }
+.tappable-name:hover { background: var(--paper); }
+.tappable-name:focus-visible { outline: 2px solid var(--teal); outline-offset: 1px; }
+.review-grades { display: flex; gap: 10px; align-items: stretch; }
+.review-cell {
+  flex: 1; background: var(--paper); border-radius: 10px; padding: 8px 10px;
+  display: flex; flex-direction: column; gap: 3px; justify-content: flex-end;
+}
+.review-cell .hint {
+  min-height: 2.4em; display: flex; align-items: flex-end; line-height: 1.15;
+}
+.review-cell > strong, .review-cell > .grade-input {
+  align-self: stretch; min-height: 40px; display: flex; align-items: center;
+  box-sizing: border-box;
+}
+.review-cell > strong { padding: 0 2px; }
+.review-solei { font-size: 1.05rem; }
+.name-with-photo { display: flex; align-items: center; gap: 10px; }
+.name-with-photo .photo-avatar { flex-shrink: 0; }
+.grade-input { min-height: 40px; padding: 6px 10px; font-weight: 700; max-width: 100%; }
+.input-error { border-color: var(--red); outline: 2px solid var(--red); }
+
+.sum-pill.up { background: var(--green); }
+.sum-pill.down { background: var(--red); }
+.crit-summary-item.up { background: var(--green-soft); }
+.crit-summary-item.up strong { color: var(--green); }
+.crit-summary-item.down { background: var(--red-soft); }
+.crit-summary-item.down strong { color: var(--red); }
+
+@media (min-width: 560px) {
+  /* flex-wrap + volle Breite für .review-notes: Name und Noten stehen
+     nebeneinander, die Kursnotizen brechen darunter um – sonst quetschen
+     sie sich als drittes Flex-Kind rechts daneben und verdecken den Namen. */
+  .review-row { flex-direction: row; flex-wrap: wrap; align-items: center; justify-content: space-between; }
+  .review-name { min-width: 0; flex: 1; }
+  .review-grades { flex: 1.2; }
+  .review-notes { width: 100%; }
+}
+
+/* ---------- Prozent-Bewertungsspiegel ---------- */
+.pct-details summary {
+  cursor: pointer; font-weight: 600; padding: 8px 0; color: var(--teal-dark);
+}
+.pct-scroll { max-height: 340px; overflow-y: auto; border: 1px solid var(--line); border-radius: 10px; padding: 4px 8px; }
+
+/* ---------- Update-Banner ---------- */
+.update-banner {
+  position: fixed; top: 10px; left: 50%; transform: translateX(-50%);
+  background: var(--ink); color: #fff; border-radius: 999px;
+  padding: 9px 10px 9px 18px; display: flex; align-items: center; gap: 12px;
+  box-shadow: 0 4px 16px rgba(34,48,58,0.35); z-index: 60;
+  max-width: 94vw; font-size: 0.92rem;
+}
+
+/* ---------- Notenübersicht ---------- */
+.screen-wide { max-width: none; }
+.table-scroll { overflow-x: auto; background: var(--card); border-radius: var(--radius); box-shadow: var(--shadow); }
+.grades-table { border-collapse: collapse; font-size: 0.82rem; min-width: 100%; }
+.grades-table th, .grades-table td {
+  border: 1px solid var(--line); padding: 5px 7px; text-align: center; white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.grades-table .group-row th {
+  background: var(--ink); color: #fff; font-size: 0.72rem; letter-spacing: 0.04em; text-transform: uppercase;
+}
+.grades-table tr:nth-child(2) th { background: var(--teal-soft); color: var(--teal-dark); }
+.grades-table .sticky-col {
+  position: sticky; left: 0; background: var(--card); text-align: left; z-index: 2;
+  box-shadow: 1px 0 0 var(--line);
+}
+.grades-table .group-row .sticky-col { background: var(--ink); }
+.grades-table tr:nth-child(2) .sticky-col { background: var(--teal-soft); }
+.name-cell { font-weight: 600; cursor: pointer; color: var(--teal-dark); }
+.avg-cell { background: #f6f8f7; font-weight: 600; }
+.z-cell { background: var(--teal-soft); font-weight: 700; }
+.tend-cell { font-size: 1.05rem; font-weight: 700; }
+.z-input { min-height: 34px; width: 4rem; padding: 4px 6px; text-align: center; font-weight: 700; }
+
+/* ---------- Notenausdruck ---------- */
+.report { display: flex; flex-direction: column; gap: 14px; }
+.report-head h2 { margin: 0 0 4px; }
+.print-sub { margin: 0; color: var(--ink-soft); font-size: 0.9rem; }
+.report-section { margin: 4px 0 -6px; }
+.report-block h3 { margin: 0 0 6px; font-size: 0.95rem; }
+.report-table {
+  border-collapse: collapse; font-size: 0.72rem; width: 100%;
+  table-layout: fixed;
+}
+.report-table th, .report-table td {
+  border: 1px solid var(--line); padding: 3px 4px; text-align: center; font-variant-numeric: tabular-nums;
+  white-space: normal; overflow-wrap: break-word; word-break: break-word; hyphens: auto;
+}
+.report-table th:first-child, .report-table td:first-child { width: 3.6rem; }
+@media (max-width: 480px) { .report-table { font-size: 0.62rem; } }
+
+/* Schüleransicht: Auf schmalen Bildschirmen (Smartphones) steht das
+   Liniendiagramm über den Kriterien-Buttons, damit es ohne Scrollen sichtbar
+   ist; auf Tablets/PCs bleibt es darunter. */
+.protokoll-stack { display: flex; flex-direction: column; }
+.protokoll-stack > * { min-width: 0; }
+@media (max-width: 480px) {
+  .protokoll-stack .chart-card-slot { order: -1; }
+}
+.report-table th { background: var(--teal-soft); color: var(--teal-dark); font-weight: 650; }
+.report-table .row-label { text-align: left; color: var(--ink-soft); }
+.report-table .val.strong { font-weight: 750; background: #f6f8f7; }
+.report-table .val.up { background: var(--green-soft); color: var(--green); font-weight: 700; }
+.report-table .val.down { background: var(--red-soft); color: var(--red); font-weight: 700; }
+.report-line { margin: 0; }
+.zeugnis-box { text-align: center; margin-top: 10px; }
+.zeugnis-head { margin: 0 0 4px; font-weight: 750; }
+.zeugnis-line { text-align: center; }
+
+/* ---------- Druck / PDF ----------
+   Der eigentliche Druck erfolgt über ein isoliertes Druckfenster (siehe printNode in app.js),
+   das seine Stile selbst mitbringt. Hier ist daher kein Druck-Stil mehr nötig. */
+
+/* ---------- Farbschemata ---------- */
+[data-theme="blau"]      { --teal: #1d63b8; --teal-dark: #154a8a; --teal-soft: #e4edf8; }
+[data-theme="aubergine"] { --teal: #7a3b78; --teal-dark: #5b2b5a; --teal-soft: #f2e7f1; }
+[data-theme="wald"]      { --teal: #3d7a3f; --teal-dark: #2c5a2e; --teal-soft: #e7f2e7; }
+[data-theme="schiefer"]  { --teal: #4a6274; --teal-dark: #364a59; --teal-soft: #e9eef2; }
+.theme-row { display: flex; flex-wrap: wrap; gap: 8px; }
+.theme-swatch {
+  display: inline-flex; align-items: center; gap: 8px;
+  border: 2px solid var(--line); background: var(--card); border-radius: 999px;
+  padding: 8px 14px 8px 9px; min-height: 44px; font-size: 0.9rem;
+}
+.theme-swatch.active { border-color: var(--teal); font-weight: 650; }
+.theme-dot { width: 22px; height: 22px; border-radius: 50%; flex-shrink: 0; }
+
+/* ---------- Protokoll-Filter & Diagramm ---------- */
+.crit-summary-item.clickable { cursor: pointer; border: 2px solid transparent; }
+.crit-summary-item.selected { border-color: var(--teal); background: var(--teal-soft); }
+.chart-host svg { width: 100%; height: auto; display: block; }
+
+/* ---------- Fehlzeiten ---------- */
+.abs-row { padding: 10px 16px; border-bottom: 1px solid var(--line); display: flex; flex-direction: column; gap: 8px; }
+.abs-row:last-child { border-bottom: none; }
+.abs-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.abs-count {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 22px; height: 22px; border-radius: 999px; margin-left: 8px;
+  background: var(--red); color: #fff; font-size: 0.75rem; font-weight: 750; padding: 0 6px;
+}
+.abs-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.abs-chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: var(--red-soft); color: var(--red); border-radius: 999px;
+  padding: 4px 6px 4px 12px; font-size: 0.85rem; font-weight: 600;
+}
+.abs-x {
+  border: none; background: none; color: var(--red); font-size: 1.1rem;
+  width: 26px; height: 26px; border-radius: 50%; line-height: 1;
+}
+.abs-x:active { background: rgba(180,56,47,0.15); }
+
+/* ---------- Neue Farbschemata ---------- */
+[data-theme="himmel"] { --teal: #0284c7; --teal-dark: #02669a; --teal-soft: #e3f2fb; }
+[data-theme="orange"] { --teal: #d1580a; --teal-dark: #a34408; --teal-soft: #fbeadd; }
+[data-theme="beere"]  { --teal: #b83280; --teal-dark: #8f2663; --teal-soft: #f9e7f2; }
+
+/* ---------- Farbige Titelzeile ---------- */
+.topbar {
+  background: linear-gradient(150deg, var(--teal), var(--teal-dark));
+  border-radius: 14px; padding: 10px 12px; box-shadow: var(--shadow);
+}
+.topbar-title { color: #fff; }
+.topbar .icon-btn {
+  background: rgba(255,255,255,0.14); border-color: rgba(255,255,255,0.35); color: #fff;
+}
+.topbar .icon-btn:active { background: rgba(255,255,255,0.3); }
+.topbar .btn-small.btn-plain {
+  background: rgba(255,255,255,0.14); border-color: rgba(255,255,255,0.35); color: #fff;
+}
+.topbar .logo-dot { background: rgba(255,255,255,0.22); border: 2px solid rgba(255,255,255,0.65); color: #fff; }
+.topbar .logo-dot svg { color: #fff; }
+
+/* ---------- Beta-Kennzeichnung ---------- */
+.beta-tag {
+  display: inline-block; margin-left: 8px; padding: 1px 8px;
+  border-radius: 999px; font-size: 0.62em; font-weight: 700; letter-spacing: 0.04em;
+  text-transform: uppercase; vertical-align: middle;
+  background: rgba(255,255,255,0.25); color: #fff; border: 1px solid rgba(255,255,255,0.5);
+}
+/* Beta-Tag außerhalb der Titelzeile (z. B. im Über-Kasten) im Schema-Ton */
+.about-box .beta-tag {
+  background: var(--teal-soft); color: var(--teal-dark); border-color: var(--teal);
+}
+.about-box { margin-top: 18px; }
+.about-box .section-head { margin-bottom: 8px; }
+.about-box a { color: var(--teal-dark); font-weight: 600; }
+
+/* ---------- Diagramm-Legende ---------- */
+.legend-dot {
+  display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 4px;
+}
+.legend-dot.red { background: var(--red); }
+
+
+/* ---------- Sperrbildschirm ---------- */
+.lock-screen { align-items: center; max-width: 340px; margin: 0 auto; }
+.pin-dots { display: flex; gap: 12px; justify-content: center; min-height: 18px; }
+.pin-dot {
+  width: 14px; height: 14px; border-radius: 50%;
+  border: 2px solid var(--teal); background: transparent;
+}
+.pin-dot.filled { background: var(--teal); }
+.lock-msg { min-height: 1.2em; text-align: center; }
+.pin-pad {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;
+  width: 100%; max-width: 280px;
+}
+.pin-key {
+  height: 64px; border-radius: 16px; border: 1px solid var(--line);
+  background: var(--card); font-size: 1.4rem; font-weight: 650; color: var(--ink);
+}
+.pin-key:active { background: var(--teal-soft); }
+.pin-key:disabled { opacity: 0.4; }
+.pin-ok { background: var(--teal); border-color: var(--teal); color: #fff; font-size: 1.05rem; }
+.pin-ok:active { background: var(--teal-dark); }
+.lock-forgot { margin-top: 10px; }
+.lock-screen .field { width: 100%; }
+.lock-pw { text-align: center; }
+
+/* ---------- Sperrbildschirm: Tastatur-Hinweis ---------- */
+.lock-kbd-hint { text-align: center; margin-top: 6px; opacity: 0.85; }
+/* Auf Geräten ohne feine Zeigegeräte (reine Touchgeräte) ausblenden */
+@media (pointer: coarse) and (hover: none) {
+  .lock-kbd-hint { display: none; }
+}
+
+/* ---------- Zustimmungs-Checkbox (Disclaimer) ---------- */
+.check-row { display: flex; align-items: flex-start; gap: 10px; cursor: pointer; padding: 4px 0; }
+.check-row input[type="checkbox"] { width: 20px; height: 20px; margin-top: 2px; flex-shrink: 0; }
+
+/* ---------- Biometrie ---------- */
+.bio-row { padding: 4px 0; }
+.bio-btn { margin-top: 6px; }
+.lock-alt { margin-top: 10px; }
+
+/* Mehrzeilige Hinweise mit erhaltenen Umbrüchen */
+.prewrap { white-space: pre-wrap; }
+
+/* ---------- Tabs (Sitzplan) ---------- */
+.tabbar { display: flex; gap: 6px; }
+.tab {
+  flex: 1; border: 1px solid var(--line); background: var(--card);
+  border-radius: 11px; padding: 10px; font-weight: 600; color: var(--ink-soft); min-height: 44px;
+}
+.tab.active { background: var(--ink); border-color: var(--ink); color: #fff; }
+
+/* ---------- Fotos ---------- */
+.photo-row { display: flex; align-items: center; gap: 12px; padding: 10px 14px; border-bottom: 1px solid var(--line); }
+.photo-row:last-child { border-bottom: none; }
+.photo-info { flex: 1; min-width: 0; }
+.photo-actions { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+.photo-avatar {
+  position: relative; width: 52px; height: 52px; border-radius: 12px; overflow: hidden;
+  background: var(--teal-soft); flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+}
+.photo-avatar.small { width: 40px; height: 40px; border-radius: 9px; }
+.photo-fallback { font-weight: 750; color: var(--teal-dark); font-size: 1rem; }
+.photo-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; background: transparent; }
+.photo-img:not([src]) { display: none; }
+
+/* ---------- Sitzplan-Raster ---------- */
+.seat-scroll {
+  overflow-x: auto; margin: 8px 0; -webkit-overflow-scrolling: touch;
+  display: flex; justify-content: safe center;
+  scrollbar-width: thin;
+}
+/* Sichtbarer horizontaler Scrollbalken als Hinweis auf weitere Spalten */
+.seat-scroll::-webkit-scrollbar { height: 10px; }
+.seat-scroll::-webkit-scrollbar-track { background: var(--line); border-radius: 999px; }
+.seat-scroll::-webkit-scrollbar-thumb { background: var(--teal); border-radius: 999px; }
+.seat-grid {
+  display: grid; gap: 8px;
+  background: var(--card); border-radius: var(--radius); padding: 10px; box-shadow: var(--shadow);
+  width: max-content;
+}
+.seat-cell {
+  width: 88px; height: 88px; border: 2px dashed var(--line); border-radius: 10px;
+  display: flex; flex-direction: column; align-items: stretch; justify-content: flex-start;
+  padding: 0; cursor: pointer; overflow: hidden; box-sizing: border-box;
+}
+.seat-cell.filled { border-style: solid; border-color: var(--teal-soft); background: #fafbfb; }
+.seat-cell.targetable:not(.filled) { border-color: var(--teal); background: var(--teal-soft); }
+.seat-cell.selected { outline: 3px solid var(--teal); outline-offset: 1px; }
+.photo-avatar.seat { width: 100%; height: auto; flex: 1; border-radius: 0; min-height: 0; }
+.photo-avatar.seat .photo-fallback { font-size: 1.6rem; }
+.seat-name { font-size: 0.72rem; font-weight: 600; text-align: center; line-height: 1.15;
+  overflow: hidden; text-overflow: ellipsis; max-width: 100%; white-space: nowrap;
+  padding: 3px 2px; background: rgba(255,255,255,0.85); }
+.seat-hint { background: var(--teal-soft); color: var(--teal-dark); padding: 8px 12px; border-radius: 10px; }
+.btn-inline { background: none; border: none; color: var(--teal-dark); font-weight: 650; text-decoration: underline; padding: 0; }
+.seat-pool { display: flex; flex-wrap: wrap; gap: 8px; }
+.pool-chip {
+  display: inline-flex; align-items: center; gap: 8px;
+  border: 1px solid var(--line); background: var(--card); border-radius: 999px;
+  padding: 5px 14px 5px 5px; min-height: 44px; font-size: 0.9rem;
+}
+.pool-chip.selected { border-color: var(--teal); background: var(--teal-soft); font-weight: 650; }
+
+/* ---------- Foto in der SoLei-Erfassung ---------- */
+.tap-row > .photo-avatar.small { margin-right: 10px; }
+
+/* ---------- Lehrerpult ---------- */
+.teacher-desk {
+  margin: 8px auto 4px; max-width: 55%; text-align: center;
+  background: var(--ink); color: #fff; border-radius: 10px;
+  padding: 8px 16px; font-size: 0.82rem; font-weight: 650; letter-spacing: 0.03em;
+}
+
+/* ---------- Schüler-Modus: Foto im Kopf ---------- */
+.student-head { display: flex; align-items: center; gap: 10px; justify-content: center; flex: 1; min-width: 0; }
+.student-head .crit-current { text-align: left; }
+
+/* ---------- Sitzplan-Modusleiste ---------- */
+.seat-modebar { display: flex; gap: 6px; margin-bottom: 10px; }
+.seat-mode-btn {
+  flex: 1; border: 1px solid var(--line); background: var(--card);
+  border-radius: 11px; padding: 10px; font-weight: 600; color: var(--ink-soft); min-height: 46px;
+}
+.seat-mode-btn.active { background: var(--teal); border-color: var(--teal); color: #fff; }
+
+/* Editier-Modus optisch abgrenzen */
+.seat-grid.edit { outline: 2px dashed var(--amber); outline-offset: 3px; }
+.seat-grid.edit .seat-cell.filled { cursor: grab; }
+
+/* Kachelname (eine Zeile, Vorname + ggf. gekürzter Nachname) */
+.seat-name { font-size: 0.7rem; }
+
+/* ---------- Kurs-Dashboard: Buttonraster (2 pro Reihe) ---------- */
+.course-actions-grid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 4px 0 8px;
+}
+/* Gruppierte Blöcke auf der Kursseite: getönte Karten für die Leistungs-Bausteine.
+   Die Tönung wird aus der Theme-Akzentfarbe abgeleitet (etwas kräftiger als
+   --teal-soft, damit sie sich vom grauen Seitenhintergrund abhebt); die erste
+   Zeile ist der Fallback für Browser ohne color-mix. */
+.solei-card { background: var(--teal-soft); }
+.solei-card { background: color-mix(in srgb, var(--teal) 14%, var(--card)); }
+.card .course-actions-grid { margin: 0; }
+.course-settings-btn { margin-top: 14px; }
+.grid-btn {
+  min-height: 64px; border-radius: 12px; padding: 12px 14px;
+  display: flex; align-items: center; justify-content: center; text-align: center;
+  font-size: 0.95rem; line-height: 1.2;
+}
+.grid-btn-full { grid-column: 1 / -1; }

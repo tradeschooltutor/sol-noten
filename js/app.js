@@ -70,7 +70,7 @@
 
   /* ================= App-Start ================= */
 
-  var APP_VERSION = '0.26.0';
+  var APP_VERSION = '0.27.0';
 
   /* ---------- PWA-Installation ----------
      Chrome/Edge/Android liefern `beforeinstallprompt`: Event abfangen und
@@ -2729,6 +2729,7 @@
       '.zeugnis-box{text-align:center;margin-top:2mm;page-break-inside:avoid;break-inside:avoid;}' +
       '.zeugnis-head{margin:0 0 0.6mm;font-weight:750;font-size:8.5pt;}' +
       '.zeugnis-line{text-align:center;}' +
+      '.page-break{page-break-before:always;break-before:page;}' +
       '.charts-print h2{font-size:13pt;margin:0 0 1mm;}' +
       '.charts-print .print-sub{font-size:9pt;margin:0 0 3mm;}' +
       '.charts-print .report-block{page-break-inside:avoid;margin:0 0 2.5mm;}' +
@@ -2960,13 +2961,25 @@
       printNode(pt, true, yearShort(year) + ' ' + cls.name + ' ' + course.subject + ' Notenliste');
     }
 
+    /* Diagramm-Wahl ist eine dauerhafte Vorliebe → im verschlüsselten
+       Zustand gespeichert, nicht nur je Sitzung. */
+    var chartsOn = !!S().settings.gradesCharts;
     var viewToggle = h('div.view-toggle.grades-toggle',
       h('button.view-btn' + (gradesState.mode === 'class' ? '.active' : ''), {
         onclick: function () { if (gradesState.mode !== 'class') { gradesState.mode = 'class'; render(); } }
       }, 'Ansicht: Klasse'),
       h('button.view-btn' + (gradesState.mode === 'student' ? '.active' : ''), {
         onclick: function () { if (gradesState.mode !== 'student') { gradesState.mode = 'student'; gradesState.studentIdx = 0; render(); } }
-      }, 'Ansicht: Schüler/in')
+      }, 'Ansicht: Schüler/in'),
+      gradesState.mode === 'student'
+        ? h('button.view-btn' + (chartsOn ? '.active' : ''), {
+            onclick: function () {
+              S().settings.gradesCharts = !chartsOn;
+              Store.save();
+              render();
+            }
+          }, 'Diagramme: ' + (chartsOn ? 'Ein' : 'Aus'))
+        : null
     );
 
     if (gradesState.mode === 'student' && students.length) {
@@ -2975,7 +2988,11 @@
       var stu = students[si];
       var reportContent = buildReportContent(course, stu);
       function doStudentPrint() {
-        printNode(reportContent.cloneNode(true), false, yearShort(year) + ' ' + stu.lastName + ' ' + stu.firstName + ' Notenübersicht');
+        var pt = h('div', reportContent.cloneNode(true));
+        /* Diagramme drucken genau dann, wenn sie eingeblendet sind –
+           auf einer eigenen zweiten Seite mit Namens-Kopfzeile. */
+        if (chartsOn) pt.appendChild(buildStudentChartsContent(course, stu, true));
+        printNode(pt, false, yearShort(year) + ' ' + stu.lastName + ' ' + stu.firstName + ' Notenübersicht');
       }
       return h('div.screen.screen-wide',
         header('Notenübersicht & Zeugnisnoten', { name: 'course', params: { id: course.id } }),
@@ -2993,6 +3010,7 @@
           } }, '›')
         ),
         h('div.card', {}, reportContent),
+        chartsOn ? buildStudentChartsContent(course, stu, false) : null,
         exportWarning()
       );
     }
@@ -3014,6 +3032,121 @@
       )
     );
   };
+
+  /* ---------- Punkteentwicklung über alle bisherigen Quartale ----------
+     Fünf Liniendiagramme (je Kriterium) für die Schüler-Ansicht der
+     Notenübersicht. Y-Achse relativ zum Quartals-Maximum: Sind die Maxima
+     aller Quartale gleich (Regelfall), werden absolute Punktwerte
+     beschriftet, sonst Prozent. Quartalsgrenzen als gestrichelte Linien. */
+  function buildStudentChartsContent(course, stu, forPrint) {
+    var names = S().settings.criteriaNames;
+    var lastQ = Math.min(4, Math.max(1, course.currentQuarter || 1));
+    var upCi = typeof course.uploadCriterion === 'number' ? course.uploadCriterion : 2;
+
+    function chartFor(ci) {
+      var pts = [];
+      for (var q = 1; q <= lastQ; q++) {
+        var maxQ = course.maxPoints[q][ci];
+        Store.entriesFor(course.id, stu.id, q).list
+          .filter(function (x) { return x.criterion === ci; })
+          .sort(function (a, b) { return a.date.localeCompare(b.date) || a.createdAt.localeCompare(b.createdAt); })
+          .forEach(function (x) {
+            pts.push({ date: x.date, points: x.points, absence: !!x.absenceId, q: q, max: maxQ });
+          });
+      }
+      if (!pts.length) return { node: h('p.hint', {}, 'Noch keine Punktevergaben für dieses Kriterium.'), hasAbsence: false };
+
+      var W = 560, H = 170, padL = 34, padR = 12, padT = 16, padB = 26;
+      var iw = W - padL - padR, ih = H - padT - padB;
+      var n = pts.length;
+      var sameMax = pts.every(function (p) { return p.max === pts[0].max; });
+      function x(i) { return padL + (n === 1 ? iw / 2 : i * (iw / (n - 1))); }
+      function y(pt) { return padT + ih - (pt.max > 0 ? (pt.points / pt.max) : 0) * ih; }
+      var svg = ['<svg viewBox="0 0 ' + W + ' ' + H + '" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Punkteentwicklung ' + names[ci] + '">'];
+
+      /* Raster: absolute Stufen bei gleichem Maximum, sonst Prozent */
+      if (sameMax) {
+        Calc.tapValues(pts[0].max).forEach(function (v) {
+          var yy = padT + ih - (v / pts[0].max) * ih;
+          svg.push('<line x1="' + padL + '" y1="' + yy + '" x2="' + (W - padR) + '" y2="' + yy + '" stroke="var(--line)" stroke-width="1"/>');
+          svg.push('<text x="' + (padL - 6) + '" y="' + (yy + 3.5) + '" text-anchor="end" font-size="10" fill="var(--ink-soft)">' + Calc.fmt(v, 1) + '</text>');
+        });
+      } else {
+        [0, 0.5, 1].forEach(function (f) {
+          var yy = padT + ih - f * ih;
+          svg.push('<line x1="' + padL + '" y1="' + yy + '" x2="' + (W - padR) + '" y2="' + yy + '" stroke="var(--line)" stroke-width="1"/>');
+          svg.push('<text x="' + (padL - 6) + '" y="' + (yy + 3.5) + '" text-anchor="end" font-size="10" fill="var(--ink-soft)">' + (f * 100) + ' %</text>');
+        });
+      }
+
+      /* Quartalsgrenzen und -beschriftung */
+      var segStart = 0;
+      for (var i = 1; i <= n; i++) {
+        if (i === n || pts[i].q !== pts[i - 1].q) {
+          var cx = (x(segStart) + x(i - 1)) / 2;
+          svg.push('<text x="' + cx + '" y="' + (padT - 5) + '" text-anchor="middle" font-size="9.5" fill="var(--ink-soft)">' + pts[segStart].q + '. Q</text>');
+          if (i < n) {
+            var bx = (x(i - 1) + x(i)) / 2;
+            svg.push('<line x1="' + bx + '" y1="' + padT + '" x2="' + bx + '" y2="' + (padT + ih) + '" stroke="var(--line)" stroke-width="1" stroke-dasharray="4 3"/>');
+          }
+          segStart = i;
+        }
+      }
+
+      if (n > 1) {
+        var d = pts.map(function (pt, i) { return (i ? 'L' : 'M') + x(i) + ' ' + y(pt); }).join(' ');
+        svg.push('<path d="' + d + '" fill="none" stroke="var(--teal)" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>');
+      }
+      var step = Math.max(1, Math.ceil(n / 8));
+      var hasAbsence = false;
+      pts.forEach(function (pt, i) {
+        if (pt.absence) hasAbsence = true;
+        svg.push('<circle cx="' + x(i) + '" cy="' + y(pt) + '" r="' + (pt.absence ? 5 : 4) + '" fill="' + (pt.absence ? 'var(--red)' : 'var(--teal)') + '"/>');
+        if (i === 0 || i === n - 1 || i % step === 0) {
+          var pp = pt.date.split('-');
+          svg.push('<text x="' + x(i) + '" y="' + (H - 8) + '" text-anchor="middle" font-size="9.5" fill="var(--ink-soft)">' + pp[2] + '.' + pp[1] + '.</text>');
+        }
+      });
+      svg.push('</svg>');
+      var host = h('div.chart-host');
+      host.innerHTML = svg.join('');
+      return { node: host, hasAbsence: hasAbsence };
+    }
+
+    /* Ergebnis-Uploads über alle bisherigen Quartale summiert */
+    var upDone = 0, upMissed = 0;
+    for (var q = 1; q <= lastQ; q++) {
+      var t = Store.uploadTallyFor(course.id, stu.id, q);
+      upDone += t.done; upMissed += t.missed;
+    }
+
+    var rangeLabel = lastQ === 1 ? '1. Quartal' : '1.–' + lastQ + '. Quartal';
+    var blocks = names.map(function (nm, ci) {
+      var c = chartFor(ci);
+      var extras = [];
+      if (ci === upCi && (upDone > 0 || upMissed > 0)) {
+        extras.push(h('p.hint', {}, upDone + ' mal Ergebnisse hochgeladen, ' + upMissed + ' Ergebnisse fehlen'));
+      }
+      if (c.hasAbsence) {
+        extras.push(h('p.hint', {}, h('span.legend-dot.red'), ' rote Punkte = unentschuldigte Fehlzeit (0 Punkte)'));
+      }
+      if (forPrint) {
+        return h('div.report-block', h('h3', {}, nm + ' · ' + rangeLabel), c.node, extras);
+      }
+      return h('div.card.card-tight', h('strong', {}, nm + ' · ' + rangeLabel), c.node, extras);
+    });
+
+    if (forPrint) {
+      var cls = Store.classById(course.classId);
+      var year = Store.yearById(course.yearId);
+      return h('div.charts-print.page-break',
+        h('h2', {}, 'Punkteentwicklung'),
+        h('p.print-sub', {}, stu.lastName + ', ' + stu.firstName + ' · ' + cls.name + ' · ' + course.subject +
+          ' · ' + year.name + ' · Stand: ' + UI.fmtDate(Store.todayISO())),
+        blocks);
+    }
+    return h('div.grades-charts', blocks);
+  }
 
   /* ---------- Notenausdruck-Inhalt je Schüler/in (wiederverwendbar) ---------- */
 
