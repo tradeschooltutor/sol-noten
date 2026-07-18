@@ -1,4 +1,4 @@
-# SOL-Noten (Version 0.24.3 – Beta)
+# SOL-Noten (Version 0.25.0 – Beta)
 
 Notenverwaltung zum selbstorganisierten Lernen (SOL) als Progressive Web App (PWA).
 Basierend auf der Excel-Notenverwaltung V8.0 von Andreas Vandelaar.
@@ -56,6 +56,10 @@ Es gibt keinen Server und kein Konto. Sämtliche Noten und Schülerdaten bleiben
 © 2026 Andreas Vandelaar
 
 **Zurück-Geste/-Taste (Android):** Wischen vom Rand bzw. die Zurück-Taste navigiert innerhalb der App seitenweise zurück; ein offenes Dialogfenster wird zuerst geschlossen. Erst von der Startansicht aus beendet die Geste die App. Geplante Funktionen: siehe ROADMAP.md.
+
+## Weiterer Kurs für eine bestehende Klasse
+
+Unterrichten Sie eine Klasse in mehreren Fächern, legen Sie den zweiten Kurs über „Kurs-Einstellungen → Weitere Kurs-Verwaltung → Neuer Kurs für ein anderes Fach in dieser Klasse" an. Klasse und Schülerliste (samt Fotos) werden weiterverwendet – die Liste gehört ohnehin zur Klasse, nicht zum Kurs. Vorbelegt werden Einstellungen (Anzahl OBT/Klausuren, Gewichtung, Upload-Kriterium), Maximalpunkte und Sitzplan; alle Felder bleiben änderbar. Nicht übernommen werden Bewertungsdaten, Stundeninhalte, Notizen und die Unterrichtstage (ein anderes Fach liegt meist an anderen Wochentagen).
 
 ## Installation als App
 

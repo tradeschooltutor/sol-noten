@@ -70,7 +70,7 @@
 
   /* ================= App-Start ================= */
 
-  var APP_VERSION = '0.24.3';
+  var APP_VERSION = '0.25.0';
 
   /* ---------- PWA-Installation ----------
      Chrome/Edge/Android liefern `beforeinstallprompt`: Event abfangen und
@@ -1457,10 +1457,18 @@
     var year = Store.yearById(activeYearId());
     var course = p.id ? Store.courseById(p.id) : null;
 
+    /* Neuanlage aus einem bestehenden Kurs heraus („Neuer Kurs für ein anderes
+       Fach in dieser Klasse"): `tpl` liefert die Vorbelegung. Übernommen werden
+       Klasse, Einstellungen, Maximalpunkte und Sitzplan – nicht das Fach, keine
+       Bewertungsdaten und (wie beim Schuljahreswechsel) nicht die
+       Unterrichtstage, da ein anderes Fach meist anders liegt. */
+    var tpl = (!course && p.from) ? Store.courseById(p.from) : null;
+    var pre = course || tpl;
+
     var classSel = h('select.input');
     classSel.appendChild(h('option', { value: '' }, 'Klasse wählen …'));
     st.classes.filter(function (c) { return c.yearId === year.id; }).forEach(function (c) {
-      classSel.appendChild(h('option', { value: c.id, selected: course && course.classId === c.id }, c.name));
+      classSel.appendChild(h('option', { value: c.id, selected: pre && pre.classId === c.id }, c.name));
     });
     classSel.appendChild(h('option', { value: '__new__' }, '+ Neue Klasse anlegen'));
     var newClassInput = h('input.input', { type: 'text', placeholder: 'Name der Klasse, z. B. AK 2026', style: { display: 'none' } });
@@ -1469,14 +1477,14 @@
     });
 
     var subjectInput = h('input.input', { type: 'text', value: course ? course.subject : '', placeholder: 'z. B. Fahrzeugvertriebsprozesse' });
-    var obtInput = h('input.input.input-num', { type: 'number', min: 0, max: 8, value: course ? course.numOBT : 4 });
-    var kaInput = h('input.input.input-num', { type: 'number', min: 0, max: 8, value: course ? course.numKA : 2 });
-    var w = course ? course.weights : { sl: 40, obt: 20, ka: 40 };
+    var obtInput = h('input.input.input-num', { type: 'number', min: 0, max: 8, value: pre ? pre.numOBT : 4 });
+    var kaInput = h('input.input.input-num', { type: 'number', min: 0, max: 8, value: pre ? pre.numKA : 2 });
+    var w = pre ? pre.weights : { sl: 40, obt: 20, ka: 40 };
     var wSl = h('input.input.input-num', { type: 'number', min: 0, max: 100, value: w.sl });
     var wObt = h('input.input.input-num', { type: 'number', min: 0, max: 100, value: w.obt });
     var wKa = h('input.input.input-num', { type: 'number', min: 0, max: 100, value: w.ka });
 
-    var upCritDefault = course && typeof course.uploadCriterion === 'number' ? course.uploadCriterion : 2;
+    var upCritDefault = pre && typeof pre.uploadCriterion === 'number' ? pre.uploadCriterion : 2;
     var upCritSel = h('select.input');
     st.settings.criteriaNames.forEach(function (n, i) {
       upCritSel.appendChild(h('option', { value: i, selected: i === upCritDefault }, n));
@@ -1588,8 +1596,21 @@
           uploadCriterion: Number(upCritSel.value)
         };
         if (tDays) course.teachingDays = tDays;
+        /* Aus einem bestehenden Kurs heraus angelegt: Maximalpunkte und
+           Sitzplan übernehmen (beide hängen an Klasse/Personen, nicht am
+           Fach). Bewertungsdaten bleiben bewusst außen vor. */
+        if (tpl) {
+          if (tpl.maxPoints) course.maxPoints = JSON.parse(JSON.stringify(tpl.maxPoints));
+          if (tpl.seating) course.seating = JSON.parse(JSON.stringify(tpl.seating));
+        }
         st.courses.push(course);
         Store.save();
+        if (tpl) {
+          toast('Kurs „' + course.subject + '“ für ' + Store.classById(classId).name +
+            ' angelegt – Schülerliste, Einstellungen und Sitzplan wurden übernommen.');
+          go('course', { id: course.id });
+          return;
+        }
         go('maxPoints', { id: course.id, intro: true });
         return;
       }
@@ -1653,6 +1674,8 @@
             course.completed
               ? h('button.btn-plain.btn-block', { onclick: reopenYear }, 'Schuljahr wieder öffnen')
               : null,
+            h('button.btn-plain.btn-block', { onclick: function () { go('editCourse', { from: course.id }); } },
+              'Neuer Kurs für ein anderes Fach in dieser Klasse'),
             h('div.danger-zone',
               h('p.hint', {}, 'Gefahrenbereich'),
               h('button.btn-plain.btn-block.danger-text', { onclick: delCourseFromSettings }, 'Kurs löschen …'))
@@ -1666,6 +1689,9 @@
       h('div.card',
         h('label.field', h('span.field-label', {}, 'Klasse'), classSel, newClassInput,
           h('p.hint', {}, 'Die Schülerliste gehört zur Klasse und wird von allen Kursen dieser Klasse gemeinsam genutzt.')),
+        tpl ? h('p.hint.info-text', {},
+          'Einstellungen, Maximalpunkte und Sitzplan aus „' + tpl.subject + '“ sind vorbelegt und hier änderbar. ' +
+          'Bewertungsdaten werden nicht übernommen. Die Unterrichtstage bleiben leer, da ein anderes Fach meist an anderen Wochentagen liegt.') : null,
         h('label.field', h('span.field-label', {}, 'Fach'), subjectInput),
         h('div.field-row',
           h('label.field', h('span.field-label', {}, 'Open Book Tests je Halbjahr'), obtInput),

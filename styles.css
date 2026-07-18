@@ -84,6 +84,12 @@ body {
 .install-steps { margin: 8px 0; padding-left: 1.3rem; font-size: 0.9rem; color: var(--ink-soft); }
 .install-steps li { margin-bottom: 6px; }
 
+/* Hinweis im Formular bei Anlage aus einem bestehenden Kurs */
+.info-text {
+  background: var(--teal-soft); border-left: 3px solid var(--teal);
+  padding: 8px 10px; margin: 0;
+}
+
 /* iOS-Installationsanleitung: Overlay oben rechts, aber so weit nach unten
    versetzt, dass der Pfeil darüber sichtbar bleibt. Der Pfeil sitzt nicht am
    rechten Kartenrand, sondern unterhalb des Teilen-Symbols – das liegt in
@@ -249,7 +255,9 @@ textarea.input.note-area {
 .review-notes { margin-top: 6px; padding-top: 6px; border-top: 1px dashed var(--line); }
 .review-note { margin: 2px 0; font-size: 0.85rem; color: var(--ink); }
 .review-note .note-date { color: var(--ink-soft); font-weight: 600; }
-.btn-block { width: 100%; }
+/* Lange Beschriftungen (z. B. „Neuer Kurs für ein anderes Fach …“) dürfen
+   auf schmalen Displays umbrechen statt abgeschnitten zu werden. */
+.btn-block { width: 100%; white-space: normal; line-height: 1.3; height: auto; }
 .btn-big { font-size: 1.1rem; min-height: 58px; }
 .btn-small { min-height: 36px; padding: 6px 12px; border-radius: 9px; font-size: 0.85rem; }
 
