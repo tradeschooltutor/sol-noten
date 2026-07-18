@@ -70,7 +70,7 @@
 
   /* ================= App-Start ================= */
 
-  var APP_VERSION = '0.25.0';
+  var APP_VERSION = '0.25.1';
 
   /* ---------- PWA-Installation ----------
      Chrome/Edge/Android liefern `beforeinstallprompt`: Event abfangen und
@@ -2885,7 +2885,11 @@
 
     var body = rowsData.map(function (r) {
       var cells = [h('td.sticky-col.name-cell', {
-        onclick: function () { go('report', { id: course.id, studentId: r.stu.id }); }
+        onclick: function () {
+          gradesState.mode = 'student';
+          gradesState.studentIdx = students.indexOf(r.stu);
+          render();
+        }
       }, r.stu.lastName + ', ' + r.stu.firstName)];
       r.soleiQ.forEach(function (v) { cells.push(h('td', {}, fmtG(v))); });
       [r.slHJ1, r.slHJ2, r.slSJ].forEach(function (v) { cells.push(h('td.avg-cell', {}, fmtG(v))); });
@@ -2961,7 +2965,7 @@
         onclick: function () { if (gradesState.mode !== 'class') { gradesState.mode = 'class'; render(); } }
       }, 'Ansicht: Klasse'),
       h('button.view-btn' + (gradesState.mode === 'student' ? '.active' : ''), {
-        onclick: function () { if (gradesState.mode !== 'student') { gradesState.mode = 'student'; render(); } }
+        onclick: function () { if (gradesState.mode !== 'student') { gradesState.mode = 'student'; gradesState.studentIdx = 0; render(); } }
       }, 'Ansicht: Schüler/in')
     );
 
@@ -2970,9 +2974,14 @@
       var si = gradesState.studentIdx;
       var stu = students[si];
       var reportContent = buildReportContent(course, stu);
+      function doStudentPrint() {
+        printNode(reportContent.cloneNode(true), false, yearShort(year) + ' ' + stu.lastName + ' ' + stu.firstName + ' Notenübersicht');
+      }
       return h('div.screen.screen-wide',
         header('Notenübersicht & Zeugnisnoten', { name: 'course', params: { id: course.id } }),
-        courseBox(course),
+        h('div.card.card-tight.course-box.course-box-row',
+          h('strong', {}, cls.name + ' - ' + course.subject),
+          h('button.btn-small.btn-primary.course-box-btn', { onclick: doStudentPrint }, 'Drucken / PDF')),
         h('div.grades-toggle-row', viewToggle),
         h('div.crit-nav',
           h('button.icon-btn', { onclick: function () {
@@ -2984,10 +2993,7 @@
           } }, '›')
         ),
         h('div.card', {}, reportContent),
-        h('div.actions-col',
-          h('button.btn-plain.btn-block', { onclick: function () { printNode(reportContent.cloneNode(true), false, yearShort(year) + ' ' + stu.lastName + ' ' + stu.firstName + ' Notenübersicht'); } },
-            'Drucken / als PDF speichern'),
-          exportWarning())
+        exportWarning()
       );
     }
 
@@ -3107,40 +3113,20 @@
 
   /* ---------- Notenausdruck je Schüler/in (Blatt "Notenausdruck") ---------- */
 
+  /* Ehemals eigene Seite „Notenausdruck" – seit v0.25.1 in die Schüler-
+     Ansicht von „Notenübersicht & Zeugnisnoten" integriert. Die Route bleibt
+     als Weiterleitung erhalten (alte History-Einträge, externe Verweise). */
   views.report = function (p) {
     var course = Store.courseById(p.id);
-    var cls = Store.classById(course.classId);
-    var year = Store.yearById(course.yearId);
-    var students = cls.students.slice().sort(function (a, b) {
-      return (a.lastName + a.firstName).localeCompare(b.lastName + b.firstName, 'de');
-    });
-    var si = Math.max(0, students.findIndex(function (s) { return s.id === p.studentId; }));
-    var stu = students[si];
-
-    var reportContent = buildReportContent(course, stu);
-
-    function doReportPrint() {
-      printNode(reportContent.cloneNode(true), false, yearShort(year) + ' ' + stu.lastName + ' ' + stu.firstName + ' Notenübersicht');
+    if (course && p.studentId) {
+      var students = Store.classById(course.classId).students.slice().sort(function (a, b) {
+        return (a.lastName + a.firstName).localeCompare(b.lastName + b.firstName, 'de');
+      });
+      var si = students.findIndex(function (s) { return s.id === p.studentId; });
+      gradesState.studentIdx = si > -1 ? si : 0;
     }
-
-    return h('div.screen',
-      header('Notenausdruck', { name: 'grades', params: { id: course.id } },
-        h('button.btn-small.btn-plain', { onclick: doReportPrint }, 'Drucken')),
-      courseBox(course),
-      h('div.crit-nav',
-        h('button.icon-btn', { onclick: function () {
-          go('report', { id: course.id, studentId: students[(si + students.length - 1) % students.length].id });
-        } }, '‹'),
-        h('span.crit-current', {}, stu.lastName + ', ' + stu.firstName),
-        h('button.icon-btn', { onclick: function () {
-          go('report', { id: course.id, studentId: students[(si + 1) % students.length].id });
-        } }, '›')
-      ),
-      h('div.card', {}, reportContent),
-      h('button.btn-primary.btn-block', { onclick: doReportPrint },
-        'Drucken / als PDF speichern (für das Notengespräch)'),
-      exportWarning()
-    );
+    gradesState.mode = 'student';
+    return views.grades({ id: p.id });
   };
 
   /* ================= Unentschuldigte Fehlzeiten ================= */

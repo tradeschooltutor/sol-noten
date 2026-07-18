@@ -71,7 +71,11 @@ body {
 
 /* Kursnamen-Box mit rechtsbündigem Button (SoLei-Punktestand, Schüler/in) –
    kompakter Button, damit die Box nicht höher wird. */
-.course-box-row {
+/* Wichtig: .card.course-box-row (nicht nur .course-box-row), denn .card
+   setzt flex-direction: column und steht später im Stylesheet – bei gleicher
+   Spezifität würde die Spalten-Regel gewinnen und der Button unter den
+   Namen rutschen. */
+.card.course-box-row {
   display: flex; flex-direction: row; align-items: center;
   justify-content: space-between;
   gap: 10px; text-align: left; padding-top: 9px; padding-bottom: 9px;
@@ -558,9 +562,13 @@ button:focus-visible, .input:focus-visible, select:focus-visible {
 .crit-summary-item.down strong { color: var(--red); }
 
 @media (min-width: 560px) {
-  .review-row { flex-direction: row; align-items: center; justify-content: space-between; }
+  /* flex-wrap + volle Breite für .review-notes: Name und Noten stehen
+     nebeneinander, die Kursnotizen brechen darunter um – sonst quetschen
+     sie sich als drittes Flex-Kind rechts daneben und verdecken den Namen. */
+  .review-row { flex-direction: row; flex-wrap: wrap; align-items: center; justify-content: space-between; }
   .review-name { min-width: 0; flex: 1; }
   .review-grades { flex: 1.2; }
+  .review-notes { width: 100%; }
 }
 
 /* ---------- Prozent-Bewertungsspiegel ---------- */
