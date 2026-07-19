@@ -265,17 +265,22 @@ textarea.input.note-area {
 .exam-def-row { display: flex; gap: 16px; flex-wrap: wrap; }
 .field-inline { display: flex; flex-direction: column; gap: 4px; }
 .task-grid {
-  display: grid; grid-template-columns: repeat(auto-fill, minmax(86px, 1fr));
-  gap: 8px; margin: 6px 0;
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(62px, 1fr));
+  gap: 6px; margin: 6px 0;
 }
-.task-cell { display: flex; flex-direction: column; gap: 2px; }
-.task-cell .hint { font-size: 0.75rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.task-max, .task-pts { min-width: 0; width: 100%; text-align: center; }
+.task-cell { display: flex; flex-direction: column; gap: 1px; }
+.task-cell .task-no { font-weight: 700; font-size: 0.78rem; }
+.task-cell .hint { font-size: 0.72rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.task-max, .task-pts { min-width: 0; width: 100%; text-align: center; padding-left: 4px; padding-right: 4px; }
+/* Punkte über dem Aufgaben-Maximum: Inhalt rot statt Rahmen (Zusatzpunkte erlaubt) */
+.task-pts.input-over { color: var(--red); font-weight: 700; }
 .exam-student { border-bottom: 1px solid var(--line); }
 .exam-student:last-child { border-bottom: none; }
 .exam-head-row { cursor: pointer; }
 .exam-student.open { background: color-mix(in srgb, var(--teal) 6%, var(--card)); border-radius: 10px; }
 .exam-detail { padding: 4px 12px 12px; display: flex; flex-direction: column; gap: 8px; }
+.order-ctl { display: flex; flex-direction: column; gap: 2px; flex-shrink: 0; }
+.order-btn { width: 30px; height: 24px; min-height: 24px; border-radius: 6px; font-size: 0.7rem; padding: 0; }
 .review-note { margin: 2px 0; font-size: 0.85rem; color: var(--ink); }
 .review-note .note-date { color: var(--ink-soft); font-weight: 600; }
 /* Lange Beschriftungen (z. B. „Neuer Kurs für ein anderes Fach …“) dürfen
@@ -496,6 +501,9 @@ textarea.input.note-area {
 }
 @media (max-width: 380px) { .seg-btn { width: 48px; } }
 .seg-btn:last-child { border-right: none; }
+/* Variante für lange Beschriftungen (z. B. Klausurbewertungs-Schalter):
+   Breite aus dem Inhalt statt fester 56px. */
+.seg.seg-wide .seg-btn { width: auto; padding: 10px 14px; white-space: normal; line-height: 1.25; }
 .seg-btn.active { background: var(--teal); color: #fff; }
 
 /* ---------- Protokoll ---------- */
