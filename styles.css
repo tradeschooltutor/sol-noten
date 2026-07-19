@@ -268,7 +268,7 @@ textarea.input.note-area {
   display: grid; grid-template-columns: repeat(auto-fill, minmax(62px, 1fr));
   gap: 6px; margin: 6px 0;
 }
-.task-cell { display: flex; flex-direction: column; gap: 1px; }
+.task-cell { display: flex; flex-direction: column; gap: 1px; align-items: center; text-align: center; }
 .task-cell .task-no { font-weight: 700; font-size: 0.78rem; }
 .task-cell .hint { font-size: 0.72rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .task-max, .task-pts { min-width: 0; width: 100%; text-align: center; padding-left: 4px; padding-right: 4px; }
@@ -281,6 +281,24 @@ textarea.input.note-area {
 .exam-detail { padding: 4px 12px 12px; display: flex; flex-direction: column; gap: 8px; }
 .order-ctl { display: flex; flex-direction: column; gap: 2px; flex-shrink: 0; }
 .order-btn { width: 30px; height: 24px; min-height: 24px; border-radius: 6px; font-size: 0.7rem; padding: 0; }
+
+/* Klassendurchschnitte: Zeilen am Listenende und in der Klassentabelle */
+.student-row.avg-row, .review-row.avg-row {
+  background: color-mix(in srgb, var(--teal) 8%, var(--card));
+  border-radius: 10px; cursor: default; font-weight: 600;
+}
+.grades-table tr.avg-row td {
+  font-weight: 700; background: color-mix(in srgb, var(--teal) 10%, var(--card));
+  border-top: 2px solid var(--teal);
+}
+
+/* Notenspiegel (Klausuren): horizontale Tabelle Note 1–6 */
+.mirror-tbl { border-collapse: collapse; width: 100%; max-width: 28rem; }
+.mirror-tbl th, .mirror-tbl td {
+  border: 1px solid var(--line); padding: 6px 8px; text-align: center; font-size: 0.9rem;
+}
+.mirror-tbl th { background: color-mix(in srgb, var(--teal) 10%, var(--card)); }
+.mirror-tbl td { font-weight: 700; }
 .review-note { margin: 2px 0; font-size: 0.85rem; color: var(--ink); }
 .review-note .note-date { color: var(--ink-soft); font-weight: 600; }
 /* Lange Beschriftungen (z. B. „Neuer Kurs für ein anderes Fach …“) dürfen

@@ -70,7 +70,7 @@
 
   /* ================= App-Start ================= */
 
-  var APP_VERSION = '0.29.0';
+  var APP_VERSION = '0.30.0';
 
   /* ---------- PWA-Installation ----------
      Chrome/Edge/Android liefern `beforeinstallprompt`: Event abfangen und
@@ -1799,10 +1799,12 @@
   };
 
   function pointstandRows(course, cls, q) {
-    return cls.students.map(function (stu) {
+    var sums = [];
+    var rows = cls.students.map(function (stu) {
       var e = Store.entriesFor(course.id, stu.id, q);
       var stat = Calc.quarterStatus(e.byCriterion);
       var grade = Calc.gradeFor15(stat.sum, S().settings.grading15);
+      if (stat.rated > 0) sums.push(stat.sum);
       return h('div.student-row', { onclick: function () { go('protokoll', { courseId: course.id, studentId: stu.id, quarter: q }); } },
         h('div.student-name', {}, stu.lastName + ', ' + stu.firstName),
         h('div.student-stats', {},
@@ -1816,6 +1818,17 @@
         )
       );
     });
+    /* Klassendurchschnitt am unteren Ende der Liste */
+    if (sums.length) {
+      var avg = Math.round(sums.reduce(function (a, b) { return a + b; }, 0) / sums.length * 10) / 10;
+      var avgGrade = Calc.gradeFor15(avg, S().settings.grading15);
+      rows.push(h('div.student-row.avg-row',
+        h('div.student-name', {}, 'ø Klassendurchschnitt (' + sums.length + ' von ' + cls.students.length + ')'),
+        h('div.student-stats', {},
+          h('span.sum-pill', {}, Calc.fmt(avg, 1) + ' / 15'),
+          h('span.grade-pill.g' + Math.round(avgGrade.g), {}, 'Note ' + Calc.fmt(avgGrade.g)))));
+    }
+    return rows;
   }
 
   views.pointstand = function (p) {
@@ -2136,6 +2149,19 @@
       return { ok: true, value: Math.round(n * 100) / 100 };
     }
 
+    /* Klassendurchschnitt der SoLei-Noten – live bei Portfolio-Eingaben. */
+    var latestSolei = {};
+    var avgSoleiCell = h('strong.review-solei');
+    function refreshSoleiAvg() {
+      var vals = [];
+      Object.keys(latestSolei).forEach(function (sid) {
+        if (latestSolei[sid] != null) vals.push(latestSolei[sid]);
+      });
+      avgSoleiCell.textContent = vals.length
+        ? Calc.fmt(Math.round(vals.reduce(function (a, b) { return a + b; }, 0) / vals.length * 100) / 100)
+        : '–';
+    }
+
     var rows = students.map(function (stu) {
       var e = Store.entriesFor(course.id, stu.id, q);
       var stat = Calc.quarterStatus(e.byCriterion);
@@ -2163,6 +2189,8 @@
         /* Auslegung A: ohne Portfolio zählt allein der SL-Bogen; mit Portfolio wird gemittelt. */
         var g = (r.ok && slGrade) ? Calc.soleiGrade(slGrade.g, r.value) : null;
         soleiCell.textContent = g == null ? '–' : Calc.fmt(g);
+        latestSolei[stu.id] = g;
+        refreshSoleiAvg();
       }
       inp.addEventListener('input', refreshSolei);
 
@@ -2245,7 +2273,10 @@
           'Wird kein Portfolio bzw. keine mündliche Prüfung eingetragen, zählt allein die Note SL-Bogen.')
       ),
       h('div.card.card-list', {},
-        students.length ? rows : h('div.empty', h('p', {}, 'Diese Klasse hat noch keine Schüler/innen.'))),
+        students.length ? [rows, h('div.review-row.avg-row',
+          h('div.review-name', {}, h('strong', {}, 'ø Klassendurchschnitt')),
+          h('div.review-grades', h('div.review-cell', h('span.hint', {}, 'SoLei-Note'), avgSoleiCell)))]
+          : h('div.empty', h('p', {}, 'Diese Klasse hat noch keine Schüler/innen.'))),
       h('div.actions-col',
         h('button.btn-primary.btn-block', { onclick: saveAll }, 'Portfolionoten speichern'),
         q === 4 && !course.completed
@@ -2292,7 +2323,7 @@
     });
     var results = obtResults(course, hj, idx);
 
-    var hjSeg = h('div.seg', {}, [1, 2].map(function (v) {
+    var hjSeg = h('div.seg.seg-wide', {}, [1, 2].map(function (v) {
       return h('button.seg-btn' + (hj === v ? '.active' : ''), {
         onclick: function () { go('obt', { id: course.id, hj: v, idx: 0 }); }
       }, v + '. Halbjahr');
@@ -2625,7 +2656,7 @@
     var listHost = h('div.card.card-list');
     var studentRefreshers = [];
     var taskLabelRefreshers = [];
-    function refreshAllStudents() { studentRefreshers.forEach(function (f) { f(); }); }
+    function refreshAllStudents() { studentRefreshers.forEach(function (f) { f(); }); mirrorRefresh(); }
     function renderStudentTaskLabels() { taskLabelRefreshers.forEach(function (f) { f(); }); }
 
     function studentRow(stu) {
@@ -2720,6 +2751,7 @@
             if (hasAny && work.order[stu.id] == null) work.order[stu.id] = nextOrder();
             markOver();
             refresh();
+            mirrorRefresh();
             scheduleSave();
           });
           pInp.addEventListener('change', persistNow);
@@ -2816,8 +2848,51 @@
       printNode(host, false, yearShort(Store.yearById(course.yearId)) + ' ' + cls.name + ' Klausur ' + (idx + 1) + ' HJ' + hj + ' Bewertungsbögen');
     }
 
+    /* ----- Notenspiegel: Anzahl je ganzer Note 1–6, live ----- */
+    var mirrorRefresh = function () {};
+    function mirrorCounts() {
+      var t = taskSum();
+      var counts = [0, 0, 0, 0, 0, 0];
+      if (!t.ok || t.sum <= 0) return counts;
+      students.forEach(function (st2) {
+        var arr = work.taskPoints[st2.id] || [];
+        var any = false, sum = 0;
+        arr.forEach(function (v) { if (v != null) { any = true; sum += v; } });
+        if (!any) return;
+        var pct = sum / t.sum * 100;
+        var g = Calc.gradeForPercent(pct, pctTable).g;
+        var whole = Math.min(6, Math.max(1, Math.round(g)));
+        counts[whole - 1]++;
+      });
+      return counts;
+    }
+    function mirrorTable() {
+      var counts = mirrorCounts();
+      return h('table.mirror-tbl',
+        h('tr', [1, 2, 3, 4, 5, 6].map(function (n) { return h('th', {}, 'Note ' + n); })),
+        h('tr', counts.map(function (c2) { return h('td', {}, String(c2)); })));
+    }
+    var mirrorHost = h('div');
+    mirrorRefresh = function () {
+      mirrorHost.innerHTML = '';
+      mirrorHost.appendChild(mirrorTable());
+    };
+    function printMirror() {
+      var counts = mirrorCounts();
+      var total = counts.reduce(function (a, b) { return a + b; }, 0);
+      if (!total) { toast('Noch keine bewerteten Klausuren – es gibt nichts zu drucken.'); return; }
+      var pt = h('div.exam-sheet',
+        h('h2', {}, 'Notenspiegel · Klausur ' + (idx + 1) + ' · ' + hj + '. Halbjahr'),
+        h('p.print-sub', {}, cls.name + ' · ' + course.subject + ' · ' +
+          Store.yearById(course.yearId).name +
+          (work.date ? ' · Klausurdatum: ' + UI.fmtDate(work.date) : '')),
+        mirrorTable(),
+        h('p.exam-comment', {}, total + ' bewertete Klausur(en)'));
+      printNode(pt, false, yearShort(Store.yearById(course.yearId)) + ' ' + cls.name + ' Klausur ' + (idx + 1) + ' HJ' + hj + ' Notenspiegel');
+    }
+
     /* Sortier-Umschalter */
-    var sortSeg = h('div.seg');
+    var sortSeg = h('div.seg.seg-wide');
     [{ v: 'alpha', l: 'Alphabet' }, { v: 'entry', l: 'Eingabe' }].forEach(function (o) {
       sortSeg.appendChild(h('button.seg-btn' + (work.sort === o.v ? '.active' : ''), {
         onclick: function () {
@@ -2831,6 +2906,7 @@
 
     renderTasks();
     renderStudents();
+    mirrorRefresh();
 
     return h('div.screen',
       header('Klausuren', { name: 'course', params: { id: course.id } }),
@@ -2850,9 +2926,13 @@
         h('div.row-between',
           h('div.row-gap', h('span.hint', {}, 'Sortierung'), sortSeg),
           h('button.btn-small.btn-primary', { onclick: function () { printSheets(ratedStudents()); } }, 'Bewertungsbögen drucken')),
-        h('p.hint', {}, 'In der Eingabe-Sortierung stehen die Personen in der Reihenfolge ihrer ersten Punkteeingabe (Korrekturstapel); ▲▼ sortiert um. Der Druck folgt der gewählten Sortierung – eine Seite je Person; einzelne Seiten wählen Sie im Druckdialog aus.'),
-        exportWarning()),
-      listHost
+        h('p.hint', {}, 'In der Eingabe-Sortierung stehen die Personen in der Reihenfolge ihrer ersten Punkteeingabe (Korrekturstapel); ▲▼ sortiert um. Der Druck folgt der gewählten Sortierung – eine Seite je Person; einzelne Seiten wählen Sie im Druckdialog aus.')),
+      listHost,
+      h('div.card.card-tight',
+        h('div.row-between',
+          h('strong', {}, 'Notenspiegel'),
+          h('button.btn-small.btn-plain', { onclick: printMirror }, 'Notenspiegel drucken')),
+        mirrorHost)
     );
   }
 
@@ -2874,7 +2954,7 @@
        Datengetrieben vor Einstellung – Umschalten versteckt nie Daten. */
     var fullMode = !!(data.full || S().settings.kaFullMode);
 
-    var hjSeg = h('div.seg', {}, [1, 2].map(function (v) {
+    var hjSeg = h('div.seg.seg-wide', {}, [1, 2].map(function (v) {
       return h('button.seg-btn' + (hj === v ? '.active' : ''), {
         onclick: function () { go('klausuren', { id: course.id, hj: v, idx: 0 }); }
       }, v + '. Halbjahr');
@@ -3147,6 +3227,12 @@
       '.exam-sum-row td{font-weight:700;background:#f4f4f4;}' +
       '.exam-result{font-size:11pt;font-weight:700;margin:1mm 0;}' +
       '.exam-comment{font-size:9.5pt;margin:1mm 0;}' +
+      '.mirror-tbl{border-collapse:collapse;}' +
+      '.mirror-tbl th,.mirror-tbl td{border:1px solid #888;padding:1mm 4mm;font-size:10pt;text-align:center;}' +
+      '.mirror-tbl th{background:#eee;}' +
+      '.mirror-tbl td{font-weight:700;}' +
+      '.grades-table tr.avg-row td{font-weight:700;background:#eef3f2;border-top:1pt solid #333;' +
+        '-webkit-print-color-adjust:exact;print-color-adjust:exact;}' +
       '.charts-print h2{font-size:13pt;margin:0 0 1mm;}' +
       '.charts-print .print-sub{font-size:9pt;margin:0 0 3mm;}' +
       '.charts-print .report-block{page-break-inside:avoid;margin:0 0 2.5mm;}' +
@@ -3322,10 +3408,43 @@
       return h('tr', {}, cells);
     });
 
+    /* Durchschnittszeile: Spaltenmittel über alle Personen mit Wert.
+       Tendenz und manuelle Zeugnisspalten bleiben bewusst leer. */
+    function avgRow() {
+      function colAvg(pick) {
+        return Calc.avgRound2(rowsData.map(pick));
+      }
+      var cells = [h('td.sticky-col', {}, h('strong', {}, 'ø Klasse'))];
+      for (var qi = 0; qi < 4; qi++) (function (qi2) {
+        cells.push(h('td', {}, fmtG(colAvg(function (r) { return r.soleiQ[qi2]; }))));
+      })(qi);
+      [function (r) { return r.slHJ1; }, function (r) { return r.slHJ2; }, function (r) { return r.slSJ; }]
+        .forEach(function (p2) { cells.push(h('td.avg-cell', {}, fmtG(colAvg(p2)))); });
+      [1, 2].forEach(function (hj) {
+        for (var i = 0; i < nObt; i++) (function (hj2, i2) {
+          cells.push(h('td', {}, fmtG(colAvg(function (r) { return r.obtG[hj2][i2]; }))));
+        })(hj, i);
+      });
+      [function (r) { return r.obtHJ1; }, function (r) { return r.obtHJ2; }, function (r) { return r.obtSJ; }]
+        .forEach(function (p2) { cells.push(h('td.avg-cell', {}, fmtG(colAvg(p2)))); });
+      [1, 2].forEach(function (hj) {
+        for (var k = 0; k < nKa; k++) (function (hj2, k2) {
+          cells.push(h('td', {}, fmtG(colAvg(function (r) { return r.kaG[hj2][k2]; }))));
+        })(hj, k);
+      });
+      [function (r) { return r.kaHJ1; }, function (r) { return r.kaHJ2; }, function (r) { return r.kaSJ; }]
+        .forEach(function (p2) { cells.push(h('td.avg-cell', {}, fmtG(colAvg(p2)))); });
+      [function (r) { return r.zHJ1; }, function (r) { return r.zHJ2; }, function (r) { return r.zSJ; }]
+        .forEach(function (p2) { cells.push(h('td.avg-cell.z-cell', {}, fmtG(colAvg(p2)))); });
+      cells.push(h('td', {}, ''), h('td', {}, ''), h('td', {}, ''));
+      return h('tr.avg-row', {}, cells);
+    }
+
     var table = h('table.grades-table',
       groupRow(),
       h('tr', {}, headCells()),
-      body
+      body,
+      students.length ? avgRow() : null
     );
 
     function parseZeugnis(str) {
@@ -3432,10 +3551,87 @@
       );
     }
 
+    /* ----- Leistungsverlauf: Klassendurchschnitte als Liniendiagramm -----
+       X-Achse = Leistungen der gewählten Kategorie in zeitlicher Reihenfolge,
+       Y-Achse = Durchschnittsnote (1 oben, 6 unten). */
+    if (!gradesState.chartMetric) gradesState.chartMetric = 'solei';
+    function classAvgChartCard() {
+      function pts() {
+        function avgOf(pick) { return Calc.avgRound2(rowsData.map(pick)); }
+        var out = [];
+        if (gradesState.chartMetric === 'solei') {
+          for (var q2 = 1; q2 <= 4; q2++) (function (qq) {
+            var v = avgOf(function (r) { return r.soleiQ[qq - 1]; });
+            if (v != null) out.push({ label: qq + '. Q', v: v });
+          })(q2);
+        } else if (gradesState.chartMetric === 'obt') {
+          [1, 2].forEach(function (hj) {
+            for (var i = 0; i < nObt; i++) (function (hj2, i2) {
+              var v = avgOf(function (r) { return r.obtG[hj2][i2]; });
+              if (v != null) out.push({ label: 'OBT ' + (i2 + 1) + ' · ' + hj2 + '.HJ', v: v });
+            })(hj, i);
+          });
+        } else {
+          [1, 2].forEach(function (hj) {
+            for (var k = 0; k < nKa; k++) (function (hj2, k2) {
+              var v = avgOf(function (r) { return r.kaG[hj2][k2]; });
+              if (v != null) out.push({ label: 'K' + (k2 + 1) + ' · ' + hj2 + '.HJ', v: v });
+            })(hj, k);
+          });
+        }
+        return out;
+      }
+
+      var metricSeg = h('div.seg.seg-wide');
+      [{ v: 'solei', l: 'SoLei' }, { v: 'obt', l: 'Open Book Tests' }, { v: 'ka', l: 'Klausuren' }]
+        .forEach(function (o) {
+          metricSeg.appendChild(h('button.seg-btn' + (gradesState.chartMetric === o.v ? '.active' : ''), {
+            onclick: function () {
+              if (gradesState.chartMetric === o.v) return;
+              gradesState.chartMetric = o.v;
+              render();
+            }
+          }, o.l));
+        });
+
+      var data2 = pts();
+      var chartNode;
+      if (!data2.length) {
+        chartNode = h('p.hint', {}, 'Für diese Kategorie liegen noch keine Durchschnittswerte vor.');
+      } else {
+        var W = 560, H = 190, padL = 30, padR = 14, padT = 12, padB = 34;
+        var iw = W - padL - padR, ih = H - padT - padB;
+        var n = data2.length;
+        function x(i) { return padL + (n === 1 ? iw / 2 : i * (iw / (n - 1))); }
+        function y(v) { return padT + (v - 1) / 5 * ih; } /* Note 1 oben, 6 unten */
+        var svg = ['<svg viewBox="0 0 ' + W + ' ' + H + '" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Klassendurchschnitte">'];
+        for (var g2 = 1; g2 <= 6; g2++) {
+          svg.push('<line x1="' + padL + '" y1="' + y(g2) + '" x2="' + (W - padR) + '" y2="' + y(g2) + '" stroke="var(--line)" stroke-width="1"/>');
+          svg.push('<text x="' + (padL - 6) + '" y="' + (y(g2) + 3.5) + '" text-anchor="end" font-size="10" fill="var(--ink-soft)">' + g2 + '</text>');
+        }
+        if (n > 1) {
+          var d2 = data2.map(function (pt2, i) { return (i ? 'L' : 'M') + x(i) + ' ' + y(pt2.v); }).join(' ');
+          svg.push('<path d="' + d2 + '" fill="none" stroke="var(--teal)" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>');
+        }
+        data2.forEach(function (pt2, i) {
+          svg.push('<circle cx="' + x(i) + '" cy="' + y(pt2.v) + '" r="4" fill="var(--teal)"/>');
+          svg.push('<text x="' + x(i) + '" y="' + (y(pt2.v) - 8) + '" text-anchor="middle" font-size="10" font-weight="700" fill="var(--teal)">' + Calc.fmt(pt2.v) + '</text>');
+          svg.push('<text x="' + x(i) + '" y="' + (H - 8) + '" text-anchor="middle" font-size="9.5" fill="var(--ink-soft)">' + pt2.label + '</text>');
+        });
+        svg.push('</svg>');
+        chartNode = h('div.chart-host');
+        chartNode.innerHTML = svg.join('');
+      }
+      return h('div.card.card-tight',
+        h('div.row-between', h('strong', {}, 'Leistungsverlauf (ø Klasse)'), metricSeg),
+        chartNode);
+    }
+
     return h('div.screen.screen-wide',
       header('Notenübersicht & Zeugnisnoten', { name: 'course', params: { id: course.id } }),
         courseBox(course),
       h('div.grades-toggle-row', viewToggle),
+      classAvgChartCard(),
       h('p.hint.grades-hint',
         'Hier vergeben Sie die ', h('strong', {}, 'Zeugnisnoten für das HJ-Zeugnis und das Jahreszeugnis'),
         ' (in der Liste ganz rechts)!', h('br'),
