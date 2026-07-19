@@ -1,5 +1,5 @@
 /* SOL-Noten – Service Worker: macht die App vollständig offline nutzbar. */
-var CACHE = 'sol-noten-v0.32.0';
+var CACHE = 'sol-noten-v0.33.0';
 var FILES = [
   './',
   'index.html',

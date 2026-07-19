@@ -70,7 +70,7 @@
 
   /* ================= App-Start ================= */
 
-  var APP_VERSION = '0.32.0';
+  var APP_VERSION = '0.33.0';
 
   /* ---------- PWA-Installation ----------
      Chrome/Edge/Android liefern `beforeinstallprompt`: Event abfangen und
@@ -527,9 +527,25 @@
       return (a.lastName + a.firstName).localeCompare(b.lastName + b.firstName, 'de');
     });
 
+    /* Planauswahl gehört in die Kursnamen-Box (rechtsbündig neben dem Namen);
+       die Verwaltungs-Buttons bleiben im Bearbeiten-Modus beim Raster. */
+    var planSelTop = h('select.input.plan-select');
+    Store.seatingsOf(course).forEach(function (sp) {
+      planSelTop.appendChild(h('option', { value: sp.id, selected: sp.id === course.activeSeating }, sp.name));
+    });
+    planSelTop.addEventListener('change', function () {
+      selectedSeatStudent = null;
+      Store.setActiveSeating(course.id, planSelTop.value);
+      render();
+    });
+
     return h('div.screen',
       header('Sitzplan', { name: 'course', params: { id: course.id } }),
-      courseBox(course),
+      p.tab === 'photos'
+        ? courseBox(course)
+        : h('div.card.card-tight.course-box.course-box-row',
+            h('strong', {}, cls.name + ' - ' + course.subject),
+            planSelTop),
       h('div.tabbar',
         h('button.tab' + (p.tab !== 'photos' ? '.active' : ''), {
           onclick: function () { go('seating', { id: course.id, tab: 'plan' }); } }, 'Sitzplan'),
@@ -685,20 +701,10 @@
         ]).then(function (ok) { return ok ? inp.value.trim() : null; });
       }
 
-      var planSel = h('select.input.plan-select');
-      plans.forEach(function (sp) {
-        planSel.appendChild(h('option', { value: sp.id, selected: sp.id === plan.id }, sp.name));
-      });
-      planSel.addEventListener('change', function () {
-        selectedSeatStudent = null;
-        Store.setActiveSeating(course.id, planSel.value);
-        render();
-      });
-
-      var planBar = h('div.row-between.plan-bar',
-        h('div.row-gap', h('span.hint', {}, 'Sitzplan'), planSel),
-        editMode
-          ? h('div.row-gap',
+      var planBar = editMode
+        ? h('div.row-between.plan-bar',
+            h('span.hint', {}, 'Sitzplan „' + plan.name + '“'),
+            h('div.row-gap',
               h('button.btn-small.btn-plain', { onclick: function () {
                 askPlanName('Neuer Sitzplan', '', 'Anlegen').then(function (name) {
                   if (!name) return;
@@ -736,14 +742,12 @@
                         render();
                       });
                   } }, 'Löschen')
-                : null)
-          : null
-      );
+                : null))
+        : null;
 
       if (!editMode) {
         return h('div',
           modeToggle,
-          planBar,
           h('p.hint', {}, 'Tippen Sie auf eine Person, um ihre SoLei-Punkte zu vergeben (aktuelles Quartal, heutiges Datum).'),
           gridScroll,
           teacherDesk,
@@ -3038,7 +3042,34 @@
       h('div.card.card-tight',
         h('div.row-between',
           h('strong', {}, 'Notenspiegel'),
-          h('button.btn-small.btn-plain', { onclick: printMirror }, 'Notenspiegel drucken')),
+          h('div.row-gap',
+            h('button.btn-small.btn-plain', { onclick: function () {
+              var t = taskSum();
+              var head = ['Name', 'Datum'];
+              work.tasks.forEach(function (mp, ti) { head.push('Aufg. ' + (ti + 1) + ' (max ' + (mp == null ? '?' : mp) + ')'); });
+              head.push('Summe', 'Mögliche Punkte', 'Prozent', 'Note', 'Kommentar');
+              var rows = [head];
+              sortedStudents().forEach(function (st2) {
+                var arr = work.taskPoints[st2.id] || [];
+                if (!arr.some(function (v) { return v != null; })) return;
+                var sum = 0;
+                var row = [st2.lastName + ', ' + st2.firstName,
+                  UI.fmtDate(work.dates[st2.id] || work.date || '')];
+                work.tasks.forEach(function (mp, ti) {
+                  row.push(arr[ti] != null ? arr[ti] : 0);
+                  if (arr[ti] != null) sum += arr[ti];
+                });
+                sum = Math.round(sum * 100) / 100;
+                var pct = (t.ok && t.sum > 0) ? Math.round(sum / t.sum * 10000) / 100 : null;
+                row.push(sum, t.ok ? t.sum : '', pct == null ? '' : Calc.fmt(Math.round(pct * 10) / 10, 1),
+                  pct == null ? '' : Calc.fmt(Calc.gradeForPercent(pct, pctTable).g),
+                  work.comments[st2.id] || '');
+                rows.push(row);
+              });
+              if (rows.length < 2) { toast('Noch keine bewerteten Klausuren zum Kopieren.'); return; }
+              copyRowsToClipboard(rows, 'Klausurergebnisse');
+            } }, 'Ergebnisse kopieren'),
+            h('button.btn-small.btn-plain', { onclick: printMirror }, 'Notenspiegel drucken'))),
         mirrorHost)
     );
   }
@@ -3754,6 +3785,9 @@
       classAvgChartCard(),
       h('div.actions-col',
         h('button.btn-plain.btn-block', { onclick: doExcel }, 'Als Excel-Datei exportieren'),
+        h('button.btn-plain.btn-block', {
+          onclick: function () { copyRowsToClipboard(exportRows(), 'Notenübersicht'); }
+        }, 'In die Zwischenablage kopieren'),
         h('button.btn-plain.btn-block', { onclick: doPrint }, 'Drucken / als PDF speichern'),
         exportWarning()
       )
@@ -4363,7 +4397,24 @@
       h('div.card.card-list', {}, list.length ? list : h('div.empty', h('p', {}, 'Noch keine Schüler/innen.'))),
       h('div.actions-col',
         h('button.btn-primary.btn-block', { onclick: function () { editStudent(null); } }, '+ Schüler/in hinzufügen'),
-        h('button.btn-primary.btn-block', { onclick: importStudents }, 'Aus Excel einfügen (Kopieren & Einfügen)')
+        h('button.btn-primary.btn-block', { onclick: importStudents }, 'Aus Excel einfügen (Kopieren & Einfügen)'),
+        cls.students.length
+          ? h('button.btn-plain.btn-block', { onclick: function () {
+              /* Spaltenreihenfolge wie beim Import („Aus Excel einfügen“),
+                 damit kopierte Listen unverändert wieder einlesbar sind. */
+              var rows = [['Nachname', 'Vorname', 'Telefon Schüler/in', 'E-Mail Schüler/in',
+                'Ausbildungsbetrieb', 'Ausbilder/in bzw. Eltern',
+                'Telefon Ausbilder/Eltern', 'E-Mail Ausbilder/Eltern']];
+              cls.students.slice().sort(function (a, b) {
+                return (a.lastName + a.firstName).localeCompare(b.lastName + b.firstName, 'de');
+              }).forEach(function (stu) {
+                rows.push([stu.lastName || '', stu.firstName || '', stu.phone || '', stu.email || '',
+                  stu.company || '', stu.trainerName || '', stu.trainerPhone || '', stu.trainerEmail || '']);
+              });
+              copyRowsToClipboard(rows, 'Schülerliste');
+            } }, 'In die Zwischenablage kopieren')
+          : null,
+        cls.students.length ? exportWarning() : null
       )
     );
 
@@ -5201,6 +5252,44 @@
     return s.replace(/[^\wäöüÄÖÜß-]+/g, '_');
   }
 
+  /* ---------- Zwischenablage ----------
+     Zeilen als TSV kopieren – Excel/LibreOffice verteilen das direkt auf
+     Zellen. Tabulatoren und Zeilenumbrüche innerhalb einer Zelle werden
+     durch Leerzeichen ersetzt, damit das Raster nicht zerfällt. */
+  function rowsToTSV(rows) {
+    return rows.map(function (row) {
+      return row.map(function (v) {
+        if (v === null || v === undefined) return '';
+        return String(v).replace(/[\t\r\n]+/g, ' ');
+      }).join('\t');
+    }).join('\n');
+  }
+
+  function copyRowsToClipboard(rows, label) {
+    var text = rowsToTSV(rows);
+    function fallback() {
+      /* execCommand als Rückfallebene (ältere Browser, unsichere Kontexte). */
+      var ta = document.createElement('textarea');
+      ta.value = text;
+      ta.setAttribute('readonly', '');
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      var ok = false;
+      try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
+      ta.remove();
+      if (ok) toast((label || 'Liste') + ' in die Zwischenablage kopiert – in Excel mit Strg+V einfügen.');
+      else UI.modal('Kopieren nicht möglich',
+        h('p', {}, 'Der Browser hat das Kopieren abgelehnt. Nutzen Sie bitte den Excel-Export.'));
+    }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(function () {
+        toast((label || 'Liste') + ' in die Zwischenablage kopiert – in Excel mit Strg+V einfügen.');
+      }).catch(fallback);
+    } else fallback();
+  }
+
   /* ---------- Excel-Export aller Schuljahresdaten (Rohdaten + Notenübersicht) ---------- */
 
   /* Ein Tabellenblatt je Kurs: Kopf, Notenübersicht und alle Rohdaten-Abschnitte
@@ -5418,12 +5507,26 @@
       { label: 'Abbrechen', value: false },
       { label: 'Drucken / PDF', value: 'print',
         validate: function () { return yearHasCourses(sel.value, err); } },
+      { label: 'Zwischenablage', value: 'clip',
+        validate: function () { return yearHasCourses(sel.value, err); } },
       { label: 'Excel-Datei', value: 'xlsx', primary: true,
         validate: function () { return yearHasCourses(sel.value, err); } }
     ]).then(function (choice) {
       if (!choice) return;
       var year = Store.yearById(sel.value);
       var courses = S().courses.filter(function (c) { return c.yearId === year.id; });
+      if (choice === 'clip') {
+        /* Mehrere Kurse: Blöcke mit Kurstitel und Leerzeile dazwischen. */
+        var rows = [];
+        courses.forEach(function (c, i) {
+          var cls = Store.classById(c.classId);
+          if (i) rows.push([]);
+          rows.push([(cls ? cls.name : '?') + ' · ' + c.subject]);
+          gradeExportRows(c).forEach(function (r) { rows.push(r); });
+        });
+        copyRowsToClipboard(rows, courses.length + ' Notenübersicht(en)');
+        return;
+      }
       if (choice === 'xlsx') {
         var sheets = courses.map(function (c) {
           var cls = Store.classById(c.classId);

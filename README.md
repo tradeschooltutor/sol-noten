@@ -1,4 +1,4 @@
-# SOL-Noten (Version 0.32.0 – Beta)
+# SOL-Noten (Version 0.33.0 – Beta)
 
 Notenverwaltung zum selbstorganisierten Lernen (SOL) als Progressive Web App (PWA).
 Basierend auf der Excel-Notenverwaltung V8.0 von Andreas Vandelaar.
@@ -73,7 +73,7 @@ Ist die App bereits installiert, zeigen beide Stellen das an und der Hinweis ent
 
 ## Mehrere Sitzpläne je Kurs
 
-Wechselt eine Klasse den Raum, lassen sich mehrere Sitzpläne hinterlegen und über eine Auswahlliste umschalten; der zuletzt gewählte Plan ist beim nächsten Öffnen wieder aktiv. Namen werden frei vergeben – in der Regel die Raumnummer (z. B. „3-EG-080"). Im Modus „Sitzplan bearbeiten" stehen **+ Neu** (leerer Plan), **Duplizieren** (übernimmt die aktuelle Anordnung als Ausgangspunkt), **Umbenennen** und **Löschen** zur Verfügung; der letzte verbliebene Plan kann nicht gelöscht werden. Jeder Plan hat eine eigene Spaltenzahl und eigene Platzierungen, da Räume unterschiedlich geschnitten sind. Vorhandene Sitzpläne älterer Versionen werden beim ersten Start automatisch als Plan „Standard" übernommen. Beim Schuljahreswechsel und bei „Neuer Kurs für ein anderes Fach in dieser Klasse" werden alle Pläne mitkopiert; wird eine Person aus der Klasse entfernt, verschwindet sie aus allen Plänen.
+Wechselt eine Klasse den Raum, lassen sich mehrere Sitzpläne hinterlegen und über die Auswahlliste rechts in der Kursnamen-Box umschalten; der zuletzt gewählte Plan ist beim nächsten Öffnen wieder aktiv. Namen werden frei vergeben – in der Regel die Raumnummer (z. B. „3-EG-080"). Im Modus „Sitzplan bearbeiten" stehen **+ Neu** (leerer Plan), **Duplizieren** (übernimmt die aktuelle Anordnung als Ausgangspunkt), **Umbenennen** und **Löschen** zur Verfügung; der letzte verbliebene Plan kann nicht gelöscht werden. Jeder Plan hat eine eigene Spaltenzahl und eigene Platzierungen, da Räume unterschiedlich geschnitten sind. Vorhandene Sitzpläne älterer Versionen werden beim ersten Start automatisch als Plan „Standard" übernommen. Beim Schuljahreswechsel und bei „Neuer Kurs für ein anderes Fach in dieser Klasse" werden alle Pläne mitkopiert; wird eine Person aus der Klasse entfernt, verschwindet sie aus allen Plänen.
 
 ## Speicherverhalten
 
@@ -91,6 +91,17 @@ Wechselt eine Klasse den Raum, lassen sich mehrere Sitzpläne hinterlegen und ü
 ## Vollständige Klausurbewertung
 
 In den Globalen Einstellungen (Abschnitt „Klausurbewertung") wählbar: **Einfach** (je Klausur eine Maximalpunktzahl, je Schüler/in die Gesamtpunkte – bisheriges Verhalten) oder **Vollständig** (die komplette Punktevergabe erfolgt in der App). Im vollständigen Modus werden je Klausur das Klausurdatum, die Anzahl der Aufgaben (1–50) und die möglichen Punkte je Aufgabe festgelegt; je Schüler/in (Zeile antippen) die erreichten Punkte je Aufgabe – die Maximalpunkte stehen dabei immer sichtbar am Feld. Datum je Person überschreibbar (Nachschreiber), Kommentarfeld je Person. Summe, Prozent und Note (Prozent-Bewertungsspiegel, abgerundet auf den vollen Prozentpunkt – identisch zur Excel-Klassenverwaltung) berechnet die App live; alle Eingaben werden automatisch gespeichert (kein Speichern-Button – bei Sperre wegen Inaktivität geht nichts verloren). Leere Felder zählen als 0, sobald mindestens ein Feld ausgefüllt ist, ganz ohne Eingabe gilt die Person als nicht bewertet. Punkte über dem Aufgaben-Maximum (Zusatzpunkte) sind erlaubt und werden rot dargestellt; über 100 % gilt die Note der 100-%-Zeile. Die Summen werden in das bisherige Datenmodell durchgeschrieben – Zeugnisrechnung, Notenübersicht und Exporte funktionieren unverändert. Der Schalter bestimmt nur die Erfassung neuer Klausuren; bereits vollständig bewertete Klausuren behalten ihre Aufgaben-Ansicht, Umschalten versteckt nie Daten. **Stapelreihenfolge:** Beim ersten Punkteeintrag erhält jede Person eine Laufnummer; der Umschalter „Sortierung: Alphabet / Eingabe" zeigt die Liste wahlweise in der Reihenfolge des Korrekturstapels, ▲▼ sortiert manuell um (z. B. Nachschreiber ans Ende). **Druck:** „Bewertungsbögen drucken" erzeugt eine Seite je bewerteter Person in der gewählten Sortierung – Aufgabentabelle (Aufgabe, mögliche und erreichte Punkte), Summe, Prozent, Note mit Notentext, Datum; die Kommentarzeile erscheint nur bei Personen mit Kommentar. Einzelne Seiten wählt man im Druckdialog des Systems aus; zusätzlich gibt es in der aufgeklappten Personenzeile „Bogen drucken (nur diese Person)" für den Nachschreiber-Fall. **Export:** Der „Excel-Export aller Schuljahresdaten" enthält je vollständig bewerteter Klausur einen Abschnitt „Aufgabenpunkte" (Name, Datum, Punkte je Aufgabe, Summe, Kommentar).
+
+## Export in die Zwischenablage
+
+Neben dem Datei-Export lassen sich Listen direkt in die Zwischenablage kopieren – als Tabulator-getrennter Text, den Excel und LibreOffice unmittelbar auf Zellen verteilen (Einfügen mit Strg+V). Verfügbar über einen eigenen Button „In die Zwischenablage kopieren" bzw. „Zwischenablage":
+
+- **Notenübersicht & Zeugnisnoten** (Ansicht Klasse) – die vollständige Tabelle,
+- **Globale Einstellungen → „Nur Notenübersichten exportieren"** – alle Kurse eines Schuljahres nacheinander, jeweils mit Kurstitel,
+- **Schülerliste** – in derselben Spaltenreihenfolge wie „Aus Excel einfügen", also unverändert wieder einlesbar,
+- **Klausuren** (vollständige Bewertung) – „Ergebnisse kopieren": Punkte je Aufgabe, Summe, Prozent, Note und Kommentar in der gewählten Sortierung.
+
+Bewusst ein eigener Button statt einer Umwidmung des Export-Buttons: Datei und Zwischenablage haben unterschiedliche Zwecke, und ein Kopiervorgang bleibt sonst unsichtbar.
 
 ## Hinweis zu Exporten
 
