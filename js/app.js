@@ -70,7 +70,7 @@
 
   /* ================= App-Start ================= */
 
-  var APP_VERSION = '0.31.1';
+  var APP_VERSION = '0.32.0';
 
   /* ---------- PWA-Installation ----------
      Chrome/Edge/Android liefern `beforeinstallprompt`: Event abfangen und
@@ -521,7 +521,8 @@
       );
     }
 
-    if (!course.seating) course.seating = { cols: 6, positions: {} }; /* positions: studentId -> {r,c} */
+    /* Mindestens ein Sitzplan muss existieren (positions: studentId -> {r,c}). */
+    if (!Store.seatingsOf(course).length) Store.addSeating(course.id, 'Standard');
     var students = cls.students.slice().sort(function (a, b) {
       return (a.lastName + a.firstName).localeCompare(b.lastName + b.firstName, 'de');
     });
@@ -596,8 +597,10 @@
     /* ---- Sitzplan-Raster ---- */
     function seatingGrid() {
       var editMode = p.mode === 'edit';
-      var cols = course.seating.cols;
-      var positions = course.seating.positions;
+      var plan = Store.activeSeating(course);
+      var plans = Store.seatingsOf(course);
+      var cols = plan.cols;
+      var positions = plan.positions;
       var placed = {};
       Object.keys(positions).forEach(function (sid) { placed[sid] = positions[sid]; });
       var unplaced = students.filter(function (s) { return !placed[s.id]; });
@@ -611,7 +614,7 @@
         colSel.appendChild(h('option', { value: n, selected: n === cols }, n + ' Spalten'));
       });
       colSel.addEventListener('change', function () {
-        course.seating.cols = Number(colSel.value); Store.save(); render();
+        plan.cols = Number(colSel.value); Store.save(); render();
       });
 
       var byPos = {};
@@ -626,7 +629,7 @@
               onclick: function () {
                 if (editMode) {
                   if (selectedSeatStudent) {
-                    course.seating.positions[selectedSeatStudent] = { r: r, c: c };
+                    plan.positions[selectedSeatStudent] = { r: r, c: c };
                     selectedSeatStudent = null; Store.save(); render();
                   } else if (sid) {
                     selectedSeatStudent = sid; render();
@@ -663,9 +666,84 @@
         }, 'Sitzplan bearbeiten')
       );
 
+      /* ---- Planauswahl und -verwaltung ----
+         Namen werden frei vergeben (in der Regel die Raumnummer). */
+      function askPlanName(title, preset, confirmLabel) {
+        var inp = h('input.input', { type: 'text', value: preset || '', placeholder: 'z.B. 3-EG-080' });
+        var err = h('p.hint.error-text');
+        return UI.modal(title, [
+          h('label.field', h('span.field-label', {}, 'Name des Sitzplans'), inp,
+            h('p.hint', {}, 'Meist die Raumnummer – frei wählbar.')),
+          err
+        ], [
+          { label: 'Abbrechen', value: false },
+          { label: confirmLabel, value: true, primary: true,
+            validate: function () {
+              if (!inp.value.trim()) { err.textContent = 'Bitte einen Namen eingeben.'; return false; }
+              return true;
+            } }
+        ]).then(function (ok) { return ok ? inp.value.trim() : null; });
+      }
+
+      var planSel = h('select.input.plan-select');
+      plans.forEach(function (sp) {
+        planSel.appendChild(h('option', { value: sp.id, selected: sp.id === plan.id }, sp.name));
+      });
+      planSel.addEventListener('change', function () {
+        selectedSeatStudent = null;
+        Store.setActiveSeating(course.id, planSel.value);
+        render();
+      });
+
+      var planBar = h('div.row-between.plan-bar',
+        h('div.row-gap', h('span.hint', {}, 'Sitzplan'), planSel),
+        editMode
+          ? h('div.row-gap',
+              h('button.btn-small.btn-plain', { onclick: function () {
+                askPlanName('Neuer Sitzplan', '', 'Anlegen').then(function (name) {
+                  if (!name) return;
+                  Store.addSeating(course.id, name);
+                  selectedSeatStudent = null;
+                  toast('Sitzplan „' + name + '“ angelegt – noch niemand platziert.');
+                  render();
+                });
+              } }, '+ Neu'),
+              h('button.btn-small.btn-plain', { onclick: function () {
+                askPlanName('Sitzplan duplizieren', plan.name + ' (Kopie)', 'Duplizieren').then(function (name) {
+                  if (!name) return;
+                  Store.addSeating(course.id, name, plan.id);
+                  selectedSeatStudent = null;
+                  toast('Sitzplan „' + name + '“ als Kopie angelegt.');
+                  render();
+                });
+              } }, 'Duplizieren'),
+              h('button.btn-small.btn-plain', { onclick: function () {
+                askPlanName('Sitzplan umbenennen', plan.name, 'Umbenennen').then(function (name) {
+                  if (!name) return;
+                  Store.renameSeating(course.id, plan.id, name);
+                  render();
+                });
+              } }, 'Umbenennen'),
+              plans.length > 1
+                ? h('button.btn-small.btn-plain.danger-text', { onclick: function () {
+                    UI.confirmDialog('Sitzplan löschen?',
+                      'Der Sitzplan „' + plan.name + '“ und seine Platzierungen werden entfernt. Fotos und alle anderen Sitzpläne bleiben erhalten.',
+                      'Löschen', true).then(function (ok) {
+                        if (!ok) return;
+                        Store.removeSeating(course.id, plan.id);
+                        selectedSeatStudent = null;
+                        toast('Sitzplan gelöscht.');
+                        render();
+                      });
+                  } }, 'Löschen')
+                : null)
+          : null
+      );
+
       if (!editMode) {
         return h('div',
           modeToggle,
+          planBar,
           h('p.hint', {}, 'Tippen Sie auf eine Person, um ihre SoLei-Punkte zu vergeben (aktuelles Quartal, heutiges Datum).'),
           gridScroll,
           teacherDesk,
@@ -677,6 +755,7 @@
 
       return h('div',
         modeToggle,
+        planBar,
         h('div.row-between',
           h('label.hint', {}, 'Raster: ', colSel),
           h('div.row-gap',
@@ -718,11 +797,11 @@
         students.forEach(function (stu, i) {
           pos[stu.id] = { r: Math.floor(i / cols), c: i % cols };
         });
-        course.seating.positions = pos; selectedSeatStudent = null; Store.save(); render();
+        plan.positions = pos; selectedSeatStudent = null; Store.save(); render();
       }
       function clearPlan() {
         UI.confirmDialog('Sitzplan leeren?', 'Alle Platzierungen dieses Kurses werden entfernt (Fotos bleiben erhalten).', 'Leeren', true)
-          .then(function (ok) { if (!ok) return; course.seating.positions = {}; selectedSeatStudent = null; Store.save(); render(); });
+          .then(function (ok) { if (!ok) return; plan.positions = {}; selectedSeatStudent = null; Store.save(); render(); });
       }
     }
 
@@ -1601,7 +1680,10 @@
            Fach). Bewertungsdaten bleiben bewusst außen vor. */
         if (tpl) {
           if (tpl.maxPoints) course.maxPoints = JSON.parse(JSON.stringify(tpl.maxPoints));
-          if (tpl.seating) course.seating = JSON.parse(JSON.stringify(tpl.seating));
+          if (Array.isArray(tpl.seatings) && tpl.seatings.length) {
+            course.seatings = JSON.parse(JSON.stringify(tpl.seatings));
+            course.activeSeating = tpl.activeSeating;
+          }
         }
         st.courses.push(course);
         Store.save();
@@ -4323,7 +4405,9 @@
           st.uploadTallies = (st.uploadTallies || []).filter(function (t) { return t.studentId !== stu.id; });
           /* Sitzplatz-Positionen in allen Kursen dieser Klasse entfernen */
           st.courses.forEach(function (co) {
-            if (co.seating && co.seating.positions) delete co.seating.positions[stu.id];
+            (co.seatings || []).forEach(function (sp) {
+              if (sp.positions) delete sp.positions[stu.id];
+            });
           });
           Store.deletePhoto(stu.id);
           delete photoCache[stu.id];

@@ -80,7 +80,8 @@
                              currentQuarter, portfolio:{q:{studentId:grade}},
                              dismissedQuarterHint:{q:true},
                              teachingDays:[{from:null|ISO, days:[1..6]}],
-                             lessonContents:[{id, date, text}]}
+                             lessonContents:[{id, date, text}],
+                             seatings:[{id, name, cols, positions}], activeSeating}
                              teachingDays optional: Segmente mit Gültigkeit ab
                              `from` (null = Basis, gilt auch rückwirkend);
                              fehlt das Feld, gelten alle Tage außer Sonntag. */
@@ -102,6 +103,22 @@
       if (Array.isArray(s.courses)) s.courses.forEach(function (c) {
         if (typeof c.uploadCriterion !== 'number') c.uploadCriterion = 2; /* Standard: 3. Kriterium (Arbeitsergebnisse) */
         if (typeof c.completed !== 'boolean') c.completed = false; /* Schuljahr abgeschlossen (Q4-Abschluss) */
+        /* Mehrere Sitzpläne (ab 0.32): aus dem alten Einzelplan wird der
+           erste Eintrag „Standard“ – vorhandene Pläne bleiben erhalten. */
+        if (!Array.isArray(c.seatings)) {
+          c.seatings = [];
+          if (c.seating) {
+            c.seatings.push({
+              id: uid(), name: 'Standard',
+              cols: c.seating.cols || 6,
+              positions: c.seating.positions || {}
+            });
+          }
+          delete c.seating;
+        }
+        if (c.seatings.length && !c.seatings.some(function (sp) { return sp.id === c.activeSeating; })) {
+          c.activeSeating = c.seatings[0].id;
+        }
       });
     }
     return s;
@@ -695,7 +712,10 @@
         currentQuarter: 1, portfolio: {}, quarterOverrides: null, completed: false,
         uploadCriterion: typeof c.uploadCriterion === 'number' ? c.uploadCriterion : 2
       };
-      if (c.seating) nc.seating = JSON.parse(JSON.stringify(c.seating));
+      if (Array.isArray(c.seatings) && c.seatings.length) {
+        nc.seatings = JSON.parse(JSON.stringify(c.seatings));
+        nc.activeSeating = c.activeSeating;
+      }
       /* Unterrichtstage (teachingDays) werden bewusst NICHT übernommen:
          Stundenpläne wechseln zum Schuljahr; die UI weist darauf hin, dass
          sie in den Kurs-Einstellungen neu festzulegen sind. Stundeninhalte
@@ -781,6 +801,72 @@
     return state.notes.filter(function (n) {
       return n.courseId === courseId && n.studentId === studentId;
     }).sort(function (a, b) { return (a.date || '').localeCompare(b.date || ''); });
+  }
+
+  /* ---------- Sitzpläne (mehrere je Kurs) ----------
+     Räume wechseln; jeder Plan hat einen frei vergebenen Namen (meist die
+     Raumnummer), eigene Spaltenzahl und eigene Platzierungen. */
+  function seatingsOf(course) {
+    if (!course) return [];
+    if (!Array.isArray(course.seatings)) course.seatings = [];
+    return course.seatings;
+  }
+
+  function activeSeating(course) {
+    var list = seatingsOf(course);
+    if (!list.length) return null;
+    var found = list.filter(function (sp) { return sp.id === course.activeSeating; })[0];
+    if (found) return found;
+    course.activeSeating = list[0].id;
+    return list[0];
+  }
+
+  function addSeating(courseId, name, fromId) {
+    var c = courseById(courseId);
+    if (!c) return null;
+    var list = seatingsOf(c);
+    var src = fromId ? list.filter(function (sp) { return sp.id === fromId; })[0] : null;
+    var plan = {
+      id: uid(),
+      name: String(name || '').trim() || 'Sitzplan ' + (list.length + 1),
+      cols: src ? src.cols : 6,
+      positions: src ? JSON.parse(JSON.stringify(src.positions || {})) : {}
+    };
+    list.push(plan);
+    c.activeSeating = plan.id;
+    save();
+    return plan;
+  }
+
+  function renameSeating(courseId, seatingId, name) {
+    var c = courseById(courseId);
+    var plan = c && seatingsOf(c).filter(function (sp) { return sp.id === seatingId; })[0];
+    if (!plan) return;
+    plan.name = String(name || '').trim() || plan.name;
+    save();
+  }
+
+  /* Löschen nur, solange mehr als ein Plan existiert. */
+  function removeSeating(courseId, seatingId) {
+    var c = courseById(courseId);
+    if (!c) return false;
+    var list = seatingsOf(c);
+    if (list.length <= 1) return false;
+    var i = list.findIndex(function (sp) { return sp.id === seatingId; });
+    if (i < 0) return false;
+    list.splice(i, 1);
+    if (c.activeSeating === seatingId) c.activeSeating = list[0].id;
+    save();
+    return true;
+  }
+
+  function setActiveSeating(courseId, seatingId) {
+    var c = courseById(courseId);
+    if (!c) return;
+    if (seatingsOf(c).some(function (sp) { return sp.id === seatingId; })) {
+      c.activeSeating = seatingId;
+      save();
+    }
   }
 
   /* ---------- Stundeninhalte ----------
@@ -1041,6 +1127,8 @@
     noteFor: noteFor, setNote: setNote, notesFor: notesFor,
     lessonContentFor: lessonContentFor, setLessonContent: setLessonContent,
     lessonContentsFor: lessonContentsFor,
+    seatingsOf: seatingsOf, activeSeating: activeSeating, addSeating: addSeating,
+    renameSeating: renameSeating, removeSeating: removeSeating, setActiveSeating: setActiveSeating,
     savePhoto: savePhoto, getPhoto: getPhoto, deletePhoto: deletePhoto,
     hasPhoto: hasPhoto, photoKeys: photoKeys,
     exportPhotos: exportPhotos, parsePhotoBackup: parsePhotoBackup, applyPhotoImport: applyPhotoImport,

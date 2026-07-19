@@ -1,4 +1,4 @@
-# SOL-Noten (Version 0.31.1 – Beta)
+# SOL-Noten (Version 0.32.0 – Beta)
 
 Notenverwaltung zum selbstorganisierten Lernen (SOL) als Progressive Web App (PWA).
 Basierend auf der Excel-Notenverwaltung V8.0 von Andreas Vandelaar.
@@ -70,6 +70,10 @@ SOL-Noten lässt sich als App installieren (eigenes Symbol, eigenes Fenster, off
 - **Firefox am PC** unterstützt keine Installation von Web-Apps; SOL-Noten läuft dort normal im Browser.
 
 Ist die App bereits installiert, zeigen beide Stellen das an und der Hinweis entfällt automatisch. Wurde der Hinweis auf dem Startbildschirm mit „Nicht mehr anzeigen" ausgeblendet, bleibt die Installation über die Globalen Einstellungen jederzeit erreichbar.
+
+## Mehrere Sitzpläne je Kurs
+
+Wechselt eine Klasse den Raum, lassen sich mehrere Sitzpläne hinterlegen und über eine Auswahlliste umschalten; der zuletzt gewählte Plan ist beim nächsten Öffnen wieder aktiv. Namen werden frei vergeben – in der Regel die Raumnummer (z. B. „3-EG-080"). Im Modus „Sitzplan bearbeiten" stehen **+ Neu** (leerer Plan), **Duplizieren** (übernimmt die aktuelle Anordnung als Ausgangspunkt), **Umbenennen** und **Löschen** zur Verfügung; der letzte verbliebene Plan kann nicht gelöscht werden. Jeder Plan hat eine eigene Spaltenzahl und eigene Platzierungen, da Räume unterschiedlich geschnitten sind. Vorhandene Sitzpläne älterer Versionen werden beim ersten Start automatisch als Plan „Standard" übernommen. Beim Schuljahreswechsel und bei „Neuer Kurs für ein anderes Fach in dieser Klasse" werden alle Pläne mitkopiert; wird eine Person aus der Klasse entfernt, verschwindet sie aus allen Plänen.
 
 ## Speicherverhalten
 

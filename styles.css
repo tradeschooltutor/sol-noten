@@ -300,6 +300,11 @@ textarea.input.note-area {
 .mirror-tbl th { background: color-mix(in srgb, var(--teal) 10%, var(--card)); }
 .mirror-tbl td { font-weight: 700; }
 .mirror-tbl .mirror-avg { border-left: 2px solid var(--teal); }
+
+/* Sitzplan-Verwaltung: Auswahl und Aktionen */
+.plan-bar { flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
+.plan-select { max-width: 12rem; }
+.plan-bar .row-gap { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .review-note { margin: 2px 0; font-size: 0.85rem; color: var(--ink); }
 .review-note .note-date { color: var(--ink-soft); font-weight: 600; }
 /* Lange Beschriftungen (z. B. „Neuer Kurs für ein anderes Fach …“) dürfen
