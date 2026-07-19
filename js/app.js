@@ -70,7 +70,7 @@
 
   /* ================= App-Start ================= */
 
-  var APP_VERSION = '0.31.0';
+  var APP_VERSION = '0.31.1';
 
   /* ---------- PWA-Installation ----------
      Chrome/Edge/Android liefern `beforeinstallprompt`: Event abfangen und
@@ -3018,7 +3018,37 @@
     var inputs = {};
     var refreshers = [];
     function refreshAll() { refreshers.forEach(function (f) { f(); }); }
-    maxInput.addEventListener('input', refreshAll);
+
+    /* Automatisches Speichern (Bewertungsdaten): entprellt beim Tippen,
+       sofort beim Verlassen eines Feldes. Es werden nur maxPoints/points
+       geschrieben – vorhandene Aufgabendaten (data.full) bleiben unberührt,
+       damit ein Moduswechsel nie Daten verliert. Ungültige Einzelfelder
+       (unlesbar oder über dem Maximum) werden übersprungen und rot markiert. */
+    var kaTimer = null;
+    function persistKa() {
+      if (kaTimer) { clearTimeout(kaTimer); kaTimer = null; }
+      var maxR = parseNum(maxInput.value);
+      if (!maxR.ok || (maxR.value != null && maxR.value <= 0)) return;
+      var max = maxR.value;
+      var out = {};
+      students.forEach(function (stu) {
+        var r = parseNum(inputs[stu.id].value);
+        if (!r.ok || r.value == null) return;
+        if (max != null && r.value > max) return;
+        out[stu.id] = r.value;
+      });
+      data.maxPoints = max;
+      data.points = out;
+      course.ka[hj][idx] = data;
+      Store.save();
+    }
+    function scheduleKaSave() {
+      if (kaTimer) clearTimeout(kaTimer);
+      kaTimer = setTimeout(persistKa, 600);
+    }
+
+    maxInput.addEventListener('input', function () { refreshAll(); scheduleKaSave(); });
+    maxInput.addEventListener('blur', persistKa);
 
     var rows = students.map(function (stu) {
       var pts = data.points[stu.id] != null ? data.points[stu.id] : null;
@@ -3044,7 +3074,8 @@
         gradeCell.textContent = g ? Calc.fmt(g.g) : '–';
       }
       refreshers.push(refresh);
-      inp.addEventListener('input', refresh);
+      inp.addEventListener('input', function () { refresh(); scheduleKaSave(); });
+      inp.addEventListener('blur', persistKa);
       return h('div.review-row',
         h('div.review-name', nameWithPhoto(stu)),
         h('div.review-grades',
@@ -3056,36 +3087,6 @@
     });
     refreshAll();
 
-    function saveAll() {
-      var maxR = parseNum(maxInput.value);
-      if (!maxR.ok || (maxR.value != null && maxR.value <= 0)) {
-        UI.modal('Ungültige Maximalpunktzahl', h('p', {}, 'Bitte geben Sie eine Zahl größer 0 ein.'));
-        return;
-      }
-      var max = maxR.value;
-      var bad = [], anyPoints = false, out = {};
-      students.forEach(function (stu) {
-        var r = parseNum(inputs[stu.id].value);
-        if (!r.ok || (r.value != null && max != null && r.value > max)) {
-          bad.push(stu.lastName + ', ' + stu.firstName); return;
-        }
-        if (r.value != null) { out[stu.id] = r.value; anyPoints = true; }
-      });
-      if (bad.length) {
-        UI.modal('Ungültige Punkteeingabe',
-          h('p', {}, 'Punkte müssen zwischen 0 und der Maximalpunktzahl liegen. Bitte prüfen Sie: ' + bad.join('; ') + '.'));
-        return;
-      }
-      if (anyPoints && max == null) {
-        UI.modal('Maximalpunktzahl fehlt',
-          h('p', {}, 'Bitte tragen Sie zuerst die Maximalpunktzahl der Klausur ein – ohne sie können Prozent und Note nicht berechnet werden.'));
-        return;
-      }
-      course.ka[hj][idx] = { maxPoints: max, points: out };
-      Store.save();
-      toast('Klausur ' + (idx + 1) + ' (' + hj + '. Halbjahr) gespeichert.');
-    }
-
     return h('div.screen',
       header('Klausuren', { name: 'course', params: { id: course.id } }),
       courseBox(course),
@@ -3094,11 +3095,11 @@
         tabs,
         h('label.field',
           h('span.field-label', {}, 'Maximalpunktzahl dieser Klausur'), maxInput),
-        h('p.hint', {}, 'Je Schüler/in die erreichten Punkte eintragen – Prozent und Note (Prozent-Bewertungsspiegel) berechnet die App.')
+        h('p.hint', {}, 'Je Schüler/in die erreichten Punkte eintragen – Prozent und Note (Prozent-Bewertungsspiegel) berechnet die App. ' +
+          'Ohne Maximalpunktzahl können Prozent und Note nicht berechnet werden. Eingaben werden automatisch gespeichert.')
       ),
       h('div.card.card-list', {},
-        students.length ? rows : h('div.empty', h('p', {}, 'Diese Klasse hat noch keine Schüler/innen.'))),
-      h('button.btn-primary.btn-block', { onclick: saveAll }, 'Speichern')
+        students.length ? rows : h('div.empty', h('p', {}, 'Diese Klasse hat noch keine Schüler/innen.')))
     );
   };
 

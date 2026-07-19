@@ -1,4 +1,4 @@
-# SOL-Noten (Version 0.31.0 – Beta)
+# SOL-Noten (Version 0.31.1 – Beta)
 
 Notenverwaltung zum selbstorganisierten Lernen (SOL) als Progressive Web App (PWA).
 Basierend auf der Excel-Notenverwaltung V8.0 von Andreas Vandelaar.
@@ -73,7 +73,7 @@ Ist die App bereits installiert, zeigen beide Stellen das an und der Hinweis ent
 
 ## Speicherverhalten
 
-**Bewertungen speichern sich automatisch** – ohne Speichern-Button, entprellt beim Tippen und sofort beim Verlassen eines Feldes. Das gilt für Ergebnis-Uploads, Portfolio-/mdl.-Prüfungsnoten (SoLei-Quartalsnoten), Open-Book-Test-Prozentwerte, Zeugnisnoten und die vollständige Klausurbewertung. Ungültige Eingaben werden rot markiert und nicht übernommen; bei Sperre wegen Inaktivität geht dadurch nichts verloren.
+**Bewertungen speichern sich automatisch** – ohne Speichern-Button, entprellt beim Tippen und sofort beim Verlassen eines Feldes. Das gilt für Ergebnis-Uploads, Portfolio-/mdl.-Prüfungsnoten (SoLei-Quartalsnoten), Open-Book-Test-Prozentwerte, Zeugnisnoten sowie beide Varianten der Klausurbewertung (einfach und vollständig). Ungültige Eingaben werden rot markiert und nicht übernommen; bei Sperre wegen Inaktivität geht dadurch nichts verloren.
 
 **Einstellungen werden weiterhin bewusst gespeichert** (Globale Einstellungen, Kurs-Einstellungen, Maximalpunkte, Quartalszeiträume): Sie ändern sich selten und wirken weitreichend, deshalb bleibt dort der Speichern-Button.
 
