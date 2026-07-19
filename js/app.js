@@ -70,7 +70,7 @@
 
   /* ================= App-Start ================= */
 
-  var APP_VERSION = '0.30.0';
+  var APP_VERSION = '0.31.0';
 
   /* ---------- PWA-Installation ----------
      Chrome/Edge/Android liefern `beforeinstallprompt`: Event abfangen und
@@ -1476,7 +1476,7 @@
       newClassInput.style.display = classSel.value === '__new__' ? '' : 'none';
     });
 
-    var subjectInput = h('input.input', { type: 'text', value: course ? course.subject : '', placeholder: 'z. B. Fahrzeugvertriebsprozesse' });
+    var subjectInput = h('input.input', { type: 'text', value: course ? course.subject : '', placeholder: 'z.B. Betriebswirtschaftslehre' });
     var obtInput = h('input.input.input-num', { type: 'number', min: 0, max: 8, value: pre ? pre.numOBT : 4 });
     var kaInput = h('input.input.input-num', { type: 'number', min: 0, max: 8, value: pre ? pre.numKA : 2 });
     var w = pre ? pre.weights : { sl: 40, obt: 20, ka: 40 };
@@ -1665,11 +1665,11 @@
       ? [
           h('div.section-head', {}, 'Weitere Kurs-Verwaltung'),
           h('div.actions-col',
-            h('button.btn-plain.btn-block', { onclick: function () { go('students', { classId: course.classId, courseId: course.id }); } },
+            h('button.btn-plain.btn-block', { onclick: function () { go('students', { classId: course.classId, courseId: course.id, from: 'editCourse' }); } },
               'Schülerliste bearbeiten (' + (Store.classById(course.classId).students.length) + ')'),
-            h('button.btn-plain.btn-block', { onclick: function () { go('maxPoints', { id: course.id }); } },
+            h('button.btn-plain.btn-block', { onclick: function () { go('maxPoints', { id: course.id, from: 'editCourse' }); } },
               'Maximalpunkte der Kriterien (' + course.currentQuarter + '. Quartal)'),
-            h('button.btn-plain.btn-block', { onclick: function () { go('quarterDates', { id: course.id }); } },
+            h('button.btn-plain.btn-block', { onclick: function () { go('quarterDates', { id: course.id, from: 'editCourse' }); } },
               'Quartalszeiträume dieses Kurses'),
             course.completed
               ? h('button.btn-plain.btn-block', { onclick: reopenYear }, 'Schuljahr wieder öffnen')
@@ -1953,8 +1953,23 @@
         inpDone.classList.toggle('input-error', !parseCount(inpDone.value).ok);
         inpMissed.classList.toggle('input-error', !parseCount(inpMissed.value).ok);
       }
-      inpDone.addEventListener('input', refresh);
-      inpMissed.addEventListener('input', refresh);
+      /* Bewertungsdaten: sofort speichern (entprellt bzw. beim Verlassen). */
+      var upTimer = null;
+      function persistUp() {
+        if (upTimer) { clearTimeout(upTimer); upTimer = null; }
+        var rd = parseCount(inpDone.value), rm = parseCount(inpMissed.value);
+        if (!rd.ok || !rm.ok) return;
+        Store.setUploadTally(course.id, stu.id, shownQ, rd.value, rm.value);
+      }
+      function onInput() {
+        refresh();
+        if (upTimer) clearTimeout(upTimer);
+        upTimer = setTimeout(persistUp, 600);
+      }
+      inpDone.addEventListener('input', onInput);
+      inpMissed.addEventListener('input', onInput);
+      inpDone.addEventListener('blur', persistUp);
+      inpMissed.addEventListener('blur', persistUp);
       return h('div.review-row',
         h('div.review-name', nameWithPhoto(stu)),
         h('div.review-grades',
@@ -1964,25 +1979,7 @@
       );
     });
 
-    function saveAll() {
-      var bad = [];
-      students.forEach(function (stu) {
-        var rd = parseCount(inputs[stu.id].done.value);
-        var rm = parseCount(inputs[stu.id].missed.value);
-        if (!rd.ok || !rm.ok) bad.push(stu.lastName + ', ' + stu.firstName);
-      });
-      if (bad.length) {
-        UI.modal('Ungültige Eingabe',
-          h('p', {}, 'Bitte geben Sie ganze Zahlen (0 oder größer) ein. Bitte prüfen Sie: ' + bad.join('; ') + '.'));
-        return;
-      }
-      students.forEach(function (stu) {
-        var done = parseCount(inputs[stu.id].done.value).value;
-        var missed = parseCount(inputs[stu.id].missed.value).value;
-        Store.setUploadTally(course.id, stu.id, shownQ, done, missed);
-      });
-      toast('Ergebnis-Uploads (' + shownQ + '. Quartal) gespeichert.');
-    }
+    
 
     return h('div.screen',
       header('Ergebnis-Uploads', { name: 'course', params: { id: course.id } }),
@@ -1992,8 +1989,7 @@
       students.length === 0
         ? h('div.empty', h('p', {}, 'Diese Klasse hat noch keine Schüler/innen.'))
         : h('div.card.card-list', {}, rows),
-      h('div.actions-col',
-        h('button.btn-primary.btn-block', { onclick: saveAll }, 'Uploads speichern'))
+      h('p.hint', {}, 'Eingaben werden automatisch gespeichert.')
     );
   };
 
@@ -2073,7 +2069,9 @@
     }
 
     return h('div.screen',
-      header('Maximalpunkte', { name: 'course', params: { id: course.id } }),
+      header('Maximalpunkte', p.from === 'editCourse'
+        ? { name: 'editCourse', params: { id: course.id } }
+        : { name: 'course', params: { id: course.id } }),
       courseBox(course),
       p.intro ? h('div.banner-info', {},
         h('span', {}, 'Bitte prüfen Sie die Maximalpunkte der Kriterien für das ' + q + '. Quartal, ' +
@@ -2192,7 +2190,23 @@
         latestSolei[stu.id] = g;
         refreshSoleiAvg();
       }
-      inp.addEventListener('input', refreshSolei);
+      /* Bewertungsdaten: sofort speichern (entprellt bzw. beim Verlassen). */
+      var pfTimer = null;
+      function persistPortfolio() {
+        if (pfTimer) { clearTimeout(pfTimer); pfTimer = null; }
+        var r = parseGrade(inp.value);
+        if (!r.ok) return;
+        if (!course.portfolio[q]) course.portfolio[q] = {};
+        if (r.value == null) delete course.portfolio[q][stu.id];
+        else course.portfolio[q][stu.id] = r.value;
+        Store.save();
+      }
+      inp.addEventListener('input', function () {
+        refreshSolei();
+        if (pfTimer) clearTimeout(pfTimer);
+        pfTimer = setTimeout(persistPortfolio, 600);
+      });
+      inp.addEventListener('blur', persistPortfolio);
 
       var row = h('div.review-row',
         h('div.review-name.name-with-photo.tappable-name', {
@@ -2223,7 +2237,7 @@
         h('div.review-grades',
           h('div.review-cell', h('span.hint', {}, 'SL-Bogen'),
             h('strong', {}, slGrade ? Calc.fmt(slGrade.g) : '–')),
-          h('div.review-cell', h('span.hint', {}, 'Portfolio/mdl. Prüfung'), inp),
+          h('div.review-cell', h('span.hint', {}, 'Portfolio /', h('br'), 'mdl. Prüfung'), inp),
           h('div.review-cell', h('span.hint', {}, 'SoLei-Note'), soleiCell)
         ),
         /* Kursnotizen dieses Quartals als datierte Liste – Entscheidungshilfe
@@ -2243,22 +2257,18 @@
       return row;
     });
 
-    function saveAll() {
+    /* Portfolionoten speichern sich selbst; vor dem Schuljahresabschluss
+       wird nur noch geprüft, ob alle sichtbaren Eingaben gültig sind. */
+    function allPortfolioValid() {
       var bad = [];
-      var result = {};
       students.forEach(function (stu) {
-        var r = parseGrade(inputs[stu.id].value);
-        if (!r.ok) { bad.push(stu.lastName + ', ' + stu.firstName); return; }
-        if (r.value != null) result[stu.id] = r.value;
+        if (!parseGrade(inputs[stu.id].value).ok) bad.push(stu.lastName + ', ' + stu.firstName);
       });
       if (bad.length) {
         UI.modal('Ungültige Portfolionote',
           h('p', {}, 'Portfolionoten müssen zwischen 1 und 6 liegen. Bitte prüfen Sie: ' + bad.join('; ') + '.'));
         return false;
       }
-      course.portfolio[q] = result;
-      Store.save();
-      toast('Portfolionoten für das ' + q + '. Quartal gespeichert.');
       return true;
     }
 
@@ -2278,10 +2288,10 @@
           h('div.review-grades', h('div.review-cell', h('span.hint', {}, 'SoLei-Note'), avgSoleiCell)))]
           : h('div.empty', h('p', {}, 'Diese Klasse hat noch keine Schüler/innen.'))),
       h('div.actions-col',
-        h('button.btn-primary.btn-block', { onclick: saveAll }, 'Portfolionoten speichern'),
+        h('p.hint', {}, 'Eingaben werden automatisch gespeichert.'),
         q === 4 && !course.completed
           ? h('button.btn-plain.btn-block', { onclick: function () {
-              if (!saveAll()) return;
+              if (!allPortfolioValid()) return;
               UI.confirmDialog('Schuljahr abschließen?',
                 'Der Kurs wird als „Schuljahr abgeschlossen“ markiert. Alle Ansichten, Zeugnisnoten, Drucke und Nachträge bleiben weiterhin möglich; die Markierung lässt sich in den Kurs-Einstellungen jederzeit wieder aufheben.',
                 'Schuljahr abschließen')
@@ -2374,7 +2384,24 @@
         gradeCell.textContent = g ? Calc.fmt(g.g) : '–';
         refreshAvg();
       }
-      inp.addEventListener('input', refresh);
+      /* Bewertungsdaten: sofort speichern (entprellt bzw. beim Verlassen). */
+      var obtTimer = null;
+      function persistObt() {
+        if (obtTimer) { clearTimeout(obtTimer); obtTimer = null; }
+        var r = parsePct(inp.value);
+        if (!r.ok) return;
+        if (!course.obt[hj]) course.obt[hj] = {};
+        if (!course.obt[hj][idx]) course.obt[hj][idx] = {};
+        if (r.value == null) delete course.obt[hj][idx][stu.id];
+        else course.obt[hj][idx][stu.id] = r.value;
+        Store.save();
+      }
+      inp.addEventListener('input', function () {
+        refresh();
+        if (obtTimer) clearTimeout(obtTimer);
+        obtTimer = setTimeout(persistObt, 600);
+      });
+      inp.addEventListener('blur', persistObt);
       var row = h('div.review-row',
         h('div.review-name', nameWithPhoto(stu)),
         h('div.review-grades',
@@ -2386,25 +2413,6 @@
       return row;
     });
     refreshAvg();
-
-    function saveAll() {
-      var bad = [];
-      var out = {};
-      students.forEach(function (stu) {
-        var r = parsePct(inputs[stu.id].value);
-        if (!r.ok) { bad.push(stu.lastName + ', ' + stu.firstName); return; }
-        if (r.value != null) out[stu.id] = r.value;
-      });
-      if (bad.length) {
-        UI.modal('Ungültiger Prozentwert',
-          h('p', {}, 'Prozentwerte müssen zwischen 0 und 100 liegen. Bitte prüfen Sie: ' + bad.join('; ') + '.'));
-        return false;
-      }
-      course.obt[hj][idx] = out;
-      Store.save();
-      toast('OBT ' + (idx + 1) + ' (' + hj + '. Halbjahr) gespeichert.');
-      return true;
-    }
 
     /* --- Moodle-Import --- */
     var fileInput = h('input', { type: 'file', accept: '.xlsx,.csv,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', style: { display: 'none' } });
@@ -2471,7 +2479,7 @@
       h('div.card.card-list', {},
         students.length ? rows : h('div.empty', h('p', {}, 'Diese Klasse hat noch keine Schüler/innen.'))),
       h('div.actions-col',
-        h('button.btn-primary.btn-block', { onclick: saveAll }, 'Speichern'),
+        h('p.hint', {}, 'Eingaben werden automatisch gespeichert.'),
         h('button.btn-plain.btn-block', { onclick: function () { fileInput.click(); } },
           'Moodle-Export einlesen (Excel/CSV)'),
         fileInput
@@ -2868,9 +2876,26 @@
     }
     function mirrorTable() {
       var counts = mirrorCounts();
+      /* Durchschnitt der exakten Einzelnoten (nicht der gerundeten Spiegel-
+         Spalten), auf 2 Nachkommastellen – konsistent zu Calc.avgRound2. */
+      var t = taskSum();
+      var grades = [];
+      if (t.ok && t.sum > 0) {
+        students.forEach(function (st2) {
+          var arr = work.taskPoints[st2.id] || [];
+          var any = false, sum = 0;
+          arr.forEach(function (v) { if (v != null) { any = true; sum += v; } });
+          if (any) grades.push(Calc.gradeForPercent(sum / t.sum * 100, pctTable).g);
+        });
+      }
+      var avg = Calc.avgRound2(grades);
       return h('table.mirror-tbl',
-        h('tr', [1, 2, 3, 4, 5, 6].map(function (n) { return h('th', {}, 'Note ' + n); })),
-        h('tr', counts.map(function (c2) { return h('td', {}, String(c2)); })));
+        h('tr',
+          [1, 2, 3, 4, 5, 6].map(function (n) { return h('th', {}, 'Note ' + n); })
+            .concat([h('th.mirror-avg', {}, 'Durchschnitt')])),
+        h('tr',
+          counts.map(function (c2) { return h('td', {}, String(c2)); })
+            .concat([h('td.mirror-avg', {}, avg == null ? '–' : Calc.fmt(avg))])));
     }
     var mirrorHost = h('div');
     mirrorRefresh = function () {
@@ -3231,6 +3256,7 @@
       '.mirror-tbl th,.mirror-tbl td{border:1px solid #888;padding:1mm 4mm;font-size:10pt;text-align:center;}' +
       '.mirror-tbl th{background:#eee;}' +
       '.mirror-tbl td{font-weight:700;}' +
+      '.mirror-tbl .mirror-avg{border-left:2px solid #333;}' +
       '.grades-table tr.avg-row td{font-weight:700;background:#eef3f2;border-top:1pt solid #333;' +
         '-webkit-print-color-adjust:exact;print-color-adjust:exact;}' +
       '.charts-print h2{font-size:13pt;margin:0 0 1mm;}' +
@@ -3384,8 +3410,31 @@
       });
       zInputs[stu.id] = zInputs[stu.id] || {};
       zInputs[stu.id][key] = inp;
+      /* Sofort speichern (Bewertungsdaten): ungültige Werte werden markiert
+         und nicht übernommen, gültige landen direkt im Zustand. */
+      function persistZ() {
+        var r = parseZeugnis(inp.value);
+        inp.classList.toggle('input-error', !r.ok);
+        if (!r.ok) return;
+        var cur = course.zeugnis[stu.id] || {};
+        cur[key] = r.value;
+        if (cur.hj == null && cur.jahr == null) delete course.zeugnis[stu.id];
+        else course.zeugnis[stu.id] = cur;
+        Store.save();
+      }
+      inp.addEventListener('input', function () {
+        var r = parseZeugnis(inp.value);
+        inp.classList.toggle('input-error', !r.ok);
+        if (zSaveTimer) clearTimeout(zSaveTimer);
+        zSaveTimer = setTimeout(persistZ, 600);
+      });
+      inp.addEventListener('blur', function () {
+        if (zSaveTimer) { clearTimeout(zSaveTimer); zSaveTimer = null; }
+        persistZ();
+      });
       return inp;
     }
+    var zSaveTimer = null;
 
     var body = rowsData.map(function (r) {
       var cells = [h('td.sticky-col.name-cell', {
@@ -3453,24 +3502,6 @@
       var v = Number(s);
       if (isNaN(v) || v < 1 || v > 6) return { ok: false };
       return { ok: true, value: v };
-    }
-
-    function saveZeugnis() {
-      var bad = [];
-      students.forEach(function (stu) {
-        var hj = parseZeugnis(zInputs[stu.id].hj.value);
-        var jahr = parseZeugnis(zInputs[stu.id].jahr.value);
-        if (!hj.ok || !jahr.ok) { bad.push(stu.lastName + ', ' + stu.firstName); return; }
-        if (hj.value == null && jahr.value == null) { delete course.zeugnis[stu.id]; return; }
-        course.zeugnis[stu.id] = { hj: hj.value, jahr: jahr.value };
-      });
-      if (bad.length) {
-        UI.modal('Ungültige Zeugnisnote',
-          h('p', {}, 'Zeugnisnoten müssen zwischen 1 und 6 liegen. Bitte prüfen Sie: ' + bad.join('; ') + '.'));
-        return;
-      }
-      Store.save();
-      toast('Zeugnisnoten gespeichert.');
     }
 
     /* --- Exporte --- */
@@ -3631,14 +3662,14 @@
       header('Notenübersicht & Zeugnisnoten', { name: 'course', params: { id: course.id } }),
         courseBox(course),
       h('div.grades-toggle-row', viewToggle),
-      classAvgChartCard(),
       h('p.hint.grades-hint',
         'Hier vergeben Sie die ', h('strong', {}, 'Zeugnisnoten für das HJ-Zeugnis und das Jahreszeugnis'),
         ' (in der Liste ganz rechts)!', h('br'),
-        h('strong', {}, 'Tippen Sie auf einen Namen'), ', um in dessen Einzelansicht zu wechseln.'),
+        h('strong', {}, 'Tippen Sie auf einen Namen'), ', um in dessen Einzelansicht zu wechseln.', h('br'),
+        'Eingaben werden automatisch gespeichert.'),
       h('div.table-scroll', {}, table),
+      classAvgChartCard(),
       h('div.actions-col',
-        h('button.btn-primary.btn-block', { onclick: saveZeugnis }, 'Zeugnisnoten speichern'),
         h('button.btn-plain.btn-block', { onclick: doExcel }, 'Als Excel-Datei exportieren'),
         h('button.btn-plain.btn-block', { onclick: doPrint }, 'Drucken / als PDF speichern'),
         exportWarning()
@@ -4196,7 +4227,9 @@
     });
 
     return h('div.screen',
-      header('Quartalszeiträume', { name: 'course', params: { id: course.id } }),
+      header('Quartalszeiträume', p.from === 'editCourse'
+        ? { name: 'editCourse', params: { id: course.id } }
+        : { name: 'course', params: { id: course.id } }),
       courseBox(course),
       h('div.card',
         h('p.hint', {}, 'Vorgeschlagen aus dem Schuljahresplan (' + year.name + ', je 10 Schulwochen ohne Ferien). Anpassungen gelten nur für diesen Kurs.'),
@@ -4224,7 +4257,9 @@
 
   views.students = function (p) {
     var cls = Store.classById(p.classId);
-    var back = p.courseId ? { name: 'course', params: { id: p.courseId } } : { name: 'home' };
+    var back = p.from === 'editCourse' && p.courseId
+      ? { name: 'editCourse', params: { id: p.courseId } }
+      : (p.courseId ? { name: 'course', params: { id: p.courseId } } : { name: 'home' });
 
     var list = cls.students
       .slice()

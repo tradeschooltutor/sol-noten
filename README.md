@@ -1,4 +1,4 @@
-# SOL-Noten (Version 0.30.0 – Beta)
+# SOL-Noten (Version 0.31.0 – Beta)
 
 Notenverwaltung zum selbstorganisierten Lernen (SOL) als Progressive Web App (PWA).
 Basierend auf der Excel-Notenverwaltung V8.0 von Andreas Vandelaar.
@@ -71,12 +71,18 @@ SOL-Noten lässt sich als App installieren (eigenes Symbol, eigenes Fenster, off
 
 Ist die App bereits installiert, zeigen beide Stellen das an und der Hinweis entfällt automatisch. Wurde der Hinweis auf dem Startbildschirm mit „Nicht mehr anzeigen" ausgeblendet, bleibt die Installation über die Globalen Einstellungen jederzeit erreichbar.
 
+## Speicherverhalten
+
+**Bewertungen speichern sich automatisch** – ohne Speichern-Button, entprellt beim Tippen und sofort beim Verlassen eines Feldes. Das gilt für Ergebnis-Uploads, Portfolio-/mdl.-Prüfungsnoten (SoLei-Quartalsnoten), Open-Book-Test-Prozentwerte, Zeugnisnoten und die vollständige Klausurbewertung. Ungültige Eingaben werden rot markiert und nicht übernommen; bei Sperre wegen Inaktivität geht dadurch nichts verloren.
+
+**Einstellungen werden weiterhin bewusst gespeichert** (Globale Einstellungen, Kurs-Einstellungen, Maximalpunkte, Quartalszeiträume): Sie ändern sich selten und wirken weitreichend, deshalb bleibt dort der Speichern-Button.
+
 ## Klassendurchschnitte & Leistungsverlauf
 
 - **„SoLei-Punktestand"** (Ansicht Liste) und **„SoLei-Quartalsnoten"** zeigen am unteren Ende der Liste den Klassendurchschnitt (Punkte bzw. SoLei-Note; auf den Quartalsnoten live bei Portfolio-Eingaben).
 - Die Klassentabelle der **„Notenübersicht & Zeugnisnoten"** erhält als letzte Zeile „ø Klasse" mit den Spaltendurchschnitten aller SoLei-Quartalsnoten, Open Book Tests, Klausuren und der berechneten Zeugnisnoten (Tendenz und manuelle Zeugnisspalten bleiben leer); die Zeile wird mitgedruckt.
-- Ebenfalls in der Klassen-Ansicht: **Leistungsverlauf (ø Klasse)** als Liniendiagramm – Kategorie wählbar (SoLei je Quartal, Open Book Tests, Klausuren), Y-Achse Note 1 (oben) bis 6 (unten), Werte am Punkt beschriftet.
-- Die Seite **„Klausuren"** (vollständige Bewertung) zeigt unter der Schülerliste den **Notenspiegel** (Anzahl je ganzer Note 1–6, live) mit eigenem Button „Notenspiegel drucken" (separate Seite).
+- Unterhalb der Tabelle in der Klassen-Ansicht: **Leistungsverlauf (ø Klasse)** als Liniendiagramm – Kategorie wählbar (SoLei je Quartal, Open Book Tests, Klausuren), Y-Achse Note 1 (oben) bis 6 (unten), Werte am Punkt beschriftet.
+- Die Seite **„Klausuren"** (vollständige Bewertung) zeigt unter der Schülerliste den **Notenspiegel** (Anzahl je ganzer Note 1–6, live) mit Durchschnittsspalte (2 Nachkommastellen) und eigenem Button „Notenspiegel drucken" (separate Seite).
 
 ## Vollständige Klausurbewertung
 
