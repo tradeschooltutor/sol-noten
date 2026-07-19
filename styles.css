@@ -260,6 +260,22 @@ textarea.input.note-area {
 .review-notes.no-top-border { margin-top: 0; padding-top: 0; border-top: none; }
 .section-head-inline { font-weight: 700; font-size: 0.9rem; }
 .grades-charts { display: flex; flex-direction: column; gap: 12px; margin-top: 12px; }
+
+/* Vollständige Klausurbewertung: Aufgabenraster und aufklappbare Zeilen */
+.exam-def-row { display: flex; gap: 16px; flex-wrap: wrap; }
+.field-inline { display: flex; flex-direction: column; gap: 4px; }
+.task-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(86px, 1fr));
+  gap: 8px; margin: 6px 0;
+}
+.task-cell { display: flex; flex-direction: column; gap: 2px; }
+.task-cell .hint { font-size: 0.75rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.task-max, .task-pts { min-width: 0; width: 100%; text-align: center; }
+.exam-student { border-bottom: 1px solid var(--line); }
+.exam-student:last-child { border-bottom: none; }
+.exam-head-row { cursor: pointer; }
+.exam-student.open { background: color-mix(in srgb, var(--teal) 6%, var(--card)); border-radius: 10px; }
+.exam-detail { padding: 4px 12px 12px; display: flex; flex-direction: column; gap: 8px; }
 .review-note { margin: 2px 0; font-size: 0.85rem; color: var(--ink); }
 .review-note .note-date { color: var(--ink-soft); font-weight: 600; }
 /* Lange Beschriftungen (z. B. „Neuer Kurs für ein anderes Fach …“) dürfen

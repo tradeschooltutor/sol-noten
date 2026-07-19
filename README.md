@@ -1,4 +1,4 @@
-# SOL-Noten (Version 0.27.1 – Beta)
+# SOL-Noten (Version 0.28.0 – Beta)
 
 Notenverwaltung zum selbstorganisierten Lernen (SOL) als Progressive Web App (PWA).
 Basierend auf der Excel-Notenverwaltung V8.0 von Andreas Vandelaar.
@@ -70,6 +70,10 @@ SOL-Noten lässt sich als App installieren (eigenes Symbol, eigenes Fenster, off
 - **Firefox am PC** unterstützt keine Installation von Web-Apps; SOL-Noten läuft dort normal im Browser.
 
 Ist die App bereits installiert, zeigen beide Stellen das an und der Hinweis entfällt automatisch. Wurde der Hinweis auf dem Startbildschirm mit „Nicht mehr anzeigen" ausgeblendet, bleibt die Installation über die Globalen Einstellungen jederzeit erreichbar.
+
+## Vollständige Klausurbewertung
+
+In den Globalen Einstellungen (Abschnitt „Klausurbewertung") wählbar: **Einfach** (je Klausur eine Maximalpunktzahl, je Schüler/in die Gesamtpunkte – bisheriges Verhalten) oder **Vollständig** (die komplette Punktevergabe erfolgt in der App). Im vollständigen Modus werden je Klausur das Klausurdatum, die Anzahl der Aufgaben (1–50) und die möglichen Punkte je Aufgabe festgelegt; je Schüler/in (Zeile antippen) die erreichten Punkte je Aufgabe – die Maximalpunkte stehen dabei immer sichtbar am Feld. Datum je Person überschreibbar (Nachschreiber), Kommentarfeld je Person. Summe, Prozent und Note (Prozent-Bewertungsspiegel, abgerundet auf den vollen Prozentpunkt – identisch zur Excel-Klassenverwaltung) berechnet die App live und beim Speichern; leere Felder zählen als 0, sobald mindestens ein Feld ausgefüllt ist, ganz ohne Eingabe gilt die Person als nicht bewertet. Die Summen werden in das bisherige Datenmodell durchgeschrieben – Zeugnisrechnung, Notenübersicht und Exporte funktionieren unverändert. Der Schalter bestimmt nur die Erfassung neuer Klausuren; bereits vollständig bewertete Klausuren behalten ihre Aufgaben-Ansicht, Umschalten versteckt nie Daten. Druck der Bewertungsbögen (eine Seite je Person) folgt in einer späteren Version.
 
 ## Hinweis zu Exporten
 

@@ -70,7 +70,7 @@
 
   /* ================= App-Start ================= */
 
-  var APP_VERSION = '0.27.1';
+  var APP_VERSION = '0.28.0';
 
   /* ---------- PWA-Installation ----------
      Chrome/Edge/Android liefern `beforeinstallprompt`: Event abfangen und
@@ -2457,6 +2457,276 @@
     return course.ka[hj][idx];
   }
 
+  /* ---------- Vollständige Klausurbewertung ----------
+     Punkte je Aufgabe, Klausurdatum (je Schüler/in überschreibbar für
+     Nachschreiber), Kommentar. Summen werden in maxPoints/points
+     DURCHGESCHRIEBEN, damit Zeugnisrechnung, Notenübersicht und Export
+     unverändert funktionieren. Leere Aufgabenfelder zählen als 0, sobald
+     mindestens ein Feld der Person ausgefüllt ist; ganz ohne Eintrag gilt
+     die Person als nicht bewertet. */
+  var KA_MAX_TASKS = 50;
+  var fullExamOpen = {}; /* aufgeklappte Schülerzeilen je Kurs/HJ/Klausur (Sitzung) */
+
+  function fullExamView(course, cls, students, hj, idx, data, hjSeg, tabs, pctTable, parseNum) {
+    var full = data.full || { date: null, tasks: [4, 4, 4, 4], taskPoints: {}, dates: {}, comments: {} };
+    /* Arbeitskopie: gespeichert wird erst über den Speichern-Button. */
+    var work = JSON.parse(JSON.stringify(full));
+    var openKey = course.id + '/' + hj + '/' + idx;
+    if (!fullExamOpen[openKey]) fullExamOpen[openKey] = {};
+
+    var status = h('p.hint.error-text');
+
+    /* ----- Definition: Datum, Aufgabenzahl, Punkte je Aufgabe ----- */
+    var dateInput = h('input.input.date-inline', { type: 'date', value: work.date || '' });
+    var countInput = h('input.input.input-num', {
+      type: 'number', min: 1, max: KA_MAX_TASKS, value: work.tasks.length
+    });
+    var taskArea = h('div.task-grid');
+    var sumLabel = h('span.hint');
+    var taskInputs = [];
+
+    function taskSum() {
+      var sum = 0, ok = true;
+      taskInputs.forEach(function (inp) {
+        var r = parseNum(inp.value);
+        if (!r.ok || r.value == null || r.value <= 0) ok = false;
+        else sum += r.value;
+      });
+      return { sum: Math.round(sum * 100) / 100, ok: ok };
+    }
+    function refreshSum() {
+      var t = taskSum();
+      sumLabel.textContent = 'Summe: ' + Calc.fmt(t.sum) + ' Punkte' + (t.ok ? '' : ' (unvollständig)');
+      refreshAllStudents();
+    }
+    function renderTasks() {
+      taskArea.innerHTML = '';
+      taskInputs = [];
+      work.tasks.forEach(function (mp, i) {
+        var inp = h('input.input.input-num.task-max', {
+          type: 'text', inputmode: 'decimal', value: mp == null ? '' : Calc.fmt(mp), 'aria-label': 'Aufgabe ' + (i + 1)
+        });
+        inp.addEventListener('input', function () {
+          var r = parseNum(inp.value);
+          work.tasks[i] = (r.ok && r.value != null) ? r.value : null;
+          inp.classList.toggle('input-error', !(r.ok && r.value != null && r.value > 0));
+          refreshSum();
+          renderStudentTaskLabels();
+        });
+        taskInputs.push(inp);
+        taskArea.appendChild(h('label.task-cell', h('span.hint', {}, 'Aufg. ' + (i + 1)), inp));
+      });
+      refreshSum();
+    }
+    countInput.addEventListener('change', function () {
+      var n = Math.max(1, Math.min(KA_MAX_TASKS, Math.round(Number(countInput.value) || 1)));
+      countInput.value = n;
+      if (n < work.tasks.length) {
+        /* Warnen, wenn auf wegfallenden Aufgaben bereits Punkte stehen. */
+        var affected = Object.keys(work.taskPoints).some(function (sid) {
+          return (work.taskPoints[sid] || []).slice(n).some(function (v) { return v != null; });
+        });
+        var shrink = function () {
+          work.tasks = work.tasks.slice(0, n);
+          Object.keys(work.taskPoints).forEach(function (sid) {
+            work.taskPoints[sid] = (work.taskPoints[sid] || []).slice(0, n);
+          });
+          renderTasks(); renderStudents();
+        };
+        if (affected) {
+          UI.modal('Aufgaben reduzieren?',
+            h('p', {}, 'Auf mindestens einer der wegfallenden Aufgaben sind bereits Punkte eingetragen. Diese Punkte werden entfernt.'),
+            [{ label: 'Abbrechen', value: false }, { label: 'Reduzieren', value: true, primary: true }]
+          ).then(function (okv) {
+            if (okv) shrink();
+            else { countInput.value = work.tasks.length; }
+          });
+        } else shrink();
+      } else if (n > work.tasks.length) {
+        var last = work.tasks[work.tasks.length - 1];
+        while (work.tasks.length < n) work.tasks.push(last != null ? last : 4);
+        renderTasks(); renderStudents();
+      }
+    });
+
+    /* ----- Schülerliste mit aufklappbarer Punkteeingabe ----- */
+    var listHost = h('div.card.card-list');
+    var studentRefreshers = [];
+    var taskLabelRefreshers = [];
+    function refreshAllStudents() { studentRefreshers.forEach(function (f) { f(); }); }
+    function renderStudentTaskLabels() { taskLabelRefreshers.forEach(function (f) { f(); }); }
+
+    function studentRow(stu) {
+      var tp = work.taskPoints[stu.id] || [];
+      var open = !!fullExamOpen[openKey][stu.id];
+
+      var sumCell = h('span.review-solei');
+      var pctCell = h('span.hint');
+      var gradeCell = h('strong.review-solei');
+
+      function studentState() {
+        var any = false, bad = false, sum = 0;
+        var arr = work.taskPoints[stu.id] || [];
+        for (var i = 0; i < work.tasks.length; i++) {
+          var v = arr[i];
+          if (v != null) {
+            any = true;
+            if (work.tasks[i] != null && v > work.tasks[i]) bad = true;
+            sum += v;
+          }
+        }
+        return { any: any, bad: bad, sum: Math.round(sum * 100) / 100 };
+      }
+      function refresh() {
+        var t = taskSum();
+        var st2 = studentState();
+        if (!st2.any || !t.ok || t.sum <= 0) {
+          sumCell.textContent = '–'; pctCell.textContent = ''; gradeCell.textContent = '–';
+          return;
+        }
+        var pct = Math.round(st2.sum / t.sum * 10000) / 100;
+        sumCell.textContent = Calc.fmt(st2.sum) + ' / ' + Calc.fmt(t.sum);
+        pctCell.textContent = Calc.fmt(Math.round(pct * 10) / 10, 1) + ' %';
+        gradeCell.textContent = st2.bad ? '–' : Calc.fmt(Calc.gradeForPercent(pct, pctTable).g);
+      }
+      studentRefreshers.push(refresh);
+
+      var head = h('div.review-row.exam-head-row',
+        h('div.review-name', nameWithPhoto(stu)),
+        h('div.review-grades',
+          h('div.review-cell', h('span.hint', {}, 'Punkte'), sumCell),
+          h('div.review-cell', h('span.hint', {}, 'Prozent'), h('span.review-solei', {}, pctCell)),
+          h('div.review-cell', h('span.hint', {}, 'Note'), gradeCell)
+        ));
+      head.addEventListener('click', function () {
+        fullExamOpen[openKey][stu.id] = !fullExamOpen[openKey][stu.id];
+        renderStudents();
+      });
+
+      var wrap = h('div.exam-student' + (open ? '.open' : ''), head);
+      if (open) {
+        var body = h('div.exam-detail');
+        /* Datum: Vorschlag = Klausurdatum, überschreibbar (Nachschreiber). */
+        var sDate = h('input.input.date-inline', {
+          type: 'date', value: work.dates[stu.id] || work.date || ''
+        });
+        sDate.addEventListener('change', function () {
+          if (sDate.value && sDate.value !== work.date) work.dates[stu.id] = sDate.value;
+          else delete work.dates[stu.id];
+        });
+        body.appendChild(h('label.field.field-inline', h('span.hint', {}, 'Datum'), sDate));
+
+        var grid = h('div.task-grid');
+        work.tasks.forEach(function (mp, i) {
+          var lbl = h('span.hint', {}, 'Aufg. ' + (i + 1) + ' (max ' + (mp != null ? Calc.fmt(mp) : '?') + ')');
+          taskLabelRefreshers.push(function () {
+            lbl.textContent = 'Aufg. ' + (i + 1) + ' (max ' + (work.tasks[i] != null ? Calc.fmt(work.tasks[i]) : '?') + ')';
+          });
+          var pInp = h('input.input.input-num.task-pts', {
+            type: 'text', inputmode: 'decimal', placeholder: '–',
+            value: tp[i] == null ? '' : Calc.fmt(tp[i]), 'aria-label': 'Aufgabe ' + (i + 1)
+          });
+          pInp.addEventListener('input', function () {
+            var r = parseNum(pInp.value);
+            if (!work.taskPoints[stu.id]) work.taskPoints[stu.id] = [];
+            work.taskPoints[stu.id][i] = (r.ok && r.value != null) ? r.value : null;
+            var over = r.ok && r.value != null && work.tasks[i] != null && r.value > work.tasks[i];
+            pInp.classList.toggle('input-error', !r.ok || over);
+            refresh();
+          });
+          grid.appendChild(h('label.task-cell', lbl, pInp));
+        });
+        body.appendChild(grid);
+        body.appendChild(h('p.hint', {}, 'Leere Felder zählen als 0 Punkte, sobald mindestens ein Feld ausgefüllt ist. Ohne jede Eingabe gilt die Person als nicht bewertet (z. B. fehlend).'));
+
+        var cInp = h('textarea.input.lesson-ta', { rows: 1, placeholder: 'Kommentar (optional)' }, work.comments[stu.id] || '');
+        cInp.addEventListener('input', function () {
+          if (cInp.value.trim()) work.comments[stu.id] = cInp.value;
+          else delete work.comments[stu.id];
+        });
+        body.appendChild(h('label.field', h('span.hint', {}, 'Kommentar'), cInp));
+        wrap.appendChild(body);
+      }
+      refresh();
+      return wrap;
+    }
+
+    function renderStudents() {
+      listHost.innerHTML = '';
+      studentRefreshers = [];
+      taskLabelRefreshers = [];
+      if (!students.length) {
+        listHost.appendChild(h('div.empty', h('p', {}, 'Diese Klasse hat noch keine Schüler/innen.')));
+        return;
+      }
+      students.forEach(function (stu) { listHost.appendChild(studentRow(stu)); });
+    }
+
+    /* ----- Speichern: validieren, Summen durchschreiben ----- */
+    function saveFull() {
+      status.textContent = '';
+      var t = taskSum();
+      if (!t.ok || t.sum <= 0) {
+        status.textContent = 'Bitte für jede Aufgabe die möglichen Punkte (größer 0) angeben.';
+        return;
+      }
+      var bad = [];
+      var outPoints = {};
+      students.forEach(function (stu) {
+        var arr = work.taskPoints[stu.id] || [];
+        var any = false, sum = 0;
+        for (var i = 0; i < work.tasks.length; i++) {
+          var v = arr[i];
+          if (v != null) {
+            any = true;
+            if (v > work.tasks[i]) { bad.push(stu.lastName + ', ' + stu.firstName + ' (Aufgabe ' + (i + 1) + ')'); }
+            sum += v;
+          }
+        }
+        if (any) outPoints[stu.id] = Math.round(sum * 100) / 100;
+      });
+      if (bad.length) {
+        status.textContent = 'Punkte über dem Aufgaben-Maximum: ' + bad.join('; ') + '.';
+        return;
+      }
+      /* Arbeitskopie aufräumen: taskPoints ohne jede Eingabe entfernen */
+      Object.keys(work.taskPoints).forEach(function (sid) {
+        var arr = work.taskPoints[sid] || [];
+        if (!arr.some(function (v) { return v != null; })) delete work.taskPoints[sid];
+      });
+      work.date = dateInput.value || null;
+      data.full = work;
+      data.maxPoints = t.sum;
+      data.points = outPoints;
+      course.ka[hj][idx] = data;
+      Store.save();
+      toast('Klausur ' + (idx + 1) + ' (' + hj + '. Halbjahr) gespeichert – Summen, Prozent und Noten aktualisiert.');
+      go('klausuren', { id: course.id, hj: hj, idx: idx });
+    }
+
+    renderTasks();
+    renderStudents();
+
+    return h('div.screen',
+      header('Klausuren', { name: 'course', params: { id: course.id } }),
+      courseBox(course),
+      h('div.card.card-tight',
+        h('div.row-between', hjSeg, null),
+        tabs,
+        h('div.exam-def-row',
+          h('label.field.field-inline', h('span.field-label', {}, 'Klausurdatum'), dateInput),
+          h('label.field.field-inline', h('span.field-label', {}, 'Anzahl Aufgaben'), countInput)),
+        h('span.field-label', {}, 'Mögliche Punkte je Aufgabe'),
+        taskArea,
+        sumLabel,
+        h('p.hint', {}, 'Zum Eintragen der Punkte eine Person antippen. Prozent und Note (Prozent-Bewertungsspiegel) berechnet die App aus der Punktesumme.')
+      ),
+      listHost,
+      status,
+      h('button.btn-primary.btn-block', { onclick: saveFull }, 'Speichern')
+    );
+  }
+
   views.klausuren = function (p) {
     var course = Store.courseById(p.id);
     var cls = Store.classById(course.classId);
@@ -2469,6 +2739,11 @@
       return (a.lastName + a.firstName).localeCompare(b.lastName + b.firstName, 'de');
     });
     var data = kaData(course, hj, idx);
+
+    /* Vollständige Klausurbewertung: greift, wenn diese Klausur bereits
+       Aufgabendaten hat ODER der globale Schalter auf „Vollständig" steht.
+       Datengetrieben vor Einstellung – Umschalten versteckt nie Daten. */
+    var fullMode = !!(data.full || S().settings.kaFullMode);
 
     var hjSeg = h('div.seg', {}, [1, 2].map(function (v) {
       return h('button.seg-btn' + (hj === v ? '.active' : ''), {
@@ -2490,6 +2765,10 @@
       var v = Number(s);
       if (isNaN(v) || v < 0) return { ok: false };
       return { ok: true, value: Math.round(v * 100) / 100 };
+    }
+
+    if (fullMode) {
+      return fullExamView(course, cls, students, hj, idx, data, hjSeg, tabs, pctTable, parseNum);
     }
 
     var maxInput = h('input.input.input-num', {
@@ -4951,6 +5230,28 @@
             render();
           } }, 'Auf Standard zurücksetzen')
         )
+      ),
+
+      h('div.section-head', {}, 'Klausurbewertung'),
+      h('div.card',
+        h('p.hint', {}, 'Einfach: je Klausur eine Maximalpunktzahl und je Schüler/in die Gesamtpunkte. Vollständig: Punkte je Aufgabe werden in der App vergeben (mit Klausurdatum und Kommentar); Summe, Prozent und Note berechnet die App. Der Schalter bestimmt die Erfassung neuer Klausuren – bereits vollständig bewertete Klausuren behalten ihre Aufgaben-Ansicht.'),
+        (function () {
+          var seg = h('div.seg');
+          function draw() {
+            seg.innerHTML = '';
+            [{ v: false, l: 'Einfach (Gesamtpunkte)' }, { v: true, l: 'Vollständig (je Aufgabe)' }].forEach(function (o) {
+              seg.appendChild(h('button.seg-btn' + (!!st.settings.kaFullMode === o.v ? '.active' : ''), {
+                onclick: function () {
+                  if (!!st.settings.kaFullMode === o.v) return;
+                  st.settings.kaFullMode = o.v;
+                  Store.save(); draw();
+                }
+              }, o.l));
+            });
+          }
+          draw();
+          return seg;
+        })()
       ),
 
       h('div.section-head', {}, 'Bewertungsspiegel (Prozent-Schema)'),
