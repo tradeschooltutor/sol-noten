@@ -307,6 +307,14 @@ textarea.input.note-area {
 .plan-select { max-width: 11rem; min-height: 34px; padding-top: 4px; padding-bottom: 4px; font-size: 0.85rem; flex-shrink: 0; }
 @media (max-width: 480px) { .plan-select { max-width: 8.5rem; } }
 .plan-bar .row-gap { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+
+/* Demo-Modus: dauerhaft sichtbares Band auf jeder Seite */
+.demo-banner {
+  background: var(--amber); color: #fff; border-radius: var(--radius);
+  padding: 8px 12px; font-size: 0.85rem; text-align: center;
+  margin-bottom: 12px; letter-spacing: 0.02em;
+}
+.demo-banner strong { letter-spacing: 0.08em; }
 .review-note { margin: 2px 0; font-size: 0.85rem; color: var(--ink); }
 .review-note .note-date { color: var(--ink-soft); font-weight: 600; }
 /* Lange Beschriftungen (z. B. „Neuer Kurs für ein anderes Fach …“) dürfen

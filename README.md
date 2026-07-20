@@ -1,4 +1,4 @@
-# SOL-Noten (Version 0.32.1 – Beta)
+# SOL-Noten (Version 0.33.0 – Beta)
 
 Notenverwaltung zum selbstorganisierten Lernen (SOL) als Progressive Web App (PWA).
 Basierend auf der Excel-Notenverwaltung V8.0 von Andreas Vandelaar.
@@ -74,6 +74,12 @@ Ist die App bereits installiert, zeigen beide Stellen das an und der Hinweis ent
 ## Mehrere Sitzpläne je Kurs
 
 Wechselt eine Klasse den Raum, lassen sich mehrere Sitzpläne hinterlegen und über die Auswahlliste rechts in der Kursnamen-Box umschalten; der zuletzt gewählte Plan ist beim nächsten Öffnen wieder aktiv. Namen werden frei vergeben – in der Regel die Raumnummer (z. B. „3-EG-080"). Im Modus „Sitzplan bearbeiten" stehen **+ Neu** (leerer Plan), **Duplizieren** (übernimmt die aktuelle Anordnung als Ausgangspunkt), **Umbenennen** und **Löschen** zur Verfügung; der letzte verbliebene Plan kann nicht gelöscht werden. Jeder Plan hat eine eigene Spaltenzahl und eigene Platzierungen, da Räume unterschiedlich geschnitten sind. Vorhandene Sitzpläne älterer Versionen werden beim ersten Start automatisch als Plan „Standard" übernommen. Beim Schuljahreswechsel und bei „Neuer Kurs für ein anderes Fach in dieser Klasse" werden alle Pläne mitkopiert; wird eine Person aus der Klasse entfernt, verschwindet sie aus allen Plänen.
+
+## Demo-Modus (Fortbildungen und Vorführungen)
+
+In den Globalen Einstellungen unter „Demo-Modus" startbar. Die App zeigt dann ausschließlich erfundene Daten: zwei Klassen (AK25A, AK25B) mit den Kursen KPA, KUP und WISO, je zwei Unterrichtstagen pro Woche, vollständig bewerteten Quartalen 1–3 und einem noch leeren 4. Quartal – so lassen sich alle Eingabemasken (SoLei-Punkte, Ergebnis-Uploads, Fehlzeiten, Quartalsnoten, Open Book Tests, Klausuren) live vorführen, ohne etwas löschen zu müssen. Enthalten sind unterschiedlich zuverlässige Schüler/innen mit glaubwürdig schwankenden Leistungen, unentschuldigte Fehlzeiten, Upload-Zählungen (5 Prüfungen je Quartal), je Halbjahr 4 Open Book Tests und 2 Klausuren (eine davon vollständig mit Aufgabenpunkten und Notenspiegel), Sitzpläne, Stundeninhalte und Kursnotizen. Der Kurs WISO zeigt zusätzlich verschobene Maximalpunkte (Q2 betont Sozialkompetenz, Q3 die mündliche Beteiligung) sowie Portfolionoten. Fotos werden bewusst keine erzeugt – der Sitzplan zeigt die Namensinitialen.
+
+**Ihre echten Daten sind dabei geschützt:** Sie bleiben unverändert gespeichert und werden während der Demo nicht angefasst; die App arbeitet auf einer getrennten Datenwelt, aus der nichts auf die Festplatte geschrieben wird. Ein oranges Band „DEMO-MODUS" läuft auf jeder Seite mit, damit in der Fortbildung niemand die beiden verwechselt. Beim Beenden werden alle Demo-Änderungen verworfen und die echten Daten sofort wieder angezeigt. Die Beispieldaten sind reproduzierbar – jeder Start erzeugt exakt dieselbe Demo, sodass Ablaufpläne und Screenshots gültig bleiben.
 
 ## Speicherverhalten
 

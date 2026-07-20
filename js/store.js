@@ -356,8 +356,43 @@
 
   function save() {
     if (saveTimer) clearTimeout(saveTimer);
+    /* Im Demo-Modus wird bewusst NICHT auf die Festplatte geschrieben:
+       Der echte Zustand liegt dort unangetastet, und Demo-Änderungen
+       verschwinden restlos beim Beenden. */
+    if (demoBackup) { notify(); return; }
     saveTimer = setTimeout(persist, 250);
     notify();
+  }
+
+  /* ---------- Demo-Modus ----------
+     Beim Start wird der echte Zustand im Speicher beiseitegelegt und durch
+     einen frisch erzeugten Demo-Zustand ersetzt. Nichts, was in der Demo
+     geschieht, kann echte Daten berühren; beim Beenden wird der Demo-
+     Zustand verworfen und der echte zurückgeholt. */
+  var demoBackup = null;
+
+  function isDemo() { return !!demoBackup; }
+
+  function startDemo(demoState) {
+    if (demoBackup) return;
+    if (saveTimer) { clearTimeout(saveTimer); saveTimer = null; }
+    /* Ausstehende Änderungen des echten Zustands zuerst sichern. */
+    var pending = state ? persist() : Promise.resolve();
+    return pending.then(function () {
+      demoBackup = state;
+      state = demoState;
+      notify();
+      return state;
+    });
+  }
+
+  function endDemo() {
+    if (!demoBackup) return Promise.resolve(state);
+    if (saveTimer) { clearTimeout(saveTimer); saveTimer = null; }
+    state = demoBackup;
+    demoBackup = null;
+    notify();
+    return Promise.resolve(state);
   }
 
   function persist() {
@@ -1127,6 +1162,7 @@
     noteFor: noteFor, setNote: setNote, notesFor: notesFor,
     lessonContentFor: lessonContentFor, setLessonContent: setLessonContent,
     lessonContentsFor: lessonContentsFor,
+    isDemo: isDemo, startDemo: startDemo, endDemo: endDemo, freshState: freshState,
     seatingsOf: seatingsOf, activeSeating: activeSeating, addSeating: addSeating,
     renameSeating: renameSeating, removeSeating: removeSeating, setActiveSeating: setActiveSeating,
     savePhoto: savePhoto, getPhoto: getPhoto, deletePhoto: deletePhoto,

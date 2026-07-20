@@ -70,7 +70,7 @@
 
   /* ================= App-Start ================= */
 
-  var APP_VERSION = '0.32.1';
+  var APP_VERSION = '0.33.0';
 
   /* ---------- PWA-Installation ----------
      Chrome/Edge/Android liefern `beforeinstallprompt`: Event abfangen und
@@ -181,6 +181,49 @@
         h('li', {}, 'Auf das Installations-Symbol rechts in der Adressleiste klicken (Monitor mit Pfeil), oder'),
         h('li', {}, 'über das Browser-Menü (⋮ bzw. …): „SOL-Noten installieren“ / „Apps“ / „Speichern und teilen“ → „Seite installieren“.')),
       h('p.hint', {}, 'Firefox am PC unterstützt die Installation von Web-Apps leider nicht – dort läuft SOL-Noten einfach im Browser weiter.'));
+  }
+
+  /* ---------- Demo-Modus ----------
+     Getrennte Datenwelt: Der echte Zustand bleibt unangetastet liegen,
+     die App arbeitet auf frisch erzeugten Beispieldaten. Beim Beenden
+     wird die Demo restlos verworfen. */
+  function demoSection() {
+    if (Store.isDemo()) {
+      return h('div.actions-col',
+        h('p.hint', {}, 'Der Demo-Modus ist aktiv. Alle sichtbaren Klassen, Kurse und Bewertungen sind erfunden. ' +
+          'Ihre echten Daten sind unverändert gespeichert und werden beim Beenden wieder angezeigt. ' +
+          'Änderungen in der Demo werden dabei verworfen.'),
+        h('button.btn-primary.btn-block', { onclick: function () {
+          UI.confirmDialog('Demo-Modus beenden?',
+            'Die Beispieldaten werden verworfen und Ihre echten Daten wieder angezeigt.',
+            'Beenden').then(function (ok) {
+              if (!ok) return;
+              Store.endDemo().then(function () {
+                setActiveYear(null);
+                toast('Demo-Modus beendet – Ihre echten Daten sind wieder aktiv.');
+                go('home');
+              });
+            });
+        } }, 'Demo-Modus beenden'));
+    }
+    return h('div.actions-col',
+      h('p.hint', {}, 'Für Fortbildungen und Vorführungen: Die App zeigt dann zwei erfundene Klassen mit drei Kursen, ' +
+        'vollständig bewerteten Quartalen 1–3 und einem noch leeren 4. Quartal für Live-Eingaben. ' +
+        'Ihre echten Daten bleiben währenddessen unangetastet gespeichert und sind nach dem Beenden sofort wieder da.'),
+      h('button.btn-plain.btn-block', { onclick: function () {
+        UI.confirmDialog('Demo-Modus starten?',
+          'Die App zeigt anschließend nur Beispieldaten. Ihre echten Daten bleiben gespeichert und werden beim Beenden wieder angezeigt.',
+          'Starten').then(function (ok) {
+            if (!ok) return;
+            var demoState = Demo.buildState(Store.freshState, Quarters.computeQuarters,
+              { bundesland: S().settings.bundesland });
+            Store.startDemo(demoState).then(function () {
+              setActiveYear(null);
+              toast('Demo-Modus aktiv – alle Daten sind erfunden.');
+              go('home');
+            });
+          });
+      } }, 'Demo-Modus starten'));
   }
 
   /* Karte für die Einstellungsseite – unabhängig davon, ob der Hinweis auf
@@ -356,10 +399,18 @@
     applyTheme();
     var appEl = document.getElementById('app');
     clear(appEl);
+    /* Demo-Modus muss auf jeder Seite erkennbar sein – in Fortbildungen
+       darf niemand Demo- und Echtdaten verwechseln. */
+    document.body.classList.toggle('demo-active', Store.isDemo());
     var view = views[route.name];
     if (!view) return;
     try {
       var screen = view(route.params);
+      if (Store.isDemo() && screen && screen.classList && screen.classList.contains('screen')) {
+        screen.insertBefore(h('div.demo-banner', {},
+          h('strong', {}, 'DEMO-MODUS'), ' – Beispieldaten, keine echten Schülerdaten'
+        ), screen.firstChild);
+      }
       appEl.appendChild(screen);
       /* „Über diese App“ unten auf jeder Seite – außer auf dem Sperrbildschirm. */
       if (route.name !== 'lock' && screen && screen.classList && screen.classList.contains('screen')) {
@@ -5618,6 +5669,9 @@
 
       h('div.banner-info', {},
         h('span', {}, 'Maximalpunkte der Kriterien, Quartalszeiträume, Gewichtung sowie die Anzahl der Klausuren und Open Book Tests stellen Sie je Kurs ein: Kurs auf dem Startbildschirm antippen, dann „Kurs-Einstellungen“.')),
+
+      h('div.section-head', {}, 'Demo-Modus'),
+      h('div.card', {}, demoSection()),
 
       h('div.section-head', {}, 'App-Installation'),
       h('div.card', {}, installSection()),
