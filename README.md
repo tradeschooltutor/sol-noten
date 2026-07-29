@@ -1,4 +1,4 @@
-# SOL-Noten (Version 0.33.0 – Beta)
+# SOL-Noten (Version 0.33.1 – Beta)
 
 Notenverwaltung zum selbstorganisierten Lernen (SOL) als Progressive Web App (PWA).
 Basierend auf der Excel-Notenverwaltung V8.0 von Andreas Vandelaar.
@@ -64,6 +64,8 @@ Unterrichten Sie eine Klasse in mehreren Fächern, legen Sie den zweiten Kurs ü
 ## Installation als App
 
 SOL-Noten lässt sich als App installieren (eigenes Symbol, eigenes Fenster, offline nutzbar; Daten und Anmeldung bleiben erhalten):
+
+Der Installationshinweis erscheint bereits bei der **Ersteinrichtung**, noch vor dem Anlegen des Schuljahres. Das ist wichtig, weil eine installierte App auf iPhone/iPad einen eigenen Datenspeicher hat: Wer zuerst einrichtet und danach installiert, müsste die Einrichtung sonst wiederholen.
 
 - **PC/Android (Chrome, Edge):** Die App bietet einen eigenen Button „App installieren" an – auf dem Startbildschirm (ausblendbarer Hinweis) und in den Globalen Einstellungen unter „App-Installation". Er öffnet den nativen Installationsdialog des Browsers.
 - **iPhone/iPad (Safari):** Apple stellt keinen Installationsdialog bereit; die App zeigt stattdessen eine Schritt-für-Schritt-Anleitung als Overlay oben rechts – in zwei geräteabhängigen Varianten: Auf dem iPad steht sie oben rechts, mit animiertem Pfeil nach oben auf das Teilen-Symbol der Safari-Leiste, und führt über „Mehr anzeigen" (Pfeilspitze nach unten) zum Ziel. Auf dem iPhone steht sie unten mittig, mit Pfeil nach unten auf das dort platzierte Teilen-Symbol; „Mehr anzeigen" entfällt, weil „Zum Home-Bildschirm" direkt im Menü erscheint. Beide Varianten bilden die Menüpunkte „Zum Home-Bildschirm" und „Hinzufügen" nach.

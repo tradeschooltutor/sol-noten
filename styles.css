@@ -99,37 +99,52 @@ body {
    rechten Kartenrand, sondern unterhalb des Teilen-Symbols – das liegt in
    der Safari-Leiste des iPads links neben „+“ und Tab-Übersicht, also ein
    Stück von der rechten Bildschirmkante entfernt. */
+/* Äußerer Rahmen: nur Positionierung, scrollt nicht – so bleibt der Pfeil
+   immer sichtbar, auch wenn der Kasten selbst gescrollt werden muss. */
 .ios-guide {
-  position: fixed; top: 68px; right: 10px; z-index: 1000;
+  position: fixed; top: 56px; right: 10px; z-index: 1000;
   width: min(360px, calc(100vw - 20px));
+  display: flex; flex-direction: column; align-items: stretch;
+  pointer-events: none;
+}
+.ios-guide-box {
   background: var(--card); border-radius: var(--radius);
   box-shadow: 0 6px 24px rgba(0,0,0,0.25); padding: 14px 16px;
   border: 2px solid var(--teal);
+  max-height: calc(100vh - 190px); overflow-y: auto;
+  pointer-events: auto;
 }
-.ios-guide-arrow {
-  position: absolute; top: -8px; right: 88px; transform: translateY(-100%);
+.ios-guide-arrow, .ios-guide-arrow-down {
   font-size: 2.4rem; line-height: 1; color: var(--teal);
   text-shadow: 0 1px 4px rgba(0,0,0,0.2);
+  pointer-events: none;
+}
+/* iPad: Teilen-Symbol oben rechts – Pfeil über dem Kasten, etwas eingerückt. */
+.ios-guide-arrow {
+  align-self: flex-end; margin: 0 78px 2px 0;
   animation: ios-arrow-bounce 1.2s ease-in-out infinite;
 }
-
-/* iPhone: Safari zeigt das Teilen-Symbol unten in der Mitte – Anleitung
-   dorthin verlagern, mit Abwärtspfeil unterhalb der Karte. */
-.ios-guide-bottom {
-  top: auto; bottom: 88px; right: 10px; left: 10px;
-  width: auto; max-height: calc(100vh - 180px); overflow-y: auto;
+@keyframes ios-arrow-bounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
 }
+
+/* iPhone: Teilen-Symbol unten in der Mitte – Kasten nach unten, Pfeil darunter. */
+.ios-guide-bottom {
+  top: auto; bottom: 56px; right: 10px; left: 10px; width: auto;
+}
+.ios-guide-bottom .ios-guide-box { max-height: calc(100vh - 220px); }
 .ios-guide-arrow-down {
-  position: absolute; bottom: -8px; left: 50%; transform: translate(-50%, 100%);
-  font-size: 2.4rem; line-height: 1; color: var(--teal);
-  text-shadow: 0 1px 4px rgba(0,0,0,0.2);
+  align-self: center; margin-top: 2px;
   animation: ios-arrow-bounce-down 1.2s ease-in-out infinite;
 }
 @keyframes ios-arrow-bounce-down {
-  0%, 100% { transform: translate(-50%, 100%); }
-  50% { transform: translate(-50%, calc(100% + 8px)); }
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(8px); }
 }
-@media (prefers-reduced-motion: reduce) { .ios-guide-arrow-down { animation: none; } }
+@media (prefers-reduced-motion: reduce) {
+  .ios-guide-arrow, .ios-guide-arrow-down { animation: none; }
+}
 @keyframes ios-arrow-bounce {
   0%, 100% { transform: translateY(-100%); }
   50% { transform: translateY(calc(-100% - 8px)); }
@@ -315,6 +330,14 @@ textarea.input.note-area {
   margin-bottom: 12px; letter-spacing: 0.02em;
 }
 .demo-banner strong { letter-spacing: 0.08em; }
+
+/* Ersteinrichtung: Installationshinweis vor den Einstellungen */
+.setup-install { border: 2px solid var(--teal); gap: 8px; }
+
+/* Punktestand (Schüler/in): Blättern in der Namenszeile */
+.stu-nav-row { gap: 8px; }
+.stu-nav-row .name-with-photo { flex: 1; min-width: 0; justify-content: center; }
+.stu-stats { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
 .review-note { margin: 2px 0; font-size: 0.85rem; color: var(--ink); }
 .review-note .note-date { color: var(--ink-soft); font-weight: 600; }
 /* Lange Beschriftungen (z. B. „Neuer Kurs für ein anderes Fach …“) dürfen

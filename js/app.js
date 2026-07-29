@@ -70,7 +70,7 @@
 
   /* ================= App-Start ================= */
 
-  var APP_VERSION = '0.33.0';
+  var APP_VERSION = '0.33.1';
 
   /* ---------- PWA-Installation ----------
      Chrome/Edge/Android liefern `beforeinstallprompt`: Event abfangen und
@@ -162,15 +162,27 @@
             h('div.ios-mockconfirm', {}, 'Hinzufügen'))
         ];
 
-    var box = h('div.ios-guide' + (narrow ? '.ios-guide-bottom' : ''),
-      narrow ? null : h('div.ios-guide-arrow', {}, '⬆'),
+    /* Aufbau: äußerer Rahmen (fest, scrollt nicht) mit dem Pfeil AUSSERHALB
+       des Kastens. Der Kasten selbst darf scrollen; läge der Pfeil darin,
+       wäre er auf kleinen Displays erst nach dem Scrollen sichtbar. */
+    var wrap = h('div.ios-guide' + (narrow ? '.ios-guide-bottom' : ''));
+    var box = h('div.ios-guide-box',
       h('div.ios-guide-head',
         h('strong', {}, 'SOL-Noten installieren'),
-        h('button.icon-btn.ios-guide-close', { 'aria-label': 'Schließen', onclick: function () { box.remove(); } }, '×')),
+        h('button.icon-btn.ios-guide-close', { 'aria-label': 'Schließen', onclick: function () { wrap.remove(); } }, '×')),
       h('ol.install-steps', steps),
-      h('p.hint', {}, 'Danach erscheint SOL-Noten als App auf dem Home-Bildschirm.'),
-      narrow ? h('div.ios-guide-arrow-down', {}, '⬇') : null);
-    document.body.appendChild(box);
+      h('p.hint', {}, 'Danach erscheint SOL-Noten als App auf dem Home-Bildschirm.'));
+
+    if (narrow) {
+      /* iPhone: Teilen-Symbol unten in der Mitte → Pfeil unter dem Kasten. */
+      wrap.appendChild(box);
+      wrap.appendChild(h('div.ios-guide-arrow-down', {}, '⬇'));
+    } else {
+      /* iPad: Teilen-Symbol oben rechts → Pfeil über dem Kasten. */
+      wrap.appendChild(h('div.ios-guide-arrow', {}, '⬆'));
+      wrap.appendChild(box);
+    }
+    document.body.appendChild(wrap);
   }
 
   /* Plattformgenaue Installationsanleitung (wenn kein nativer Dialog möglich). */
@@ -1259,12 +1271,36 @@
       });
     }
 
+    /* Installation VOR der Einrichtung anbieten: Auf iPhone/iPad hat die
+       installierte App einen eigenen Datenspeicher, getrennt von Safari.
+       Wer zuerst einrichtet und danach installiert, müsste alles erneut
+       eingeben – genau das soll dieser Hinweis verhindern. */
+    function setupInstallCard() {
+      if (isStandalone()) return null;
+      var action;
+      if (deferredInstall) {
+        action = h('button.btn-primary.btn-block', { onclick: triggerInstall }, 'Jetzt als App installieren');
+      } else if (isIOS()) {
+        action = h('button.btn-primary.btn-block', { onclick: showIOSGuide }, 'Installations-Anleitung anzeigen');
+      } else {
+        action = null;
+      }
+      return h('div.card.setup-install',
+        h('strong', {}, 'Zuerst installieren – dann einrichten'),
+        h('p.hint', {}, 'SOL-Noten läuft am besten als installierte App: eigenes Symbol, eigenes Fenster, offline nutzbar. ' +
+          'Installieren Sie am besten jetzt, bevor Sie unten Ihr Schuljahr anlegen – sonst müssen Sie die Einrichtung nach der Installation unter Umständen noch einmal vornehmen. ' +
+          'Nach der Installation öffnen Sie SOL-Noten über das neue App-Symbol und richten dort ein.'),
+        action,
+        action ? null : installInstructions());
+    }
+
     return h('div.screen',
       h('div.setup-hero',
         h('div.setup-mark', {}, '15'),
         h('h1', {}, 'SOL-Noten'),
         h('p', {}, 'Notenverwaltung zum selbstorganisierten Lernen')
       ),
+      setupInstallCard(),
       h('div.card',
         h('label.field', h('span.field-label', {}, 'Bundesland'), landSel,
           h('p.hint', {}, 'Wird nur einmalig benötigt, um die Schulferien zu laden und daraus die vier Quartale (je 10 Schulwochen) zu berechnen. Ihre Noten bleiben ausschließlich auf diesem Gerät.')),
@@ -1843,7 +1879,7 @@
           )
         ),
         h('label.field', h('span.field-label', {}, 'Kriterium für Ergebnis-Uploads'), upCritSel,
-          h('p.hint', {}, 'Auf dieses SoLei-Kriterium werden die auf der Seite „Ergebnis-Uploads“ gezählten Uploads angerechnet.')),
+          h('p.hint', {}, 'Wenn Sie bei Ihrer SoLei-Bewertung auch berücksichtigen wollen, ob Ihre Schüler/innen ihre Ergebnisse in das Learning-Management-System Ihrer Schule hochgeladen haben (z.B. Moodle/Logineo, OneNote, Teams …), können Sie hier das Kriterium festlegen, auf das sich die erledigten/vergessenen Ergebnis-Uploads auswirken sollen. Weitere Infos finden Sie auf der Kursseite unter „Ergebnis-Uploads“.')),
         h('div.field',
           h('span.field-label', {}, 'Unterrichtstage (optional)'),
           tdArea,
@@ -1975,6 +2011,18 @@
     var shownQ = p.quarter || course.currentQuarter;
     var quarters = courseQuarters(course);
 
+    /* Reihenfolge wie überall: alphabetisch, mit Umlauf am Listenende. */
+    function goStudent(dir) {
+      var list = cls.students.slice().sort(function (a, b) {
+        return (a.lastName + a.firstName).localeCompare(b.lastName + b.firstName, 'de');
+      });
+      if (list.length < 2) return;
+      var i = list.findIndex(function (x) { return x.id === stu.id; });
+      if (i < 0) i = 0;
+      var next = list[(i + dir + list.length) % list.length];
+      go('protokoll', { courseId: course.id, studentId: next.id, quarter: p.quarter, back: p.back });
+    }
+
     var qSel = h('select.input.q-select', { style: { maxWidth: '7.5rem' } });
     [1, 2, 3, 4].forEach(function (n) {
       qSel.appendChild(h('option', { value: n, selected: n === shownQ }, n + '. Quartal'));
@@ -2018,6 +2066,18 @@
     var students = cls.students.slice().sort(function (a, b) {
       return (a.lastName + a.firstName).localeCompare(b.lastName + b.firstName, 'de');
     });
+
+    /* Reihenfolge wie überall: alphabetisch, mit Umlauf am Listenende. */
+    function goStudent(dir) {
+      var list = cls.students.slice().sort(function (a, b) {
+        return (a.lastName + a.firstName).localeCompare(b.lastName + b.firstName, 'de');
+      });
+      if (list.length < 2) return;
+      var i = list.findIndex(function (x) { return x.id === stu.id; });
+      if (i < 0) i = 0;
+      var next = list[(i + dir + list.length) % list.length];
+      go('protokoll', { courseId: course.id, studentId: next.id, quarter: p.quarter, back: p.back });
+    }
 
     var qSel = h('select.input.q-select', { style: { maxWidth: '7.5rem' } });
     [1, 2, 3, 4].forEach(function (n) {
@@ -4059,6 +4119,18 @@
     var quarters = courseQuarters(course);
     var shownQ = p.quarter || course.currentQuarter;
 
+    /* Reihenfolge wie überall: alphabetisch, mit Umlauf am Listenende. */
+    function goStudent(dir) {
+      var list = cls.students.slice().sort(function (a, b) {
+        return (a.lastName + a.firstName).localeCompare(b.lastName + b.firstName, 'de');
+      });
+      if (list.length < 2) return;
+      var i = list.findIndex(function (x) { return x.id === stu.id; });
+      if (i < 0) i = 0;
+      var next = list[(i + dir + list.length) % list.length];
+      go('protokoll', { courseId: course.id, studentId: next.id, quarter: p.quarter, back: p.back });
+    }
+
     var qSel = h('select.input.q-select', { style: { maxWidth: '7.5rem' } });
     [1, 2, 3, 4].forEach(function (n) {
       qSel.appendChild(h('option', { value: n, selected: n === shownQ }, n + '. Quartal'));
@@ -4155,6 +4227,18 @@
     });
     var shownQ = p.quarter || course.currentQuarter;
     var mode = p.view === 'date' ? 'date' : 'student';
+
+    /* Reihenfolge wie überall: alphabetisch, mit Umlauf am Listenende. */
+    function goStudent(dir) {
+      var list = cls.students.slice().sort(function (a, b) {
+        return (a.lastName + a.firstName).localeCompare(b.lastName + b.firstName, 'de');
+      });
+      if (list.length < 2) return;
+      var i = list.findIndex(function (x) { return x.id === stu.id; });
+      if (i < 0) i = 0;
+      var next = list[(i + dir + list.length) % list.length];
+      go('protokoll', { courseId: course.id, studentId: next.id, quarter: p.quarter, back: p.back });
+    }
 
     var qSel = h('select.input.q-select', { style: { maxWidth: '7.5rem' } });
     [1, 2, 3, 4].forEach(function (n) {
@@ -4961,6 +5045,18 @@
     var names = S().settings.criteriaNames;
     var q = course.currentQuarter;
 
+    /* Reihenfolge wie überall: alphabetisch, mit Umlauf am Listenende. */
+    function goStudent(dir) {
+      var list = cls.students.slice().sort(function (a, b) {
+        return (a.lastName + a.firstName).localeCompare(b.lastName + b.firstName, 'de');
+      });
+      if (list.length < 2) return;
+      var i = list.findIndex(function (x) { return x.id === stu.id; });
+      if (i < 0) i = 0;
+      var next = list[(i + dir + list.length) % list.length];
+      go('protokoll', { courseId: course.id, studentId: next.id, quarter: p.quarter, back: p.back });
+    }
+
     var qSel = h('select.input.q-select', { style: { maxWidth: '7.5rem' } });
     [1, 2, 3, 4].forEach(function (n) {
       qSel.appendChild(h('option', { value: n, selected: n === (p.quarter || q) }, n + '. Quartal'));
@@ -5163,14 +5259,23 @@
         h('button.btn-small.btn-primary.course-box-btn', { onclick: printCharts }, 'Diagramme drucken')),
       h('div.capture-bar', qSel, viewToggle),
       h('div.card.card-tight',
-        h('div.row-between',
+        /* Blättern wie auf „SoLei-Punkte vergeben“: zurück links, vor rechts. */
+        h('div.row-between.stu-nav-row',
+          h('button.icon-btn', {
+            'aria-label': 'Vorherige Person',
+            onclick: function () { goStudent(-1); }
+          }, '‹'),
           h('div.name-with-photo',
             photoTile(stu, { small: true }),
             h('strong', {}, stu.lastName + ', ' + stu.firstName)),
-          h('div.row-gap',
-            h('span.sum-pill', {}, Calc.fmt(stat.sum, 1) + ' / 15'),
-            stat.rated > 0 ? h('span.grade-pill.g' + Math.round(grade.g), {}, 'Note ' + Calc.fmt(grade.g) + ' (' + grade.label + ')') : null
-          )
+          h('button.icon-btn', {
+            'aria-label': 'Nächste Person',
+            onclick: function () { goStudent(1); }
+          }, '›')
+        ),
+        h('div.row-gap.stu-stats',
+          h('span.sum-pill', {}, Calc.fmt(stat.sum, 1) + ' / 15'),
+          stat.rated > 0 ? h('span.grade-pill.g' + Math.round(grade.g), {}, 'Note ' + Calc.fmt(grade.g) + ' (' + grade.label + ')') : null
         )
       ),
       h('div.protokoll-stack',
@@ -5411,7 +5516,7 @@
      allen Stellen identisch ist. */
   function exportWarning() {
     return h('p.hint.warn-text', {},
-      'Hinweis: Diese Datei ist – anders als das Backup – nicht verschlüsselt und enthält personenbezogene Daten. ' +
+      'Hinweis: Die exportierte Datei ist – anders als das Backup – nicht verschlüsselt und enthält personenbezogene Daten. ' +
       'Bitte nur auf geschützten Geräten speichern und nicht ungeschützt weitergeben.');
   }
 
@@ -5667,14 +5772,11 @@
     return h('div.screen',
       header('Globale Einstellungen für alle Kurse', back, h('span')),
 
-      h('div.banner-info', {},
-        h('span', {}, 'Maximalpunkte der Kriterien, Quartalszeiträume, Gewichtung sowie die Anzahl der Klausuren und Open Book Tests stellen Sie je Kurs ein: Kurs auf dem Startbildschirm antippen, dann „Kurs-Einstellungen“.')),
+      h('div.section-head', {}, 'App-Installation'),
+      h('div.card', {}, installSection()),
 
       h('div.section-head', {}, 'Demo-Modus'),
       h('div.card', {}, demoSection()),
-
-      h('div.section-head', {}, 'App-Installation'),
-      h('div.card', {}, installSection()),
 
       h('div.section-head', {}, 'Farbschema'),
       h('div.card',
@@ -5726,19 +5828,20 @@
         snapHost
       ),
 
+      h('div.section-head', {}, 'Foto-Sicherung (alle Klassen)'),
+      h('div.card', {}, photoBackupCard()),
+
       h('div.section-head', {}, 'Schuljahre'),
       h('div.card',
         h('p.hint', {}, 'Alte Schuljahre lassen sich vollständig archivieren und anschließend löschen, um Speicherplatz freizugeben: „Excel-Export aller Schuljahresdaten“ erzeugt eine Excel-Datei mit Notenübersicht und sämtlichen Rohdaten je Kurs; „Nur Notenübersichten exportieren“ liefert die kompakte Variante als Excel oder Druck/PDF.'),
         h('div.actions-col',
           h('button.btn-primary.btn-block', { onclick: yearFullExportDialog }, 'Excel-Export aller Schuljahresdaten'),
-          h('button.btn-plain.btn-block', { onclick: yearExportDialog }, 'Nur Notenübersichten exportieren')),
+          h('button.btn-plain.btn-block', { onclick: yearExportDialog }, 'Nur Notenübersichten exportieren'),
+          exportWarning()),
         h('div.danger-zone',
           h('p.hint', {}, 'Gefahrenbereich'),
           h('button.btn-plain.btn-block.danger-text', { onclick: yearDeleteDialog }, 'Schuljahr löschen …'))
       ),
-
-      h('div.section-head', {}, 'Foto-Sicherung (alle Klassen)'),
-      h('div.card', {}, photoBackupCard()),
 
       h('div.section-head', {}, 'SoLei-Kriterien (gilt für alle Kurse)'),
       h('div.card',
@@ -5753,6 +5856,9 @@
           toast('Kriteriennamen gespeichert.');
         } }, 'Kriteriennamen speichern')
       ),
+
+      h('div.banner-info', {},
+        h('span', {}, 'Maximalpunkte der Kriterien, Quartalszeiträume, Gewichtung sowie die Anzahl der Klausuren und Open Book Tests stellen Sie je Kurs ein: Kurs auf dem Startbildschirm antippen, dann „Kurs-Einstellungen“.')),
 
       h('div.section-head', {}, 'Bewertungsspiegel (15-Punkte-Schema)'),
       h('div.card',
@@ -5773,28 +5879,6 @@
             render();
           } }, 'Auf Standard zurücksetzen')
         )
-      ),
-
-      h('div.section-head', {}, 'Klausurbewertung'),
-      h('div.card',
-        h('p.hint', {}, 'Einfach: je Klausur eine Maximalpunktzahl und je Schüler/in die Gesamtpunkte. Vollständig: Punkte je Aufgabe werden in der App vergeben (mit Klausurdatum und Kommentar); Summe, Prozent und Note berechnet die App. Der Schalter bestimmt die Erfassung neuer Klausuren – bereits vollständig bewertete Klausuren behalten ihre Aufgaben-Ansicht.'),
-        (function () {
-          var seg = h('div.seg.seg-wide');
-          function draw() {
-            seg.innerHTML = '';
-            [{ v: false, l: 'Einfach (Gesamtpunkte)' }, { v: true, l: 'Vollständig (je Aufgabe)' }].forEach(function (o) {
-              seg.appendChild(h('button.seg-btn' + (!!st.settings.kaFullMode === o.v ? '.active' : ''), {
-                onclick: function () {
-                  if (!!st.settings.kaFullMode === o.v) return;
-                  st.settings.kaFullMode = o.v;
-                  Store.save(); draw();
-                }
-              }, o.l));
-            });
-          }
-          draw();
-          return seg;
-        })()
       ),
 
       h('div.section-head', {}, 'Bewertungsspiegel (Prozent-Schema)'),
@@ -5834,7 +5918,29 @@
               render();
             } }, 'Auf Standard zurücksetzen'));
         })()
-      )
+      ),
+      h('div.section-head', {}, 'Klausurbewertung'),
+      h('div.card',
+        h('p.hint', {}, 'Einfach: je Klausur eine Maximalpunktzahl und je Schüler/in die Gesamtpunkte. Vollständig: Punkte je Aufgabe werden in der App vergeben (mit Klausurdatum und Kommentar); Summe, Prozent und Note berechnet die App. Der Schalter bestimmt die Erfassung neuer Klausuren – bereits vollständig bewertete Klausuren behalten ihre Aufgaben-Ansicht.'),
+        (function () {
+          var seg = h('div.seg.seg-wide');
+          function draw() {
+            seg.innerHTML = '';
+            [{ v: false, l: 'Einfach (Gesamtpunkte)' }, { v: true, l: 'Vollständig (je Aufgabe)' }].forEach(function (o) {
+              seg.appendChild(h('button.seg-btn' + (!!st.settings.kaFullMode === o.v ? '.active' : ''), {
+                onclick: function () {
+                  if (!!st.settings.kaFullMode === o.v) return;
+                  st.settings.kaFullMode = o.v;
+                  Store.save(); draw();
+                }
+              }, o.l));
+            });
+          }
+          draw();
+          return seg;
+        })()
+      ),
+
     );
   };
 
