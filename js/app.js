@@ -70,7 +70,7 @@
 
   /* ================= App-Start ================= */
 
-  var APP_VERSION = '0.33.1';
+  var APP_VERSION = '0.33.2';
 
   /* ---------- PWA-Installation ----------
      Chrome/Edge/Android liefern `beforeinstallprompt`: Event abfangen und
@@ -602,7 +602,8 @@
       render();
     });
 
-    return h('div.screen',
+    /* Sitzplan nutzt die volle Bildschirmbreite – mehr Spalten ohne Scrollen. */
+    return h('div.screen.screen-wide',
       header('Sitzplan', { name: 'course', params: { id: course.id } }),
       p.tab === 'photos'
         ? courseBox(course)
@@ -5265,17 +5266,21 @@
             'aria-label': 'Vorherige Person',
             onclick: function () { goStudent(-1); }
           }, '‹'),
-          h('div.name-with-photo',
-            photoTile(stu, { small: true }),
-            h('strong', {}, stu.lastName + ', ' + stu.firstName)),
+          /* Name samt Punkten und Note zwischen den Blätter-Buttons; auf
+             schmalen Displays rutschen die Werte unter den Namen. */
+          h('div.stu-nav-main',
+            h('div.name-with-photo',
+              photoTile(stu, { small: true }),
+              h('strong', {}, stu.lastName + ', ' + stu.firstName)),
+            h('div.row-gap.stu-stats',
+              h('span.sum-pill', {}, Calc.fmt(stat.sum, 1) + ' / 15'),
+              stat.rated > 0 ? h('span.grade-pill.g' + Math.round(grade.g), {}, 'Note ' + Calc.fmt(grade.g) + ' (' + grade.label + ')') : null
+            )
+          ),
           h('button.icon-btn', {
             'aria-label': 'Nächste Person',
             onclick: function () { goStudent(1); }
           }, '›')
-        ),
-        h('div.row-gap.stu-stats',
-          h('span.sum-pill', {}, Calc.fmt(stat.sum, 1) + ' / 15'),
-          stat.rated > 0 ? h('span.grade-pill.g' + Math.round(grade.g), {}, 'Note ' + Calc.fmt(grade.g) + ' (' + grade.label + ')') : null
         )
       ),
       h('div.protokoll-stack',

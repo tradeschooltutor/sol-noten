@@ -32,8 +32,15 @@ body {
   -webkit-tap-highlight-color: transparent;
 }
 
-#app { max-width: 760px; margin: 0 auto; padding: 0 12px 96px; }
-.screen { display: flex; flex-direction: column; gap: 14px; padding-top: 8px; }
+/* Breite: #app selbst ist nicht mehr begrenzt – die Begrenzung sitzt an
+   .screen. Dadurch können einzelne Seiten sie über .screen-wide gezielt
+   aufheben (Sitzplan, Notenübersicht), während alle anderen Seiten in
+   angenehmer Lesebreite mittig stehen bleiben. */
+#app { margin: 0 auto; padding: 0 12px 96px; }
+.screen {
+  display: flex; flex-direction: column; gap: 14px; padding-top: 8px;
+  width: 100%; max-width: 760px; margin: 0 auto;
+}
 
 /* ---------- Kopfzeile ---------- */
 .topbar {
@@ -335,9 +342,19 @@ textarea.input.note-area {
 .setup-install { border: 2px solid var(--teal); gap: 8px; }
 
 /* Punktestand (Schüler/in): Blättern in der Namenszeile */
-.stu-nav-row { gap: 8px; }
-.stu-nav-row .name-with-photo { flex: 1; min-width: 0; justify-content: center; }
-.stu-stats { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
+.stu-nav-row { gap: 10px; }
+.stu-nav-row .icon-btn { flex-shrink: 0; }
+.stu-nav-main {
+  flex: 1; min-width: 0; display: flex; align-items: center;
+  justify-content: space-between; gap: 10px; flex-wrap: wrap;
+}
+.stu-nav-main .name-with-photo { min-width: 0; }
+.stu-stats { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+@media (max-width: 560px) {
+  /* Schmale Displays: Werte unter den Namen, damit nichts abgeschnitten wird. */
+  .stu-nav-main { justify-content: center; }
+  .stu-nav-main .name-with-photo, .stu-stats { width: 100%; justify-content: center; }
+}
 .review-note { margin: 2px 0; font-size: 0.85rem; color: var(--ink); }
 .review-note .note-date { color: var(--ink-soft); font-weight: 600; }
 /* Lange Beschriftungen (z. B. „Neuer Kurs für ein anderes Fach …“) dürfen
@@ -671,7 +688,9 @@ button:focus-visible, .input:focus-visible, select:focus-visible {
 }
 
 /* ---------- Notenübersicht ---------- */
-.screen-wide { max-width: none; }
+/* Breite Seiten: nutzen den Bildschirm aus, aber nicht grenzenlos – auf sehr
+   großen Monitoren bliebe die Tabelle sonst schwer lesbar. */
+.screen-wide { max-width: 1500px; }
 .table-scroll { overflow-x: auto; background: var(--card); border-radius: var(--radius); box-shadow: var(--shadow); }
 .grades-table { border-collapse: collapse; font-size: 0.82rem; min-width: 100%; }
 .grades-table th, .grades-table td {
