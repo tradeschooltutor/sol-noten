@@ -3,12 +3,7 @@
 Geplante Funktionen in grober Reihenfolge. Nicht terminiert; Reihenfolge und
 Zuschnitt werden vor der Umsetzung jeweils gemeinsam festgelegt.
 
-## 13. Hilfebereich – Lieferung 2
-FAQ mit Suchfeld (alle Funktionen, inkl. Plattformunterschiede), kontextbezogene
-Fragezeichen auf allen Kurs- und Unterseiten, Verlagerung der bestehenden
-Erläuterung auf „Ergebnis-Uploads“ ins FAQ.
-
-## 14. Spenden-Funktion
+## 13. Spenden-Funktion
 Bewusst an letzter Stelle; wird vorerst nicht umgesetzt.
 
 ---

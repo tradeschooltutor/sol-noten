@@ -70,7 +70,7 @@
 
   /* ================= App-Start ================= */
 
-  var APP_VERSION = '0.34.2';
+  var APP_VERSION = '0.35.0';
 
   /* ---------- PWA-Installation ----------
      Chrome/Edge/Android liefern `beforeinstallprompt`: Event abfangen und
@@ -481,9 +481,16 @@
     if (extra && !(extra.tagName === 'SPAN' && !extra.hasChildNodes())) right.push(extra);
     /* Fragezeichen in der Titelzeile nur auf den Hauptebenen. Auf den
        Unterseiten der Kurse sitzt es stattdessen in der weißen Kursbox. */
-    if (route.name === 'home' || route.name === 'course' || route.name === 'settings') {
+    var HEADER_HELP = ['home', 'course', 'settings', 'students', 'editCourse', 'yearTransfer', 'setupYear'];
+    if (HEADER_HELP.indexOf(route.name) > -1) {
       right.push(h('button.icon-btn', {
-        onclick: function () { go('help', { back: { name: route.name, params: route.params } }); },
+        onclick: function () {
+          var back = { name: route.name, params: route.params };
+          var ctx = Help.CONTEXT[route.name];
+          /* Auf den Hauptebenen die Hilfe-Übersicht, sonst direkt das Kapitel. */
+          if (ctx && route.name !== 'home' && route.name !== 'settings') go('helpPage', { chapter: ctx, back: back });
+          else go('help', { back: back });
+        },
         'aria-label': 'Hilfe', title: 'Hilfe'
       }, '?'));
     }
@@ -638,10 +645,10 @@
     return h('div.screen.screen-wide',
       header('Sitzplan', { name: 'course', params: { id: course.id } }),
       p.tab === 'photos'
-        ? courseBox(course)
+        ? courseBox(course, 'faq-fotos')
         : h('div.card.card-tight.course-box.course-box-row',
             h('strong', {}, cls.name + ' - ' + course.subject),
-            planSelTop),
+            h('div.row-gap', planSelTop, helpBtn(Help.CONTEXT.seating))),
       h('div.tabbar',
         h('button.tab' + (p.tab !== 'photos' ? '.active' : ''), {
           onclick: function () { go('seating', { id: course.id, tab: 'plan' }); } }, 'Sitzplan'),
@@ -2120,44 +2127,12 @@
       go('uploads', { id: course.id, quarter: Number(qSel.value) });
     });
 
-    /* Erläuterungen ein-/ausklappbar; der Zustand wird gemerkt (erster Aufruf: ausgeklappt). */
-    var helpCollapsed = !!S().settings.uploadsHelpCollapsed;
-    var helpArrow = h('span.collapse-arrow', {}, helpCollapsed ? '▸' : '▾');
-    var helpBody = h('div.collapse-body',
-      h('p', {},
-        'Wenn Ihre Schüler/innen die Aufgabe haben, ihre Arbeitsergebnisse in das Learning Management System der Schule (z.B. Moodle/Logineo, OneNote, usw.) hochzuladen, haben Sie zwei Möglichkeiten:',
-        h('br'),
-        'a) Sie prüfen die Uploads täglich über den Menüpunkt „SoLei-Punkte vergeben“.',
-        h('br'),
-        'b) Sie prüfen alle erfolgten / vergessenen Uploads am Quartalsende. Das können Sie hier auf dieser Seite eintragen.'),
-      h('p', {},
-        h('strong', {}, 'Wie funktioniert das?'),
-        h('br'),
-        'Die Anzahl der erfolgten Uploads wird mit jeweils ' + Calc.fmt(max, 1) + ' Punkten beim SoLei-Kriterium ',
-        h('strong', {}, critName),
-        ' gezählt. Die Anzahl der vergessenen Uploads wird mit jeweils 0 Punkten gezählt. Eine Datumsangabe erfolgt hier nicht, da die Zählung erst am Quartalsende erfolgt. Die Punkte gehen aber in die Durchschnittsberechnung beim SoLei-Kriterium ',
-        h('strong', {}, critName),
-        ' ein.'),
-      h('p', {},
-        'Wenn Sie die Uploads Ihrer Schüler/innen genauer bewerten möchten, d.h. mit Datumsangabe und abgestufter Punktevergabe für deren Vollständigkeit, nutzen Sie stattdessen Möglichkeit a), d.h. den Menüpunkt ',
-        h('strong', {}, 'SoLei-Punkte vergeben'),
-        '.')
-    );
-    if (helpCollapsed) helpBody.style.display = 'none';
-
-    var intro = h('div.card',
-      h('div.collapse-head', {
-        role: 'button', tabindex: 0,
-        onclick: function () {
-          helpCollapsed = !helpCollapsed;
-          S().settings.uploadsHelpCollapsed = helpCollapsed;
-          Store.save();
-          helpBody.style.display = helpCollapsed ? 'none' : '';
-          helpArrow.textContent = helpCollapsed ? '▸' : '▾';
-        }
-      }, h('strong', {}, 'Erläuterungen'), helpArrow),
-      helpBody
-    );
+    /* Kurzer Orientierungssatz; die ausführliche Erläuterung steht im FAQ
+       und ist über das Fragezeichen in der Kursbox erreichbar. */
+    var intro = h('div.card.card-tight',
+      h('p.hint', {},
+        'Tragen Sie hier am Quartalsende ein, wie oft jede Person ihre Ergebnisse hochgeladen und wie oft sie es vergessen hat. ' +
+        'Jeder erledigte Upload zählt mit ' + Calc.fmt(max, 1) + ' Punkten, jeder vergessene mit 0 Punkten beim SoLei-Kriterium „' + critName + '“.'));
 
     var inputs = {};
     function parseCount(str) {
@@ -3804,7 +3779,9 @@
         header('Notenübersicht & Zeugnisnoten', { name: 'course', params: { id: course.id } }),
         h('div.card.card-tight.course-box.course-box-row',
           h('strong', {}, cls.name + ' - ' + course.subject),
-          h('button.btn-small.btn-primary.course-box-btn', { onclick: doStudentPrint }, 'Drucken / PDF')),
+          h('div.row-gap',
+            h('button.btn-small.btn-primary.course-box-btn', { onclick: doStudentPrint }, 'Drucken / PDF'),
+            helpBtn(Help.CONTEXT.grades))),
         h('div.grades-toggle-row', viewToggle),
         h('div.crit-nav',
           h('button.icon-btn', { onclick: function () {
@@ -5297,7 +5274,9 @@
       header('SoLei-Punktestand', p.back || { name: 'course', params: { id: course.id } }),
       h('div.card.card-tight.course-box.course-box-row',
         h('strong', {}, cls.name + ' - ' + course.subject),
-        h('button.btn-small.btn-primary.course-box-btn', { onclick: printCharts }, 'Diagramme drucken')),
+        h('div.row-gap',
+          h('button.btn-small.btn-primary.course-box-btn', { onclick: printCharts }, 'Diagramme drucken'),
+          helpBtn(Help.CONTEXT.pointstand))),
       h('div.capture-bar', qSel, viewToggle),
       h('div.card.card-tight',
         /* Blättern wie auf „SoLei-Punkte vergeben“: zurück links, vor rechts. */
@@ -5932,13 +5911,43 @@
         h('summary', {}, helpTitle(c.title)));
       if (c.id === openChapter) det.setAttribute('open', 'open');
       det.appendChild(helpBody(c.body, false));
+      det._searchText = (c.title + ' ' + Help.plainText(c.body)).toLowerCase();
       return det;
     });
+
+    var listHost = h('div.card.card-list', {}, chapters);
+    var emptyHint = h('p.hint.search-empty', { style: { display: 'none' } },
+      'Kein Kapitel gefunden. Versuchen Sie einen anderen Begriff.');
+
+    /* Suchfeld: filtert Kapitel nach Titel und Inhalt. Bei vielen Einträgen
+       ist das der schnellste Weg zur passenden Antwort. */
+    var searchBar = null;
+    if (page.searchable) {
+      var searchInput = h('input.input', {
+        type: 'search', placeholder: 'Suchen, z. B. „Backup“ oder „Klausur“', 'aria-label': 'Hilfe durchsuchen'
+      });
+      searchInput.addEventListener('input', function () {
+        var q = searchInput.value.trim().toLowerCase();
+        var hits = 0;
+        chapters.forEach(function (det) {
+          var match = !q || det._searchText.indexOf(q) > -1;
+          det.style.display = match ? '' : 'none';
+          if (match) hits++;
+          /* Bei aktiver Suche die Treffer aufklappen, sonst wieder zuklappen. */
+          if (q && match) det.setAttribute('open', 'open');
+          else if (q) det.removeAttribute('open');
+        });
+        emptyHint.style.display = hits ? 'none' : '';
+      });
+      searchBar = h('div.card.card-tight', searchInput);
+    }
 
     var screen = h('div.screen',
       header(page.title, back),
       h('div.card.card-tight', h('p.hint', {}, page.lead)),
-      h('div.card.card-list', {}, chapters),
+      searchBar,
+      listHost,
+      emptyHint,
       h('div.actions-col',
         h('button.btn-plain.btn-block', {
           onclick: function () { printHelp([page], page.printTitle || page.title, page.title); }

@@ -1,4 +1,4 @@
-# SOL-Noten (Version 0.34.2 – Beta)
+# SOL-Noten (Version 0.35.0 – Beta)
 
 Notenverwaltung zum selbstorganisierten Lernen (SOL) als Progressive Web App (PWA).
 Basierend auf der Excel-Notenverwaltung V8.0 von Andreas Vandelaar.
@@ -81,9 +81,11 @@ Wechselt eine Klasse den Raum, lassen sich mehrere Sitzpläne hinterlegen und ü
 
 Erreichbar über das Fragezeichen in der Titelzeile (Startseite, Kursseite, Globale Einstellungen) sowie über den Button „Hilfe“, der ganz unten auf jeder Seite steht. Die Inhalte stehen in `js/help.js` als Datenstruktur – aus derselben Quelle entstehen Bildschirmansicht, Einzelseiten-Druck und Komplettanleitung, sodass nichts doppelt gepflegt werden muss.
 
-Seiten: **Erste Schritte** (Reihenfolge beim Einrichten, Installation, PIN-Warnung, Schülerliste, Fortbildung), **FAQ** (folgt in Lieferung 2), **Glossar** (18 Fachbegriffe), **Erklärvideo** (externer Link, derzeit ausgeblendet – zum Aktivieren `VIDEO_URL` in `js/app.js` setzen; bewusst nicht eingebettet, da eingebettete Videos Dritt-Skripte in die App holen würden) und **Datenschutz-Kurzinformation** (laienverständlich, zum Ausdrucken; ausdrücklich kein Ersatz für die schulische Freigabe).
+Seiten: **Erste Schritte** (Reihenfolge beim Einrichten, Installation, PIN-Warnung, Schülerliste, Fortbildung), **FAQ** (35 Kapitel zu allen Funktionen, mit Suchfeld und Plattformunterschieden für Installation, Backup, Entsperren und Zurück-Geste), **Glossar** (17 Fachbegriffe), **Erklärvideo** (externer Link, derzeit ausgeblendet – zum Aktivieren `VIDEO_URL` in `js/app.js` setzen; bewusst nicht eingebettet, da eingebettete Videos Dritt-Skripte in die App holen würden) und **Datenschutz-Kurzinformation** (laienverständlich, zum Ausdrucken; ausdrücklich kein Ersatz für die schulische Freigabe).
 
-Kapitel sind aufklappbar und im Glossar alphabetisch sortiert. Fachbegriffe in den Texten sind **antippbar** (nicht Hover – das funktioniert auf Tablets nicht): Ein Tipp klappt die Glossardefinition direkt darunter auf, ein × schließt sie. Gedruckte Fassungen tragen Version und Datum in der Kopfzeile; die Komplettanleitung beginnt mit einem Inhaltsverzeichnis. Das Drehbuch für das Erklärvideo wird separat geliefert und ist bewusst nicht Teil des Projektpakets.
+Kapitel sind aufklappbar und im Glossar alphabetisch sortiert. Das FAQ hat ein Suchfeld, das Titel und Inhalt filtert und Treffer aufklappt.
+
+**Kontextbezogene Hilfe:** Jede Seite der App hat ein Fragezeichen, das direkt zum passenden FAQ-Kapitel springt und anschließend dorthin zurückführt, wo es angetippt wurde. Auf Startseite, Kursseite und Globalen Einstellungen sitzt es in der Titelzeile, auf den Unterseiten der Kurse rechts in der weißen Kursbox. Die Zuordnung steht als `CONTEXT` in `js/help.js`. Fachbegriffe in den Texten sind **antippbar** (nicht Hover – das funktioniert auf Tablets nicht): Ein Tipp klappt die Glossardefinition direkt darunter auf, ein × schließt sie. Gedruckte Fassungen tragen Version und Datum in der Kopfzeile; die Komplettanleitung beginnt mit einem Inhaltsverzeichnis. Das Drehbuch für das Erklärvideo wird separat geliefert und ist bewusst nicht Teil des Projektpakets.
 
 ## Bildschirmbreite
 
