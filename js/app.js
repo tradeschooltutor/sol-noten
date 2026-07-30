@@ -70,7 +70,7 @@
 
   /* ================= App-Start ================= */
 
-  var APP_VERSION = '0.33.2';
+  var APP_VERSION = '0.34.0';
 
   /* ---------- PWA-Installation ----------
      Chrome/Edge/Android liefern `beforeinstallprompt`: Event abfangen und
@@ -537,10 +537,28 @@
   }
 
   /* Kursname (Klasse - Fach) als weiße Box unterhalb der Kopfzeile – auf allen Kursseiten. */
-  function courseBox(course) {
+  /* Kursnamen-Box. `helpId` verweist auf ein Hilfekapitel; das Fragezeichen
+     steht rechtsbündig und führt dorthin zurück, wo es angetippt wurde. */
+  function courseBox(course, helpId) {
     var cls = Store.classById(course.classId);
-    return h('div.card.card-tight.course-box',
-      h('strong', {}, cls.name + ' - ' + course.subject));
+    var hid = helpId || Help.CONTEXT[route.name];
+    if (!hid) {
+      return h('div.card.card-tight.course-box',
+        h('strong', {}, cls.name + ' - ' + course.subject));
+    }
+    return h('div.card.card-tight.course-box.course-box-row',
+      h('strong', {}, cls.name + ' - ' + course.subject),
+      helpBtn(hid));
+  }
+
+  /* Kleines Fragezeichen für die kontextbezogene Hilfe. */
+  function helpBtn(chapterId) {
+    return h('button.icon-btn.help-btn', {
+      'aria-label': 'Hilfe zu dieser Seite', title: 'Hilfe zu dieser Seite',
+      onclick: function () {
+        go('helpPage', { chapter: chapterId, back: { name: route.name, params: route.params } });
+      }
+    }, '?');
   }
 
   /* Schuljahr als Kurzform für Dateinamen: „2026/27" -> „26-27", „2026/2027" -> „26-27". */
@@ -1346,7 +1364,8 @@
               : null)
         : h('div.course-grid', {}, courses.map(courseTile)),
       h('button.btn-primary.btn-block', { onclick: function () { go('editCourse', {}); } }, '+ Kurs anlegen'),
-      h('button.btn-plain.btn-block', { onclick: function () { go('settings', { back: { name: 'home' } }); } }, 'Globale Einstellungen')
+      h('button.btn-plain.btn-block', { onclick: function () { go('settings', { back: { name: 'home' } }); } }, 'Globale Einstellungen'),
+      h('button.btn-plain.btn-block', { onclick: function () { go('help', { back: { name: 'home' } }); } }, 'Hilfe')
     );
     return screen;
 
@@ -3442,6 +3461,14 @@
       '.zeugnis-head{margin:0 0 0.6mm;font-weight:750;font-size:8.5pt;}' +
       '.zeugnis-line{text-align:center;}' +
       '.page-break{page-break-before:always;break-before:page;}' +
+      '.help-print-head h1{font-size:16pt;margin:0 0 1mm;}' +
+      '.help-print-page h2{font-size:13pt;margin:0 0 2mm;}' +
+      '.help-chapter-print{page-break-inside:avoid;margin:0 0 4mm;}' +
+      '.help-chapter-print h3{font-size:11pt;margin:0 0 1mm;}' +
+      '.help-p,.help-list,.help-steps{font-size:10pt;line-height:1.45;margin:0 0 2mm;}' +
+      '.help-note,.help-warn{font-size:10pt;padding:1.5mm 3mm;border-left:2pt solid #333;margin:0 0 2mm;}' +
+      '.help-toc{page-break-after:always;font-size:10pt;}' +
+      '.help-toc h2{font-size:13pt;}' +
       '.exam-sheet h2{font-size:13pt;margin:0 0 1mm;}' +
       '.exam-sheet .print-sub{font-size:9pt;color:#444;margin:0 0 2mm;}' +
       '.exam-sheet-name{font-size:11pt;margin:0 0 2mm;}' +
@@ -5681,6 +5708,200 @@
       });
     });
   }
+
+  /* ================= Hilfebereich =================
+     Inhalte stehen in js/help.js. Aus derselben Quelle entstehen die
+     Bildschirmansicht, der Druck einer einzelnen Seite und die
+     Komplettanleitung. */
+
+  /* Absatz-Text mit {{Glossar}}-Begriffen und **fett** in DOM-Knoten wandeln.
+     Glossarbegriffe sind antippbar (nicht Hover – das funktioniert auf
+     Tablet und Smartphone nicht); die Definition klappt darunter auf. */
+  function helpText(str, defHost, forPrint) {
+    var out = [];
+    String(str).split(/(\{\{.+?\}\}|\*\*.+?\*\*)/).forEach(function (part) {
+      if (!part) return;
+      if (part.indexOf('{{') === 0) {
+        var term = part.slice(2, -2);
+        var entry = Help.glossaryFor(term);
+        if (!entry || forPrint) { out.push(term); return; }
+        var btn = h('button.gloss-term', { type: 'button' }, term);
+        btn.addEventListener('click', function () {
+          var open = defHost.querySelector('[data-term="' + entry.term + '"]');
+          if (open) { open.remove(); return; }
+          var box = h('div.gloss-def', { 'data-term': entry.term },
+            h('div.row-between',
+              h('strong', {}, entry.term),
+              h('button.icon-btn.gloss-close', { 'aria-label': 'Schließen' }, '×')),
+            h('p.hint', {}, entry.def));
+          box.querySelector('.gloss-close').addEventListener('click', function () { box.remove(); });
+          defHost.appendChild(box);
+        });
+        out.push(btn);
+      } else if (part.indexOf('**') === 0) {
+        out.push(h('strong', {}, part.slice(2, -2)));
+      } else {
+        out.push(part);
+      }
+    });
+    return out;
+  }
+
+  /* Kapitelinhalt aufbauen. forPrint = ohne Interaktion, für das Druckfenster. */
+  function helpBody(body, forPrint) {
+    var wrap = h('div.help-body');
+    var defHost = h('div.gloss-host');
+    (body || []).forEach(function (b) {
+      if (b.t === 'ul') {
+        wrap.appendChild(h('ul.help-list', {}, b.v.map(function (li) {
+          return h('li', {}, helpText(li, defHost, forPrint));
+        })));
+      } else if (b.t === 'steps') {
+        wrap.appendChild(h('ol.help-steps', {}, b.v.map(function (li) {
+          return h('li', {}, helpText(li, defHost, forPrint));
+        })));
+      } else if (b.t === 'note') {
+        wrap.appendChild(h('p.help-note', {}, helpText(b.v, defHost, forPrint)));
+      } else if (b.t === 'warn') {
+        wrap.appendChild(h('p.help-warn', {}, helpText(b.v, defHost, forPrint)));
+      } else {
+        wrap.appendChild(h('p.help-p', {}, helpText(b.v, defHost, forPrint)));
+      }
+    });
+    if (!forPrint) wrap.appendChild(defHost);
+    return wrap;
+  }
+
+  /* Druckfassung: eine Seite oder die Komplettanleitung. */
+  function helpPrintNode(pages, docTitle) {
+    var host = h('div');
+    host.appendChild(h('div.help-print-head',
+      h('h1', {}, 'SOL-Noten – ' + docTitle),
+      h('p.print-sub', {}, 'Version ' + APP_VERSION + ' · Stand: ' + UI.fmtDate(Store.todayISO()))));
+
+    if (pages.length > 1) {
+      host.appendChild(h('div.help-toc',
+        h('h2', {}, 'Inhalt'),
+        h('ol', {}, pages.map(function (pg) {
+          return h('li', {}, pg.title,
+            pg.chapters.length
+              ? h('ul', {}, pg.chapters.map(function (c) { return h('li', {}, c.title); }))
+              : null);
+        }))));
+    }
+
+    pages.forEach(function (pg, i) {
+      var sec = h('div.help-print-page' + (i > 0 || pages.length > 1 ? '.page-break' : ''));
+      sec.appendChild(h('h2', {}, pg.title));
+      if (pg.lead) sec.appendChild(h('p.print-sub', {}, pg.lead));
+      if (pg.isGlossary) {
+        Help.GLOSSARY.forEach(function (g) {
+          sec.appendChild(h('div.help-chapter-print',
+            h('h3', {}, g.term),
+            h('p.help-p', {}, g.def)));
+        });
+      } else {
+        pg.chapters.forEach(function (c) {
+          sec.appendChild(h('div.help-chapter-print',
+            h('h3', {}, c.title),
+            helpBody(c.body, true)));
+        });
+      }
+      host.appendChild(sec);
+    });
+    return host;
+  }
+
+  function printHelp(pages, docTitle, fileTitle) {
+    printNode(helpPrintNode(pages, docTitle), false, 'SOL-Noten ' + fileTitle);
+  }
+
+  /* ---- Übersicht ---- */
+  views.help = function (p) {
+    var rows = Help.PAGES.map(function (pg) {
+      return h('button.card.card-tight.help-tile', {
+        onclick: function () { go('helpPage', { id: pg.id, back: { name: 'help', params: p } }); }
+      },
+        h('strong', {}, pg.title),
+        h('p.hint', {}, pg.lead));
+    });
+
+    return h('div.screen',
+      header('Hilfe', p.back || { name: 'home' }),
+      h('div.card.card-tight',
+        h('p.hint', {}, 'Kurze Erklärungen zu allen Funktionen. Auf den Seiten der App führt das Fragezeichen ',
+          h('span.help-inline-q', {}, '?'), ' direkt zum passenden Kapitel.')),
+      rows,
+      /* Erklärvideo: externer Link, bewusst nicht eingebettet – eingebettete
+         Videos würden Dritt-Skripte in eine Datenschutz-App holen. */
+      h('a.card.card-tight.help-tile.help-link', {
+        href: 'https://www.youtube.com/@sol-noten', target: '_blank', rel: 'noopener noreferrer'
+      },
+        h('strong', {}, 'Erklärvideo'),
+        h('p.hint', {}, 'Öffnet sich im Browser bzw. in der YouTube-App.')),
+      h('div.actions-col',
+        h('button.btn-plain.btn-block', {
+          onclick: function () { printHelp(Help.PAGES, 'Komplettanleitung', 'Anleitung'); }
+        }, 'Komplettanleitung drucken / als PDF speichern'))
+    );
+  };
+
+  /* ---- Einzelne Hilfeseite ---- */
+  views.helpPage = function (p) {
+    /* Aufruf über ein Kapitel (Fragezeichen) oder über die Seiten-ID. */
+    var page, openChapter = null;
+    if (p.chapter) {
+      var found = Help.chapterById(p.chapter);
+      if (found) { page = found.page; openChapter = found.chapter.id; }
+    }
+    if (!page) page = Help.pageById(p.id);
+    if (!page) return views.help({ back: p.back });
+
+    var back = p.back || { name: 'help', params: {} };
+
+    if (page.isGlossary) {
+      return h('div.screen',
+        header(page.title, back),
+        h('div.card.card-tight', h('p.hint', {}, page.lead)),
+        h('div.card.card-list', {}, Help.GLOSSARY.map(function (g) {
+          return h('details.help-chapter',
+            h('summary', {}, g.term),
+            h('p.help-p', {}, g.def));
+        })),
+        h('div.actions-col',
+          h('button.btn-plain.btn-block', {
+            onclick: function () { printHelp([page], page.title, page.title); }
+          }, 'Diese Seite drucken / als PDF speichern'))
+      );
+    }
+
+    var chapters = page.chapters.map(function (c) {
+      var det = h('details.help-chapter' + (c.id === openChapter ? '.open-target' : ''),
+        h('summary', {}, c.title));
+      if (c.id === openChapter) det.setAttribute('open', 'open');
+      det.appendChild(helpBody(c.body, false));
+      return det;
+    });
+
+    var screen = h('div.screen',
+      header(page.title, back),
+      h('div.card.card-tight', h('p.hint', {}, page.lead)),
+      h('div.card.card-list', {}, chapters),
+      h('div.actions-col',
+        h('button.btn-plain.btn-block', {
+          onclick: function () { printHelp([page], page.printTitle || page.title, page.title); }
+        }, 'Diese Seite drucken / als PDF speichern'))
+    );
+
+    /* Beim Sprung aus der App: zum aufgeklappten Kapitel scrollen. */
+    if (openChapter) {
+      setTimeout(function () {
+        var el = document.querySelector('.help-chapter.open-target');
+        if (el && el.scrollIntoView) el.scrollIntoView({ block: 'center' });
+      }, 60);
+    }
+    return screen;
+  };
 
   views.settings = function (p) {
     var st = S();

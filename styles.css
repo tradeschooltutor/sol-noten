@@ -341,6 +341,41 @@ textarea.input.note-area {
 /* Ersteinrichtung: Installationshinweis vor den Einstellungen */
 .setup-install { border: 2px solid var(--teal); gap: 8px; }
 
+/* ---------- Hilfebereich ---------- */
+.help-btn { width: 32px; height: 32px; min-height: 32px; border-radius: 8px; font-size: 1rem; font-weight: 700; flex-shrink: 0; }
+.help-inline-q {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 20px; height: 20px; border: 1px solid var(--line); border-radius: 6px;
+  font-weight: 700; font-size: 0.78rem; vertical-align: -3px;
+}
+.help-tile { text-align: left; align-items: stretch; gap: 4px; display: flex; flex-direction: column; }
+.help-tile .hint { margin: 0; }
+a.help-link { text-decoration: none; color: inherit; }
+a.help-link strong::after { content: ' ↗'; font-weight: 400; color: var(--muted); }
+.help-chapter { border-bottom: 1px solid var(--line); padding: 4px 12px; }
+.help-chapter:last-child { border-bottom: none; }
+.help-chapter > summary { padding: 8px 0; font-weight: 650; cursor: pointer; }
+.help-chapter[open] > summary { color: var(--teal); }
+.help-body { padding-bottom: 8px; }
+.help-p { margin: 0 0 8px; line-height: 1.5; }
+.help-list, .help-steps { margin: 0 0 8px; padding-left: 1.35rem; line-height: 1.5; }
+.help-list li, .help-steps li { margin-bottom: 5px; }
+.help-note, .help-warn { margin: 0 0 8px; padding: 8px 10px; border-radius: 0; line-height: 1.45; }
+.help-note { background: var(--teal-soft); border-left: 3px solid var(--teal); }
+.help-warn { background: var(--amber-soft); border-left: 3px solid var(--amber); }
+/* Glossarbegriff: antippbar (Hover funktioniert auf Tablets nicht) */
+.gloss-term {
+  border: none; background: none; padding: 0; font: inherit; color: var(--teal);
+  text-decoration: underline dotted; text-underline-offset: 2px; cursor: pointer;
+  min-height: 0;
+}
+.gloss-def {
+  background: var(--paper); border: 1px solid var(--line); border-radius: 10px;
+  padding: 8px 10px; margin-top: 8px;
+}
+.gloss-def .hint { margin: 4px 0 0; }
+.gloss-close { width: 28px; height: 28px; min-height: 28px; border-radius: 6px; font-size: 1rem; }
+
 /* Punktestand (Schüler/in): Blättern in der Namenszeile */
 .stu-nav-row { gap: 10px; }
 .stu-nav-row .icon-btn { flex-shrink: 0; }

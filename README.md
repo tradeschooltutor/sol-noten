@@ -1,4 +1,4 @@
-# SOL-Noten (Version 0.33.2 – Beta)
+# SOL-Noten (Version 0.34.0 – Beta)
 
 Notenverwaltung zum selbstorganisierten Lernen (SOL) als Progressive Web App (PWA).
 Basierend auf der Excel-Notenverwaltung V8.0 von Andreas Vandelaar.
@@ -76,6 +76,14 @@ Ist die App bereits installiert, zeigen beide Stellen das an und der Hinweis ent
 ## Mehrere Sitzpläne je Kurs
 
 Wechselt eine Klasse den Raum, lassen sich mehrere Sitzpläne hinterlegen und über die Auswahlliste rechts in der Kursnamen-Box umschalten; der zuletzt gewählte Plan ist beim nächsten Öffnen wieder aktiv. Namen werden frei vergeben – in der Regel die Raumnummer (z. B. „3-EG-080"). Im Modus „Sitzplan bearbeiten" stehen **+ Neu** (leerer Plan), **Duplizieren** (übernimmt die aktuelle Anordnung als Ausgangspunkt), **Umbenennen** und **Löschen** zur Verfügung; der letzte verbliebene Plan kann nicht gelöscht werden. Jeder Plan hat eine eigene Spaltenzahl und eigene Platzierungen, da Räume unterschiedlich geschnitten sind. Vorhandene Sitzpläne älterer Versionen werden beim ersten Start automatisch als Plan „Standard" übernommen. Beim Schuljahreswechsel und bei „Neuer Kurs für ein anderes Fach in dieser Klasse" werden alle Pläne mitkopiert; wird eine Person aus der Klasse entfernt, verschwindet sie aus allen Plänen.
+
+## Hilfebereich
+
+Über den Button „Hilfe“ auf der Startseite (unter „Globale Einstellungen“). Die Inhalte stehen in `js/help.js` als Datenstruktur – aus derselben Quelle entstehen Bildschirmansicht, Einzelseiten-Druck und Komplettanleitung, sodass nichts doppelt gepflegt werden muss.
+
+Seiten: **Erste Schritte** (Reihenfolge beim Einrichten, Installation, PIN-Warnung, Schülerliste, Fortbildung), **FAQ** (folgt in Lieferung 2), **Glossar** (18 Fachbegriffe), **Erklärvideo** (externer Link, öffnet im Browser/in der YouTube-App – bewusst nicht eingebettet, da eingebettete Videos Dritt-Skripte in die App holen würden) und **Datenschutz-Kurzinformation** (laienverständlich, zum Ausdrucken; ausdrücklich kein Ersatz für die schulische Freigabe).
+
+Kapitel sind aufklappbar. Fachbegriffe in den Texten sind **antippbar** (nicht Hover – das funktioniert auf Tablets nicht): Ein Tipp klappt die Glossardefinition direkt darunter auf, ein × schließt sie. Gedruckte Fassungen tragen Version und Datum in der Kopfzeile; die Komplettanleitung beginnt mit einem Inhaltsverzeichnis. Das Drehbuch für das Erklärvideo liegt als `VIDEO-DREHBUCH.md` im Projekt (nicht in der App).
 
 ## Bildschirmbreite
 
