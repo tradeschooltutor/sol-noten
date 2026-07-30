@@ -1,4 +1,4 @@
-# SOL-Noten (Version 0.34.0 – Beta)
+# SOL-Noten (Version 0.34.1 – Beta)
 
 Notenverwaltung zum selbstorganisierten Lernen (SOL) als Progressive Web App (PWA).
 Basierend auf der Excel-Notenverwaltung V8.0 von Andreas Vandelaar.
@@ -79,11 +79,11 @@ Wechselt eine Klasse den Raum, lassen sich mehrere Sitzpläne hinterlegen und ü
 
 ## Hilfebereich
 
-Über den Button „Hilfe“ auf der Startseite (unter „Globale Einstellungen“). Die Inhalte stehen in `js/help.js` als Datenstruktur – aus derselben Quelle entstehen Bildschirmansicht, Einzelseiten-Druck und Komplettanleitung, sodass nichts doppelt gepflegt werden muss.
+Erreichbar über das Fragezeichen in der Titelzeile (Startseite, Kursseite, Globale Einstellungen) sowie über den Button „Hilfe“, der ganz unten auf jeder Seite steht. Die Inhalte stehen in `js/help.js` als Datenstruktur – aus derselben Quelle entstehen Bildschirmansicht, Einzelseiten-Druck und Komplettanleitung, sodass nichts doppelt gepflegt werden muss.
 
-Seiten: **Erste Schritte** (Reihenfolge beim Einrichten, Installation, PIN-Warnung, Schülerliste, Fortbildung), **FAQ** (folgt in Lieferung 2), **Glossar** (18 Fachbegriffe), **Erklärvideo** (externer Link, öffnet im Browser/in der YouTube-App – bewusst nicht eingebettet, da eingebettete Videos Dritt-Skripte in die App holen würden) und **Datenschutz-Kurzinformation** (laienverständlich, zum Ausdrucken; ausdrücklich kein Ersatz für die schulische Freigabe).
+Seiten: **Erste Schritte** (Reihenfolge beim Einrichten, Installation, PIN-Warnung, Schülerliste, Fortbildung), **FAQ** (folgt in Lieferung 2), **Glossar** (18 Fachbegriffe), **Erklärvideo** (externer Link, derzeit ausgeblendet – zum Aktivieren `VIDEO_URL` in `js/app.js` setzen; bewusst nicht eingebettet, da eingebettete Videos Dritt-Skripte in die App holen würden) und **Datenschutz-Kurzinformation** (laienverständlich, zum Ausdrucken; ausdrücklich kein Ersatz für die schulische Freigabe).
 
-Kapitel sind aufklappbar. Fachbegriffe in den Texten sind **antippbar** (nicht Hover – das funktioniert auf Tablets nicht): Ein Tipp klappt die Glossardefinition direkt darunter auf, ein × schließt sie. Gedruckte Fassungen tragen Version und Datum in der Kopfzeile; die Komplettanleitung beginnt mit einem Inhaltsverzeichnis. Das Drehbuch für das Erklärvideo liegt als `VIDEO-DREHBUCH.md` im Projekt (nicht in der App).
+Kapitel sind aufklappbar. Fachbegriffe in den Texten sind **antippbar** (nicht Hover – das funktioniert auf Tablets nicht): Ein Tipp klappt die Glossardefinition direkt darunter auf, ein × schließt sie. Gedruckte Fassungen tragen Version und Datum in der Kopfzeile; die Komplettanleitung beginnt mit einem Inhaltsverzeichnis. Das Drehbuch für das Erklärvideo wird separat geliefert und ist bewusst nicht Teil des Projektpakets.
 
 ## Bildschirmbreite
 

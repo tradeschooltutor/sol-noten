@@ -70,7 +70,7 @@
 
   /* ================= App-Start ================= */
 
-  var APP_VERSION = '0.34.0';
+  var APP_VERSION = '0.34.1';
 
   /* ---------- PWA-Installation ----------
      Chrome/Edge/Android liefern `beforeinstallprompt`: Event abfangen und
@@ -426,6 +426,12 @@
       appEl.appendChild(screen);
       /* „Über diese App“ unten auf jeder Seite – außer auf dem Sperrbildschirm. */
       if (route.name !== 'lock' && screen && screen.classList && screen.classList.contains('screen')) {
+        /* Hilfe ist von jeder Seite aus erreichbar – außer aus der Hilfe selbst. */
+        if (route.name !== 'help' && route.name !== 'helpPage') {
+          screen.appendChild(h('button.btn-plain.btn-block.help-bottom-btn', {
+            onclick: function () { go('help', { back: { name: route.name, params: route.params } }); }
+          }, 'Hilfe'));
+        }
         screen.appendChild(aboutBox());
       }
     } catch (err) {
@@ -473,6 +479,14 @@
     var right = [];
     // Echte Zusatz-Buttons (z. B. „Drucken") zuerst; leere Platzhalter ignorieren.
     if (extra && !(extra.tagName === 'SPAN' && !extra.hasChildNodes())) right.push(extra);
+    /* Fragezeichen in der Titelzeile nur auf den Hauptebenen. Auf den
+       Unterseiten der Kurse sitzt es stattdessen in der weißen Kursbox. */
+    if (route.name === 'home' || route.name === 'course' || route.name === 'settings') {
+      right.push(h('button.icon-btn', {
+        onclick: function () { go('help', { back: { name: route.name, params: route.params } }); },
+        'aria-label': 'Hilfe', title: 'Hilfe'
+      }, '?'));
+    }
     if (route.name !== 'settings') {
       right.push(h('button.icon-btn', { onclick: function () { go('settings', { back: route }); }, 'aria-label': 'Einstellungen' }, '⚙'));
     }
@@ -1364,8 +1378,7 @@
               : null)
         : h('div.course-grid', {}, courses.map(courseTile)),
       h('button.btn-primary.btn-block', { onclick: function () { go('editCourse', {}); } }, '+ Kurs anlegen'),
-      h('button.btn-plain.btn-block', { onclick: function () { go('settings', { back: { name: 'home' } }); } }, 'Globale Einstellungen'),
-      h('button.btn-plain.btn-block', { onclick: function () { go('help', { back: { name: 'home' } }); } }, 'Hilfe')
+      h('button.btn-plain.btn-block', { onclick: function () { go('settings', { back: { name: 'home' } }); } }, 'Globale Einstellungen')
     );
     return screen;
 
@@ -5709,6 +5722,9 @@
     });
   }
 
+  /* Adresse des Erklärvideos. Leer = Button wird ausgeblendet. */
+  var VIDEO_URL = '';
+
   /* ================= Hilfebereich =================
      Inhalte stehen in js/help.js. Aus derselben Quelle entstehen die
      Bildschirmansicht, der Druck einer einzelnen Seite und die
@@ -5719,13 +5735,30 @@
      Tablet und Smartphone nicht); die Definition klappt darunter auf. */
   function helpText(str, defHost, forPrint) {
     var out = [];
-    String(str).split(/(\{\{.+?\}\}|\*\*.+?\*\*)/).forEach(function (part) {
+    String(str).split(/(\{\{.+?\}\}|\[\[.+?\]\]|\*\*.+?\*\*)/).forEach(function (part) {
       if (!part) return;
-      if (part.indexOf('{{') === 0) {
-        var term = part.slice(2, -2);
+      if (part.indexOf('[[') === 0) {
+        /* [[help:kapitel|Text]] springt in die Hilfe, [[app:route|Text]] in die App. */
+        var inner = part.slice(2, -2).split('|');
+        var target = inner[0], label = inner[1] || inner[0];
+        if (forPrint) { out.push(label); return; }
+        var link = h('button.help-link-btn', { type: 'button' }, label);
+        link.addEventListener('click', function () {
+          if (target.indexOf('help:') === 0) {
+            go('helpPage', { chapter: target.slice(5), back: { name: route.name, params: route.params } });
+          } else if (target.indexOf('app:') === 0) {
+            go(target.slice(4), { back: { name: route.name, params: route.params } });
+          }
+        });
+        out.push(link);
+      } else if (part.indexOf('{{') === 0) {
+        /* {{Begriff}} oder {{Begriff|angezeigter Text}} */
+        var raw = part.slice(2, -2).split('|');
+        var term = raw[0];
+        var shown = raw[1] || raw[0];
         var entry = Help.glossaryFor(term);
-        if (!entry || forPrint) { out.push(term); return; }
-        var btn = h('button.gloss-term', { type: 'button' }, term);
+        if (!entry || forPrint) { out.push(shown); return; }
+        var btn = h('button.gloss-term', { type: 'button' }, shown);
         btn.addEventListener('click', function () {
           var open = defHost.querySelector('[data-term="' + entry.term + '"]');
           if (open) { open.remove(); return; }
@@ -5833,14 +5866,17 @@
           h('span.help-inline-q', {}, '?'), ' direkt zum passenden Kapitel.')),
       rows,
       /* Erklärvideo: externer Link, bewusst nicht eingebettet – eingebettete
-         Videos würden Dritt-Skripte in eine Datenschutz-App holen. */
-      h('a.card.card-tight.help-tile.help-link', {
-        href: 'https://www.youtube.com/@sol-noten', target: '_blank', rel: 'noopener noreferrer'
-      },
-        h('strong', {}, 'Erklärvideo'),
-        h('p.hint', {}, 'Öffnet sich im Browser bzw. in der YouTube-App.')),
+         Videos würden Dritt-Skripte in eine Datenschutz-App holen.
+         VIDEO_URL auf die Adresse setzen, sobald das Video steht. */
+      VIDEO_URL
+        ? h('a.card.card-tight.help-tile.help-link', {
+            href: VIDEO_URL, target: '_blank', rel: 'noopener noreferrer'
+          },
+            h('strong', {}, 'Erklärvideo'),
+            h('p.hint', {}, 'Video wird im Browser angezeigt.'))
+        : null,
       h('div.actions-col',
-        h('button.btn-plain.btn-block', {
+        h('button.btn-plain.btn-block.help-print-btn', {
           onclick: function () { printHelp(Help.PAGES, 'Komplettanleitung', 'Anleitung'); }
         }, 'Komplettanleitung drucken / als PDF speichern'))
     );
@@ -5869,7 +5905,7 @@
             h('p.help-p', {}, g.def));
         })),
         h('div.actions-col',
-          h('button.btn-plain.btn-block', {
+          h('button.btn-plain.btn-block.help-print-btn', {
             onclick: function () { printHelp([page], page.title, page.title); }
           }, 'Diese Seite drucken / als PDF speichern'))
       );
@@ -5888,7 +5924,7 @@
       h('div.card.card-tight', h('p.hint', {}, page.lead)),
       h('div.card.card-list', {}, chapters),
       h('div.actions-col',
-        h('button.btn-plain.btn-block', {
+        h('button.btn-plain.btn-block.help-print-btn', {
           onclick: function () { printHelp([page], page.printTitle || page.title, page.title); }
         }, 'Diese Seite drucken / als PDF speichern'))
     );

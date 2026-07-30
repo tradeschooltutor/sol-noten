@@ -348,10 +348,20 @@ textarea.input.note-area {
   width: 20px; height: 20px; border: 1px solid var(--line); border-radius: 6px;
   font-weight: 700; font-size: 0.78rem; vertical-align: -3px;
 }
-.help-tile { text-align: left; align-items: stretch; gap: 4px; display: flex; flex-direction: column; }
+/* Hilfe-Kacheln und -Buttons: Rahmen in der Farbe des Farbschemas */
+.help-tile {
+  text-align: left; align-items: stretch; gap: 4px; display: flex; flex-direction: column;
+  border: 2px solid var(--teal);
+}
 .help-tile .hint { margin: 0; }
 a.help-link { text-decoration: none; color: inherit; }
 a.help-link strong::after { content: ' ↗'; font-weight: 400; color: var(--muted); }
+.help-print-btn, .help-bottom-btn { border: 2px solid var(--teal); }
+/* Verweise innerhalb der Hilfetexte */
+.help-link-btn {
+  border: none; background: none; padding: 0; font: inherit; color: var(--teal);
+  text-decoration: underline; text-underline-offset: 2px; cursor: pointer; min-height: 0;
+}
 .help-chapter { border-bottom: 1px solid var(--line); padding: 4px 12px; }
 .help-chapter:last-child { border-bottom: none; }
 .help-chapter > summary { padding: 8px 0; font-weight: 650; cursor: pointer; }
