@@ -70,7 +70,7 @@
 
   /* ================= App-Start ================= */
 
-  var APP_VERSION = '0.34.1';
+  var APP_VERSION = '0.34.2';
 
   /* ---------- PWA-Installation ----------
      Chrome/Edge/Android liefern `beforeinstallprompt`: Event abfangen und
@@ -428,7 +428,7 @@
       if (route.name !== 'lock' && screen && screen.classList && screen.classList.contains('screen')) {
         /* Hilfe ist von jeder Seite aus erreichbar – außer aus der Hilfe selbst. */
         if (route.name !== 'help' && route.name !== 'helpPage') {
-          screen.appendChild(h('button.btn-plain.btn-block.help-bottom-btn', {
+          screen.appendChild(h('button.btn-plain.btn-block', {
             onclick: function () { go('help', { back: { name: route.name, params: route.params } }); }
           }, 'Hilfe'));
         }
@@ -5735,7 +5735,7 @@
      Tablet und Smartphone nicht); die Definition klappt darunter auf. */
   function helpText(str, defHost, forPrint) {
     var out = [];
-    String(str).split(/(\{\{.+?\}\}|\[\[.+?\]\]|\*\*.+?\*\*)/).forEach(function (part) {
+    String(str).split(/(\{\{.+?\}\}|\[\[.+?\]\]|\*\*.+?\*\*|_.+?_)/).forEach(function (part) {
       if (!part) return;
       if (part.indexOf('[[') === 0) {
         /* [[help:kapitel|Text]] springt in die Hilfe, [[app:route|Text]] in die App. */
@@ -5773,9 +5773,25 @@
         out.push(btn);
       } else if (part.indexOf('**') === 0) {
         out.push(h('strong', {}, part.slice(2, -2)));
+      } else if (part.charAt(0) === '_' && part.charAt(part.length - 1) === '_' && part.length > 2) {
+        out.push(h('em', {}, part.slice(1, -1)));
       } else {
         out.push(part);
       }
+    });
+    return out;
+  }
+
+  /* Überschriften: nur **fett** und _kursiv_, keine Verweise oder Glossarbegriffe
+     (ein Button in einer Überschrift wäre weder lesbar noch bedienbar). */
+  function helpTitle(str) {
+    var out = [];
+    String(str).split(/(\*\*.+?\*\*|_.+?_)/).forEach(function (part) {
+      if (!part) return;
+      if (part.indexOf('**') === 0) out.push(h('strong', {}, part.slice(2, -2)));
+      else if (part.charAt(0) === '_' && part.charAt(part.length - 1) === '_' && part.length > 2) {
+        out.push(h('em', {}, part.slice(1, -1)));
+      } else out.push(part);
     });
     return out;
   }
@@ -5836,7 +5852,7 @@
       } else {
         pg.chapters.forEach(function (c) {
           sec.appendChild(h('div.help-chapter-print',
-            h('h3', {}, c.title),
+            h('h3', {}, helpTitle(c.title)),
             helpBody(c.body, true)));
         });
       }
@@ -5876,7 +5892,7 @@
             h('p.hint', {}, 'Video wird im Browser angezeigt.'))
         : null,
       h('div.actions-col',
-        h('button.btn-plain.btn-block.help-print-btn', {
+        h('button.btn-plain.btn-block', {
           onclick: function () { printHelp(Help.PAGES, 'Komplettanleitung', 'Anleitung'); }
         }, 'Komplettanleitung drucken / als PDF speichern'))
     );
@@ -5905,7 +5921,7 @@
             h('p.help-p', {}, g.def));
         })),
         h('div.actions-col',
-          h('button.btn-plain.btn-block.help-print-btn', {
+          h('button.btn-plain.btn-block', {
             onclick: function () { printHelp([page], page.title, page.title); }
           }, 'Diese Seite drucken / als PDF speichern'))
       );
@@ -5913,7 +5929,7 @@
 
     var chapters = page.chapters.map(function (c) {
       var det = h('details.help-chapter' + (c.id === openChapter ? '.open-target' : ''),
-        h('summary', {}, c.title));
+        h('summary', {}, helpTitle(c.title)));
       if (c.id === openChapter) det.setAttribute('open', 'open');
       det.appendChild(helpBody(c.body, false));
       return det;
@@ -5924,7 +5940,7 @@
       h('div.card.card-tight', h('p.hint', {}, page.lead)),
       h('div.card.card-list', {}, chapters),
       h('div.actions-col',
-        h('button.btn-plain.btn-block.help-print-btn', {
+        h('button.btn-plain.btn-block', {
           onclick: function () { printHelp([page], page.printTitle || page.title, page.title); }
         }, 'Diese Seite drucken / als PDF speichern'))
     );

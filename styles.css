@@ -348,15 +348,14 @@ textarea.input.note-area {
   width: 20px; height: 20px; border: 1px solid var(--line); border-radius: 6px;
   font-weight: 700; font-size: 0.78rem; vertical-align: -3px;
 }
-/* Hilfe-Kacheln und -Buttons: Rahmen in der Farbe des Farbschemas */
+/* Hilfe-Kacheln: gleicher neutraler Rahmen wie bei allen ungefüllten Buttons */
 .help-tile {
   text-align: left; align-items: stretch; gap: 4px; display: flex; flex-direction: column;
-  border: 2px solid var(--teal);
+  border: 1px solid var(--line);
 }
 .help-tile .hint { margin: 0; }
 a.help-link { text-decoration: none; color: inherit; }
 a.help-link strong::after { content: ' ↗'; font-weight: 400; color: var(--muted); }
-.help-print-btn, .help-bottom-btn { border: 2px solid var(--teal); }
 /* Verweise innerhalb der Hilfetexte */
 .help-link-btn {
   border: none; background: none; padding: 0; font: inherit; color: var(--teal);

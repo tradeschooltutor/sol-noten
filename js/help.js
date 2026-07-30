@@ -42,6 +42,10 @@
     { term: 'Lernmanagementsystem', def: 'Digitale Lernplattform der Schule, etwa Moodle, Logineo, Teams oder OneNote.' }
   ];
 
+  /* Alphabetisch sortiert – so erscheinen die Begriffe auf dem Bildschirm
+     und im Ausdruck in derselben, nachschlagbaren Reihenfolge. */
+  GLOSSARY.sort(function (a, b) { return a.term.localeCompare(b.term, 'de'); });
+
   function glossaryFor(term) {
     var t = String(term || '').toLowerCase();
     for (var i = 0; i < GLOSSARY.length; i++) {
@@ -77,7 +81,7 @@
         },
         {
           id: 'start-installation',
-          title: 'Warum sollte ich **SOL-Noten** als App installieren?',
+          title: 'Warum sollte ich _SOL-Noten_ als App installieren?',
           body: [
             { t: 'p', v: 'SOL-Noten ist eine so genannte {{PWA}} (Progressive Web App) – eine Website, die sich wie eine App installieren lässt. Sie läuft zwar auch im Browser, **du solltest sie aber am besten jetzt direkt auf deinem Gerät installieren. Dadurch hast du folgende Vorteile:**' },
             { t: 'ul', v: [
@@ -148,7 +152,7 @@
           title: 'Wozu dient diese Kurzinformation?',
           body: [
             { t: 'p', v: 'Diese Information beschreibt in einfachen Worten, wie SOL-Noten mit Daten umgeht. Sie richtet sich an Lehrkräfte, Schulleitungen und schulische Datenschutzbeauftragte und soll die Prüfung erleichtern.' },
-            { t: 'warn', v: 'Dieses Blatt ist **keine** datenschutzrechtliche Freigabe und ersetzt sie nicht. Ob und unter welchen Bedingungen die App eingesetzt werden darf, entscheidet Ihre Schule beziehungsweise Ihr Schulträger – die Vorgaben unterscheiden sich je Bundesland. Häufig sind ein Eintrag im Verzeichnis der Verarbeitungstätigkeiten und eine Genehmigung erforderlich. Der Entwickler ist kein Jurist und kann keine Rechtsberatung leisten.' }
+            { t: 'warn', v: 'Dieses Blatt ist **keine** datenschutzrechtliche Freigabe und ersetzt sie nicht. Ob und unter welchen Bedingungen die App eingesetzt werden darf, entscheidet Ihre Schulleitung. Der Entwickler ist kein Jurist und kann keine Rechtsberatung leisten.' }
           ]
         },
         {
@@ -183,12 +187,12 @@
           body: [
             { t: 'p', v: 'Da alle Daten auf dem Gerät der Lehrkraft bleiben, liegt die Verantwortung für ihren Schutz bei der Lehrkraft. Ein Auftragsverarbeitungsvertrag mit dem Entwickler ist nicht erforderlich, weil keine Daten an ihn übermittelt werden.' },
             { t: 'ul', v: [
-              'Gerät mit Bildschirmsperre schützen; ein starkes Passwort für die App wählen.',
+              'App mit PIN, Passwort oder biometrischem Login schützen.',
               'Regelmäßig ein {{Backup}} anlegen – Backups sind verschlüsselt.',
-              '**Exporte und Ausdrucke sind nicht verschlüsselt** und enthalten Namen und Noten im Klartext. Nur auf geschützten Geräten speichern und nicht ungeschützt weitergeben, etwa per unverschlüsselter E-Mail.',
+              'Exporte und Ausdrucke sind nicht verschlüsselt und enthalten Namen und Noten im Klartext. Nur auf geschützten Geräten speichern und nicht ungeschützt weitergeben, etwa per unverschlüsselter E-Mail.',
               'Fotos von Lernenden nur mit der erforderlichen Einwilligung erfassen; sie werden ebenfalls verschlüsselt gespeichert.',
               'Beim Gerätewechsel ein verschlüsseltes {{Backup}} anlegen (Globale Einstellungen), auf einen externen Datenträger speichern, die App auf dem neuen Gerät installieren und die Backup-Datei dort einspielen (Globale Einstellungen).',
-              'Beim Ausscheiden aus der Schule oder Gerätewechsel Daten löschen (Globale Einstellungen) beziehungsweise das Gerät zurücksetzen.'
+              'Beim Ausscheiden aus der Schule Daten löschen (Globale Einstellungen) beziehungsweise das Gerät zurücksetzen.'
             ] },
             { t: 'p', v: 'Verarbeitet werden je Lernenden: Name, Klasse, Kurs, Bewertungen, Fehlzeiten und optional Kontaktdaten, Ausbildungsbetrieb sowie ein Foto. Die Daten werden zur Leistungsbewertung verarbeitet und bleiben bis zur Löschung durch die Lehrkraft erhalten.' }
           ]

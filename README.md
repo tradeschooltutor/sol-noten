@@ -1,4 +1,4 @@
-# SOL-Noten (Version 0.34.1 – Beta)
+# SOL-Noten (Version 0.34.2 – Beta)
 
 Notenverwaltung zum selbstorganisierten Lernen (SOL) als Progressive Web App (PWA).
 Basierend auf der Excel-Notenverwaltung V8.0 von Andreas Vandelaar.
@@ -83,7 +83,7 @@ Erreichbar über das Fragezeichen in der Titelzeile (Startseite, Kursseite, Glob
 
 Seiten: **Erste Schritte** (Reihenfolge beim Einrichten, Installation, PIN-Warnung, Schülerliste, Fortbildung), **FAQ** (folgt in Lieferung 2), **Glossar** (18 Fachbegriffe), **Erklärvideo** (externer Link, derzeit ausgeblendet – zum Aktivieren `VIDEO_URL` in `js/app.js` setzen; bewusst nicht eingebettet, da eingebettete Videos Dritt-Skripte in die App holen würden) und **Datenschutz-Kurzinformation** (laienverständlich, zum Ausdrucken; ausdrücklich kein Ersatz für die schulische Freigabe).
 
-Kapitel sind aufklappbar. Fachbegriffe in den Texten sind **antippbar** (nicht Hover – das funktioniert auf Tablets nicht): Ein Tipp klappt die Glossardefinition direkt darunter auf, ein × schließt sie. Gedruckte Fassungen tragen Version und Datum in der Kopfzeile; die Komplettanleitung beginnt mit einem Inhaltsverzeichnis. Das Drehbuch für das Erklärvideo wird separat geliefert und ist bewusst nicht Teil des Projektpakets.
+Kapitel sind aufklappbar und im Glossar alphabetisch sortiert. Fachbegriffe in den Texten sind **antippbar** (nicht Hover – das funktioniert auf Tablets nicht): Ein Tipp klappt die Glossardefinition direkt darunter auf, ein × schließt sie. Gedruckte Fassungen tragen Version und Datum in der Kopfzeile; die Komplettanleitung beginnt mit einem Inhaltsverzeichnis. Das Drehbuch für das Erklärvideo wird separat geliefert und ist bewusst nicht Teil des Projektpakets.
 
 ## Bildschirmbreite
 
