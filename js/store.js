@@ -161,6 +161,21 @@
   }
   function failedAttempts() { return (security && security.fail && security.fail.count) || 0; }
 
+  /* Nach erfolgreichem Entsperren (egal auf welchem Weg) die Datenbank laden.
+     Eine Stelle für alle drei Wege – PIN, Biometrie, Wiederherstellungsschlüssel. */
+  function loadDecryptedState() {
+    return idbGet('state', 'main').then(function (saved) {
+      if (saved && saved.enc) {
+        return CryptoBox.decryptWithKey(masterKey, saved).then(function (plain) {
+          state = migrate(JSON.parse(plain));
+          return state;
+        });
+      }
+      state = migrate(saved) || freshState();
+      return state;
+    });
+  }
+
   /* App entsperren: PIN prüft sich selbst über das Entpacken des Hauptschlüssels. */
   function unlock(pin) {
     if (!isEncrypted()) return Promise.reject(new Error('Keine Verschlüsselung aktiv.'));
@@ -178,16 +193,7 @@
       security.fail = { count: 0, lockUntil: 0 };
       return saveSecurity();
     }).then(function () {
-      return idbGet('state', 'main');
-    }).then(function (saved) {
-      if (saved && saved.enc) {
-        return CryptoBox.decryptWithKey(masterKey, saved).then(function (plain) {
-          state = migrate(JSON.parse(plain));
-          return state;
-        });
-      }
-      state = migrate(saved) || freshState();
-      return state;
+      return loadDecryptedState();
     }).catch(function (err) {
       if (/Falsche PIN/.test(err.message || '')) {
         masterRaw = null; masterKey = null;
@@ -254,16 +260,7 @@
       return CryptoBox.importAesKey(raw);
     }).then(function (key) {
       masterKey = key;
-      return idbGet('state', 'main');
-    }).then(function (saved) {
-      if (saved && saved.enc) {
-        return CryptoBox.decryptWithKey(masterKey, saved).then(function (plain) {
-          state = migrate(JSON.parse(plain));
-          return state;
-        });
-      }
-      state = migrate(saved) || freshState();
-      return state;
+      return loadDecryptedState();
     });
   }
 
@@ -335,6 +332,100 @@
       return chain;
     });
   }
+
+  /* ---------- Wiederherstellungsschlüssel ---------- *
+     Zweiter Umschlag um denselben Hauptschlüssel. Wer ihn öffnet, hat exakt
+     denselben Zugriff wie mit der PIN – alle Daten sind vollständig da, es
+     wird nichts neu verschlüsselt und nichts neu geschrieben. */
+
+  function hasRecoveryKey() { return !!(security && security.recovery); }
+  function recoveryCreatedAt() {
+    return (security && security.recovery && security.recovery.createdAt) || null;
+  }
+
+  /* Erzeugt einen neuen Schlüssel und gibt ihn EINMALIG im Klartext zurück.
+     Ein bereits vorhandener Schlüssel wird dabei ungültig. PIN bzw. Passwort
+     ist immer nötig – auch bei entsperrter App, damit niemand an einem kurz
+     unbeaufsichtigten Gerät heimlich einen Zweitschlüssel anlegen kann. */
+  function createRecoveryKey(secret) {
+    if (!isEncrypted()) return Promise.reject(new Error('Verschlüsselung ist nicht aktiv.'));
+    var key = CryptoBox.generateRecoveryKey();
+    return CryptoBox.unwrapMaster(secret, security.wrapped).then(function (raw) {
+      return CryptoBox.wrapMaster(CryptoBox.normalizeRecoveryKey(key), raw);
+    }).then(function (wrapped) {
+      wrapped.createdAt = new Date().toISOString();
+      security.recovery = wrapped;
+      return saveSecurity();
+    }).then(function () { return key; });
+  }
+
+  /* Nur prüfen, ohne zu entsperren – für die Bestätigung beim Zurücksetzen. */
+  function verifyRecoveryKey(key) {
+    if (!hasRecoveryKey()) return Promise.resolve(false);
+    return CryptoBox.unwrapMaster(CryptoBox.normalizeRecoveryKey(key), security.recovery)
+      .then(function () { return true; })
+      .catch(function () { return false; });
+  }
+
+  /* Entsperren mit dem Wiederherstellungsschlüssel. Die Wartesperre nach
+     Fehlversuchen gilt hier bewusst nicht: Der Schlüssel hat 120 Bit, Raten
+     ist ausgeschlossen – und wer die PIN vergessen hat, ist typischerweise
+     gerade erst in die Wartesperre gelaufen. */
+  function unlockWithRecovery(key) {
+    if (!isEncrypted()) return Promise.reject(new Error('Keine Verschlüsselung aktiv.'));
+    if (!hasRecoveryKey()) return Promise.reject(new Error('Für dieses Gerät ist kein Wiederherstellungsschlüssel hinterlegt.'));
+    return CryptoBox.unwrapMaster(CryptoBox.normalizeRecoveryKey(key), security.recovery)
+      .catch(function () { throw new Error('Der Wiederherstellungsschlüssel ist nicht korrekt.'); })
+      .then(function (raw) {
+        masterRaw = raw;
+        return CryptoBox.importAesKey(raw);
+      }).then(function (k) {
+        masterKey = k;
+        security.fail = { count: 0, lockUntil: 0 };
+        return saveSecurity();
+      }).then(function () {
+        return loadDecryptedState();
+      });
+  }
+
+  /* Neue PIN bzw. neues Passwort setzen, wenn der Hauptschlüssel bereits im
+     Speicher liegt (nach Entsperren per Wiederherstellungsschlüssel). */
+  function setSecretFromMaster(newSecret, newKind) {
+    if (!masterRaw) return Promise.reject(new Error('Die App ist nicht entsperrt.'));
+    return CryptoBox.wrapMaster(newSecret, masterRaw).then(function (wrapped) {
+      security.wrapped = wrapped;
+      security.secretKind = newKind === 'password' ? 'password' : 'pin';
+      security.fail = { count: 0, lockUntil: 0 };
+      return saveSecurity();
+    });
+  }
+
+  /* ---------- Zurücksetzen mit Wartezeit ---------- *
+     Ein angefordertes Zurücksetzen wird vorgemerkt und erst nach 24 Stunden
+     ausführbar. So bleibt der Weg für die rechtmäßige Nutzerin offen, während
+     ein spontaner Zugriff auf ein kurz unbeaufsichtigtes Gerät ins Leere
+     läuft: Die Vormerkung ist auf jeder Seite sichtbar und jederzeit ohne
+     Anmeldung abbrechbar. */
+  var RESET_WAIT_MS = 24 * 60 * 60 * 1000;
+
+  function resetRequest() {
+    if (!security) return Promise.resolve(0);
+    security.resetAt = Date.now() + RESET_WAIT_MS;
+    return saveSecurity().then(function () { return security.resetAt; });
+  }
+  function resetCancel() {
+    if (security && security.resetAt) {
+      delete security.resetAt;
+      return saveSecurity();
+    }
+    return Promise.resolve();
+  }
+  function resetPendingAt() { return (security && security.resetAt) || 0; }
+  function resetDue() {
+    var at = resetPendingAt();
+    return !!at && Date.now() >= at;
+  }
+  function resetWaitHours() { return RESET_WAIT_MS / 3600000; }
 
   /* Kompletter Neustart (PIN vergessen): löscht alle Daten unwiderruflich. */
   function factoryReset() {
@@ -1175,6 +1266,11 @@
     biometricsEnabled: biometricsEnabled, enableBiometrics: enableBiometrics,
     disableBiometrics: disableBiometrics, unlockBiometric: unlockBiometric,
     getLockWait: getLockWait, failedAttempts: failedAttempts, factoryReset: factoryReset,
+    hasRecoveryKey: hasRecoveryKey, recoveryCreatedAt: recoveryCreatedAt,
+    createRecoveryKey: createRecoveryKey, verifyRecoveryKey: verifyRecoveryKey,
+    unlockWithRecovery: unlockWithRecovery, setSecretFromMaster: setSecretFromMaster,
+    resetRequest: resetRequest, resetCancel: resetCancel, resetPendingAt: resetPendingAt,
+    resetDue: resetDue, resetWaitHours: resetWaitHours,
     folderBackupSupported: folderBackupSupported, chooseBackupFolder: chooseBackupFolder,
     backupFolderNeedsPermission: backupFolderNeedsPermission, regrantBackupPermission: regrantBackupPermission,
     removeBackupFolder: removeBackupFolder, daysSinceExport: daysSinceExport,

@@ -70,7 +70,7 @@
 
   /* ================= App-Start ================= */
 
-  var APP_VERSION = '0.38.0';
+  var APP_VERSION = '0.39.0';
 
   /* ---------- PWA-Installation ----------
      Chrome/Edge/Android liefern `beforeinstallprompt`: Event abfangen und
@@ -312,6 +312,25 @@
         go('helpPage', { chapter: 'start-installation', back: { name: 'home', params: {} } });
       }
     });
+  }
+
+  /* Bestandsnutzer haben noch keinen Schlüssel – ein dezenter, ausblendbarer
+     Hinweis holt das nach. Ohne ihn hilft bei vergessener PIN nur ein Backup. */
+  function recoveryMissingBanner() {
+    if (!Store.isEncrypted() || Store.hasRecoveryKey()) return null;
+    var st = S();
+    if (st.settings && st.settings.recoveryHintDismissed) return null;
+    if (Store.isDemo()) return null;
+    return h('div.card.card-tight.install-banner',
+      h('p.hint', {}, 'Empfehlung: Legen Sie einen Wiederherstellungsschlüssel an. Er öffnet die App, falls Sie ' +
+        (Store.secretKind() === 'password' ? 'Ihr Passwort' : 'Ihre PIN') + ' einmal vergessen – ohne ihn hilft dann nur noch eine Backup-Datei.'),
+      h('div.row-gap',
+        h('button.btn-small.btn-primary', { onclick: function () { newRecoveryKeyFlow(); } }, 'Schlüssel erzeugen'),
+        h('button.btn-small.btn-plain', { onclick: function () {
+          st.settings.recoveryHintDismissed = true;
+          Store.save();
+          render();
+        } }, 'Nicht mehr anzeigen')));
   }
 
   /* Dezente, ausblendbare Einladung auf dem Startbildschirm. */
@@ -1157,31 +1176,80 @@
       });
     }
 
+    /* „PIN vergessen?“ – erste Option ist immer der Wiederherstellungs-
+       schlüssel; das Zurücksetzen bleibt der letzte Ausweg. */
     function forgotPin() {
-      UI.modal(kind === 'password' ? 'Passwort vergessen?' : 'PIN vergessen?',
-        h('div', {},
-          h('p', {}, 'Ohne ' + (kind === 'password' ? 'Passwort' : 'PIN') + ' können die verschlüsselten Daten auf diesem Gerät nicht wiederhergestellt werden – es gibt bewusst keine Hintertür.'),
-          h('p', {}, 'Der Weg zurück: App zurücksetzen und anschließend Ihre Backup-Datei einspielen (Passwort der Backup-Datei bzw. bei automatischen Ordner-Backups die damalige PIN bzw. das damalige Passwort erforderlich).'),
-          h('p.error-text', {}, 'Das Zurücksetzen löscht alle Daten auf diesem Gerät unwiderruflich.')
-        ), [
-          { label: 'Abbrechen', value: false },
-          { label: 'App zurücksetzen …', value: true, danger: true }
-        ]).then(function (ok) {
-          if (!ok) return;
-          var confirmInput = h('input.input', { type: 'text', placeholder: 'LÖSCHEN' });
-          UI.modal('Wirklich alle Daten löschen?',
-            [h('p', {}, 'Bitte tippen Sie zur Bestätigung das Wort LÖSCHEN ein.'), confirmInput],
-            [
-              { label: 'Abbrechen', value: false },
-              { label: 'Endgültig löschen', value: true, danger: true,
-                validate: function () { return confirmInput.value.trim() === 'LÖSCHEN'; } }
-            ]).then(function (yes) {
-              if (!yes) return;
-              Store.factoryReset().then(function () {
-                toast('App wurde zurückgesetzt.');
-                go('setup');
+      var word = kind === 'password' ? 'Passwort' : 'PIN';
+      var hasKey = Store.hasRecoveryKey();
+      var body = [
+        h('p', {}, 'Ohne ' + word + ' können die verschlüsselten Daten auf diesem Gerät nicht gelesen werden – es gibt bewusst keine Hintertür.'),
+        hasKey
+          ? h('p', {}, 'Für dieses Gerät ist ein ', h('strong', {}, 'Wiederherstellungsschlüssel'),
+              ' hinterlegt. Mit ihm kommen Sie sofort wieder hinein, und ', h('strong', {}, 'alle Daten bleiben erhalten'), '.')
+          : h('p', {}, 'Für dieses Gerät ist kein Wiederherstellungsschlüssel hinterlegt. Es bleibt nur das Zurücksetzen und anschließend das Einspielen einer Backup-Datei.'),
+        h('p.hint', {}, 'Das Zurücksetzen löscht alle Daten auf diesem Gerät unwiderruflich und wird erst nach ' +
+          Store.resetWaitHours() + ' Stunden ausgeführt.')
+      ];
+      var buttons = [{ label: 'Abbrechen', value: false }];
+      if (hasKey) buttons.push({ label: 'Schlüssel eingeben', value: 'key', primary: true });
+      buttons.push({ label: 'App zurücksetzen …', value: 'reset', danger: true });
+
+      UI.modal(word + ' vergessen?', body, buttons).then(function (choice) {
+        if (choice === 'key') recoveryUnlockFlow();
+        else if (choice === 'reset') resetFlow(function () { renderLock(); });
+      });
+    }
+
+    /* Entsperren per Wiederherstellungsschlüssel; danach wird direkt ein
+       neuer Zugang festgelegt – die vergessene PIN nützt ja niemandem. */
+    function recoveryUnlockFlow() {
+      var input = h('textarea.input.recovery-input', { autocomplete: 'off', spellcheck: 'false',
+        placeholder: 'ABCDEF-GHJKMN-PQRSTV-WXYZ01' });
+      var err = h('p.hint.error-text');
+      UI.modal('Wiederherstellungsschlüssel eingeben', [
+        h('p', {}, 'Bitte tragen Sie den Schlüssel ein, den Sie bei der Einrichtung notiert oder ausgedruckt haben. Groß- und Kleinschreibung sowie Bindestriche spielen keine Rolle.'),
+        h('label.field', {}, input),
+        err
+      ], [
+        { label: 'Abbrechen', value: false },
+        { label: 'Entsperren', value: true, primary: true, validate: function () {
+            if (CryptoBox.normalizeRecoveryKey(input.value).length === CryptoBox.recoveryLength()) return true;
+            err.textContent = 'Der Schlüssel besteht aus ' + CryptoBox.recoveryLength() + ' Zeichen. Bitte vollständig eintragen.';
+            return false;
+          } }
+      ]).then(function (ok) {
+        if (!ok) return;
+        Store.unlockWithRecovery(input.value).then(function () {
+          UI.modal('Entsperrt', [
+            h('p', {}, 'Der Schlüssel war korrekt – alle Daten sind unverändert vorhanden.'),
+            h('p', {}, 'Legen Sie jetzt einen neuen Zugang fest. Der bisherige ' +
+              (kind === 'password' ? 'Passwortzugang' : 'PIN-Zugang') + ' wird dabei ersetzt.')
+          ], [{ label: 'Weiter', value: true, primary: true }], { mandatory: true })
+            .then(newSecretAfterRecovery);
+        }).catch(function (e) {
+          UI.modal('Nicht entsperrt', h('p', {}, e.message));
+        });
+      });
+    }
+
+    function newSecretAfterRecovery() {
+      var pins = secretInputPair(['Neu festlegen', 'Wiederholen']);
+      UI.modal('Neuen Zugang festlegen',
+        [h('p.hint', {}, 'Die App fragt diese Eingabe künftig beim Start ab.')].concat(pins.nodes),
+        [{ label: 'Festlegen', value: true, primary: true, validate: pins.validate }],
+        { mandatory: true }).then(function () {
+          Store.setSecretFromMaster(pins.value(), pins.kind()).then(function () {
+            /* Der benutzte Schlüssel ist jetzt bekanntermaßen im Umlauf
+               (Zettel, Datei, Zwischenablage) – deshalb gleich ein frischer. */
+            return Store.createRecoveryKey(pins.value()).then(function (key) {
+              showRecoveryKeyFlow(key, function () {
+                toast('Neuer Zugang und neuer Wiederherstellungsschlüssel sind aktiv.');
+                go('home');
               });
             });
+          }).catch(function (e) {
+            UI.modal('Fehler', h('p', {}, e.message)).then(function () { go('home'); });
+          });
         });
     }
 
@@ -1252,6 +1320,8 @@
           container.appendChild(h('p.hint.lock-kbd-hint', {}, 'Am Computer können Sie die PIN auch über die Tastatur eingeben (Enter bestätigt).'));
         }
       }
+      var pending = resetPendingBanner(function () { renderLock(); });
+      if (pending) container.appendChild(pending);
       container.appendChild(h('button.btn-plain.btn-small.lock-forgot', { onclick: forgotPin },
         kind === 'password' ? 'Passwort vergessen?' : 'PIN vergessen?'));
     }
@@ -1436,6 +1506,8 @@
       header('SOL-Noten', null),
       backupBanner(),
       folderPermissionBanner(),
+      resetPendingBanner(),
+      recoveryMissingBanner(),
       installBanner(),
       h('div.row-between',
         h('label.year-label', {}, 'Schuljahr ', yearSel),
@@ -3513,6 +3585,8 @@
       'body{padding:6mm;}' +
       '.print-page h2{margin:0 0 2mm;}' +
       '.print-sub{margin:0 0 3mm;color:#333;}' +
+      '.recovery-key-print{font-family:ui-monospace,Consolas,monospace;font-size:15pt;font-weight:700;' +
+        'letter-spacing:0.1em;border:1px dashed #333;padding:4mm;margin:4mm 0;text-align:center;}' +
       '.grades-table{font-size:6.5pt;width:100%;border-collapse:collapse;}' +
       '.report-table{font-size:8.5pt;width:100%;border-collapse:collapse;}' +
       '.grades-table th,.grades-table td,.report-table th,.report-table td{' +
@@ -6442,8 +6516,268 @@
     });
   }
 
-  /* Pflicht-PIN in der Ersteinrichtung: erklärt die Verschlüsselung, keine
-     Abbruchmöglichkeit; Backup wird nur empfohlen (Datenbank noch leer). */
+  /* ================= App zurücksetzen ================= *
+     Zwei Stufen: erst das Wort LÖSCHEN, dann die Berechtigung. Wer den
+     Wiederherstellungsschlüssel hat, darf sofort – er könnte die App ohnehin
+     öffnen. Alle anderen lösen eine Vormerkung aus, die erst nach 24 Stunden
+     ausführbar ist und bis dahin auf jeder Seite sichtbar und mit einem Klick
+     abbrechbar bleibt. Damit läuft der spontane Zugriff auf ein kurz
+     unbeaufsichtigtes Gerät ins Leere. */
+  function performReset() {
+    Store.factoryReset().then(function () {
+      toast('App wurde zurückgesetzt.');
+      go('setup');
+    });
+  }
+
+  function fmtDateTime(ms) {
+    var d = new Date(ms);
+    var p = function (n) { return (n < 10 ? '0' : '') + n; };
+    return p(d.getDate()) + '.' + p(d.getMonth() + 1) + '.' + d.getFullYear() +
+      ', ' + p(d.getHours()) + ':' + p(d.getMinutes()) + ' Uhr';
+  }
+
+  function resetFlow(onCancel) {
+    var confirmInput = h('input.input', { type: 'text', autocomplete: 'off', placeholder: 'LÖSCHEN' });
+    UI.modal('Wirklich alle Daten löschen?', [
+      h('p', {}, 'Alle Schuljahre, Klassen, Noten und Fotos auf diesem Gerät werden unwiderruflich gelöscht. Backup-Dateien außerhalb der App bleiben erhalten.'),
+      h('p', {}, 'Bitte tippen Sie zur Bestätigung das Wort LÖSCHEN ein:'),
+      h('label.field', {}, confirmInput)
+    ], [
+      { label: 'Abbrechen', value: false },
+      { label: 'Weiter', value: true, danger: true,
+        validate: function () { return confirmInput.value.trim().toUpperCase() === 'LÖSCHEN'; } }
+    ]).then(function (ok) {
+      if (!ok) { if (onCancel) onCancel(); return; }
+      /* Ohne aktive Verschlüsselung gibt es nichts zu schützen – dann sofort. */
+      if (!Store.isEncrypted()) { performReset(); return; }
+      secondFactor();
+    });
+
+    function secondFactor() {
+      var hasKey = Store.hasRecoveryKey();
+      var body = [
+        h('p', {}, 'Zum Schutz vor versehentlichem oder fremdem Löschen ist eine zweite Bestätigung nötig.'),
+        hasKey
+          ? h('p', {}, 'Mit dem ', h('strong', {}, 'Wiederherstellungsschlüssel'), ' wird sofort zurückgesetzt. ' +
+              'Ohne ihn wird das Zurücksetzen für ' + Store.resetWaitHours() + ' Stunden vorgemerkt.')
+          : h('p', {}, 'Für dieses Gerät ist kein Wiederherstellungsschlüssel hinterlegt. Das Zurücksetzen wird deshalb für ' +
+              Store.resetWaitHours() + ' Stunden vorgemerkt.'),
+        h('p.hint', {}, 'Die Vormerkung ist auf jeder Seite sichtbar und lässt sich jederzeit abbrechen. Wenn Sie diese Meldung sehen, ohne sie ausgelöst zu haben, brechen Sie sie bitte ab und ändern Sie Ihre ' +
+          (Store.secretKind() === 'password' ? 'Passwort-Eingabe' : 'PIN') + '.')
+      ];
+      var buttons = [{ label: 'Abbrechen', value: false }];
+      if (hasKey) buttons.push({ label: 'Schlüssel eingeben', value: 'key' });
+      buttons.push({ label: Store.resetWaitHours() + ' Stunden vormerken', value: 'wait', danger: true });
+
+      UI.modal('Zurücksetzen bestätigen', body, buttons).then(function (choice) {
+        if (choice === 'wait') {
+          Store.resetRequest().then(function (at) {
+            UI.modal('Zurücksetzen vorgemerkt', [
+              h('p', {}, 'Das Zurücksetzen ist ab ', h('strong', {}, fmtDateTime(at)), ' ausführbar.'),
+              h('p', {}, 'Bis dahin können Sie es jederzeit abbrechen – der Hinweis dazu erscheint auf dem Sperrbildschirm und auf der Startseite.')
+            ], [{ label: 'Verstanden', value: true, primary: true }]).then(function () {
+              if (onCancel) onCancel();
+              render();
+            });
+          });
+          return;
+        }
+        if (choice === 'key') {
+          var input = h('textarea.input.recovery-input', { autocomplete: 'off', spellcheck: 'false',
+            placeholder: 'ABCDEF-GHJKMN-PQRSTV-WXYZ01' });
+          var err = h('p.hint.error-text');
+          UI.modal('Wiederherstellungsschlüssel eingeben', [
+            h('p', {}, 'Mit dem Schlüssel wird sofort zurückgesetzt.'),
+            h('label.field', {}, input),
+            err
+          ], [
+            { label: 'Abbrechen', value: false },
+            { label: 'Endgültig löschen', value: true, danger: true, validate: function () {
+                if (CryptoBox.normalizeRecoveryKey(input.value).length === CryptoBox.recoveryLength()) return true;
+                err.textContent = 'Der Schlüssel besteht aus ' + CryptoBox.recoveryLength() + ' Zeichen.';
+                return false;
+              } }
+          ]).then(function (proceed) {
+            if (!proceed) { if (onCancel) onCancel(); return; }
+            Store.verifyRecoveryKey(input.value).then(function (valid) {
+              if (valid) performReset();
+              else UI.modal('Nicht zurückgesetzt', h('p', {}, 'Der Wiederherstellungsschlüssel ist nicht korrekt.'))
+                .then(function () { if (onCancel) onCancel(); });
+            });
+          });
+          return;
+        }
+        if (onCancel) onCancel();
+      });
+    }
+  }
+
+  /* Hinweisband für ein vorgemerktes Zurücksetzen – auf Sperrbildschirm und
+     Startseite, damit eine fremd ausgelöste Vormerkung nicht unbemerkt bleibt. */
+  function resetPendingBanner(onChange) {
+    var at = Store.resetPendingAt();
+    if (!at) return null;
+    var due = Store.resetDue();
+    return h('div.card.card-tight.reset-pending',
+      h('strong', {}, due ? 'Zurücksetzen ist jetzt ausführbar' : 'Zurücksetzen vorgemerkt'),
+      h('p.hint', {}, due
+        ? 'Alle Daten auf diesem Gerät werden gelöscht, sobald Sie es bestätigen.'
+        : 'Ausführbar ab ' + fmtDateTime(at) + '. Falls Sie das nicht selbst veranlasst haben, brechen Sie es bitte ab.'),
+      h('div.row-gap',
+        h('button.btn-small.btn-primary', { onclick: function () {
+          Store.resetCancel().then(function () {
+            toast('Zurücksetzen abgebrochen.');
+            if (onChange) onChange(); else render();
+          });
+        } }, 'Abbrechen'),
+        due
+          ? h('button.btn-small.btn-plain.danger-text', { onclick: function () {
+              UI.confirmDialog('Jetzt zurücksetzen?',
+                'Alle Daten auf diesem Gerät werden unwiderruflich gelöscht.',
+                'Endgültig löschen', true).then(function (ok) { if (ok) performReset(); });
+            } }, 'Jetzt zurücksetzen')
+          : null));
+  }
+
+  /* ================= Wiederherstellungsschlüssel ================= */
+
+  /* Textdatei ablegen (nicht JSON – der Schlüssel soll lesbar bleiben). */
+  function saveTextFile(name, text) {
+    var blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+    var a = h('a', { href: URL.createObjectURL(blob), download: name });
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 500);
+  }
+
+  function recoveryPlainText(key) {
+    return 'SOL-Noten – Wiederherstellungsschlüssel\r\n' +
+      'Erstellt am ' + UI.fmtDate(Store.todayISO()) + '\r\n\r\n' +
+      key + '\r\n\r\n' +
+      'Mit diesem Schlüssel lässt sich SOL-Noten auf diesem Gerät auch dann öffnen,\r\n' +
+      'wenn PIN oder Passwort vergessen wurden. Alle Daten bleiben dabei erhalten.\r\n' +
+      'Bewahren Sie ihn getrennt vom Gerät auf – wer ihn hat, kommt an die Daten.\r\n';
+  }
+
+  function printRecoveryKey(key) {
+    printNode(h('div',
+      h('h2', {}, 'SOL-Noten – Wiederherstellungsschlüssel'),
+      h('p.print-sub', {}, 'Erstellt am ' + UI.fmtDate(Store.todayISO())),
+      h('p.recovery-key-print', {}, key),
+      h('p', {}, 'Mit diesem Schlüssel lässt sich SOL-Noten auf diesem Gerät auch dann öffnen, wenn PIN oder Passwort vergessen wurden. Alle Daten bleiben dabei erhalten.'),
+      h('p', {}, 'Bewahren Sie dieses Blatt getrennt vom Gerät auf – wer den Schlüssel hat, kommt an die Daten.'),
+      h('p', {}, 'Aufbewahrungsort: ______________________________________')
+    ), false, 'Wiederherstellungsschlüssel');
+  }
+
+  /* Zeigt den Schlüssel und lässt ihn anschließend stichprobenartig
+     bestätigen. Die Kontrolle ist die eigentliche Absicherung: Wer sie nicht
+     beantworten kann, hat den Schlüssel nicht wirklich notiert. Der Weg
+     zurück zur Anzeige bleibt bewusst offen – die Frage soll erinnern,
+     nicht aussperren. */
+  function showRecoveryKeyFlow(key, onDone) {
+    var groups = key.split('-');
+    /* Zwei verschiedene Gruppen, zufällig gewählt. */
+    var i1 = Math.floor(Math.random() * groups.length);
+    var i2 = (i1 + 1 + Math.floor(Math.random() * (groups.length - 1))) % groups.length;
+    if (i2 < i1) { var t = i1; i1 = i2; i2 = t; }
+
+    function showKey() {
+      var copyMsg = h('p.hint');
+      UI.modal('Wiederherstellungsschlüssel', [
+        h('p', {}, 'Dieser Schlüssel ist Ihr Ersatzweg in die App, falls Sie ' +
+          (Store.secretKind() === 'password' ? 'Ihr Passwort' : 'Ihre PIN') + ' einmal vergessen. ' +
+          'Damit bleiben alle Daten erhalten – ohne ihn hilft nur noch ein Backup.'),
+        h('p.recovery-key', {}, key),
+        h('div.row-gap.recovery-actions',
+          h('button.btn-small.btn-plain', { onclick: function () { printRecoveryKey(key); } }, 'Drucken'),
+          h('button.btn-small.btn-plain', { onclick: function () {
+            saveTextFile('SOL-Noten-Wiederherstellungsschluessel.txt', recoveryPlainText(key));
+          } }, 'Als Datei speichern'),
+          h('button.btn-small.btn-plain', { onclick: function () {
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+              navigator.clipboard.writeText(key).then(function () {
+                copyMsg.textContent = 'Schlüssel in die Zwischenablage kopiert.';
+              }).catch(function () {
+                copyMsg.textContent = 'Kopieren hat nicht geklappt – bitte abschreiben oder drucken.';
+              });
+            } else {
+              copyMsg.textContent = 'Kopieren ist in diesem Browser nicht möglich – bitte abschreiben oder drucken.';
+            }
+          } }, 'Kopieren')),
+        copyMsg,
+        h('p.help-warn', {}, 'Bewahren Sie den Schlüssel getrennt vom Gerät auf – etwa ausgedruckt zu Hause oder in einem Passwort-Manager. Wer ihn hat, kommt an die Daten.'),
+        h('p.hint', {}, 'Der Schlüssel wird nur jetzt angezeigt. Später lässt sich lediglich ein neuer erzeugen; der alte wird dabei ungültig.')
+      ], [{ label: 'Weiter zur Kontrolle', value: true, primary: true }], { mandatory: true })
+        .then(askCheck);
+    }
+
+    function askCheck() {
+      var in1 = h('input.input.recovery-group', { type: 'text', autocomplete: 'off', spellcheck: 'false', placeholder: '6 Zeichen' });
+      var in2 = h('input.input.recovery-group', { type: 'text', autocomplete: 'off', spellcheck: 'false', placeholder: '6 Zeichen' });
+      var err = h('p.hint.error-text');
+      function group(el) { return CryptoBox.normalizeRecoveryKey(el.value); }
+      UI.modal('Kontrolle: Haben Sie den Schlüssel notiert?', [
+        h('p', {}, 'Bitte tragen Sie zwei Abschnitte aus Ihrer Notiz ein. So ist sichergestellt, dass der Schlüssel wirklich gesichert ist.'),
+        h('label.field', h('span.field-label', {}, (i1 + 1) + '. Abschnitt'), in1),
+        h('label.field', h('span.field-label', {}, (i2 + 1) + '. Abschnitt'), in2),
+        err
+      ], [
+        { label: 'Schlüssel noch einmal anzeigen', value: 'back' },
+        { label: 'Bestätigen', value: 'ok', primary: true, validate: function () {
+            if (group(in1) === groups[i1] && group(in2) === groups[i2]) return true;
+            err.textContent = 'Mindestens ein Abschnitt stimmt nicht. Bitte prüfen – oder den Schlüssel noch einmal anzeigen lassen.';
+            return false;
+          } }
+      ], { mandatory: true }).then(function (v) {
+        if (v === 'back') showKey();
+        else if (onDone) onDone();
+      });
+    }
+
+    showKey();
+  }
+
+  /* Neuen Schlüssel erzeugen – immer mit PIN-/Passwortbestätigung. */
+  function newRecoveryKeyFlow(onDone) {
+    var isPw = Store.secretKind() === 'password';
+    var had = Store.hasRecoveryKey();
+    var secret = h('input.input', { type: 'password', autocomplete: 'current-password',
+      inputmode: isPw ? null : 'numeric', placeholder: isPw ? 'Passwort' : 'PIN' });
+    var err = h('p.hint.error-text');
+    UI.modal(had ? 'Neuen Wiederherstellungsschlüssel erzeugen' : 'Wiederherstellungsschlüssel erzeugen', [
+      had
+        ? h('p.help-warn', {}, 'Der bisherige Schlüssel wird dabei ungültig. Notieren Sie den neuen Schlüssel und vernichten Sie die alte Notiz.')
+        : h('p', {}, 'Der Schlüssel öffnet die App, falls Sie ' + (isPw ? 'Ihr Passwort' : 'Ihre PIN') + ' vergessen – alle Daten bleiben dabei erhalten.'),
+      h('p', {}, 'Bitte bestätigen Sie zunächst mit ' + (isPw ? 'Ihrem Passwort' : 'Ihrer PIN') + '.'),
+      h('label.field', h('span.field-label', {}, isPw ? 'Passwort' : 'PIN'), secret),
+      err
+    ], [
+      { label: 'Abbrechen', value: false },
+      { label: 'Erzeugen', value: true, primary: true,
+        validate: function () {
+          if (secret.value) return true;
+          err.textContent = isPw ? 'Bitte geben Sie Ihr Passwort ein.' : 'Bitte geben Sie Ihre PIN ein.';
+          return false;
+        } }
+    ]).then(function (ok) {
+      if (!ok) { if (onDone) onDone(false); return; }
+      Store.createRecoveryKey(secret.value).then(function (key) {
+        showRecoveryKeyFlow(key, function () {
+          toast('Wiederherstellungsschlüssel gespeichert.');
+          if (onDone) onDone(true);
+          render();
+        });
+      }).catch(function (e) {
+        UI.modal('Nicht erzeugt', h('p', {}, /Falsche PIN/.test(e.message || '')
+          ? (isPw ? 'Das Passwort ist nicht korrekt.' : 'Die PIN ist nicht korrekt.')
+          : e.message)).then(function () { if (onDone) onDone(false); });
+      });
+    });
+  }
+
+
   function requirePinSetup(onDone) {
     if (Store.isEncrypted()) { if (onDone) onDone(); return; }
     if (!CryptoBox.supported()) {
@@ -6469,8 +6803,16 @@
             h('strong', {}, 'Backup-Empfehlung:'),
             h('br'),
             'Sobald Sie Schüler/innen und Noten erfasst haben, sichern Sie Ihre Daten über „Einstellungen → Backup-Datei jetzt speichern“. Diese Backups sind ebenfalls verschlüsselt. Sichern Sie die Backup-Dateien regelmäßig, beispielsweise auf einem externen Datenträger.')
-        ], [{ label: 'Verstanden', value: true, primary: true }]).then(function () {
-          if (onDone) onDone();
+        ], [{ label: 'Weiter', value: true, primary: true }], { mandatory: true }).then(function () {
+          /* Direkt im Anschluss den Wiederherstellungsschlüssel – er ist nur
+             dann etwas wert, wenn er vor dem ersten Datensatz entsteht. */
+          Store.createRecoveryKey(pins.value()).then(function (key) {
+            showRecoveryKeyFlow(key, function () { if (onDone) onDone(); });
+          }).catch(function () {
+            /* Schlüssel nicht erzeugbar: Einrichtung darf trotzdem weitergehen,
+               die Einstellungen bieten ihn später erneut an. */
+            if (onDone) onDone();
+          });
         });
       }).catch(function (e) {
         UI.modal('Aktivierung fehlgeschlagen', h('p', {}, e.message)).then(function () {
@@ -6548,7 +6890,9 @@
           if (!ok) return;
           Store.enableEncryption(pins.value(), pins.kind()).then(function () {
             toast('Verschlüsselung ist aktiv. Die App fragt ' + (pins.kind() === 'password' ? 'das Passwort' : 'die PIN') + ' künftig beim Start ab.');
-            render();
+            return Store.createRecoveryKey(pins.value()).then(function (key) {
+              showRecoveryKeyFlow(key, render);
+            }).catch(function () { render(); });
           }).catch(function (e) {
             UI.modal('Aktivierung fehlgeschlagen', h('p', {}, e.message));
           });
@@ -6650,12 +6994,25 @@
       Store.setAutolock(v);
       toast('Automatische Sperre: ' + lockSel.options[lockSel.selectedIndex].text + '.');
     });
+    var recoveryLine = Store.hasRecoveryKey()
+      ? h('p.hint', {}, 'Wiederherstellungsschlüssel: vorhanden' +
+          (Store.recoveryCreatedAt() ? ' (erstellt am ' + UI.fmtDate(String(Store.recoveryCreatedAt()).slice(0, 10)) + ')' : '') +
+          '. Ein neuer Schlüssel macht den bisherigen ungültig – sinnvoll, wenn die Notiz verloren ging oder in fremde Hände geraten sein könnte.')
+      : h('p.hint.warn-text', {}, 'Es ist kein Wiederherstellungsschlüssel hinterlegt. Ohne ihn sind die Daten bei vergessener ' +
+          (Store.secretKind() === 'password' ? 'Passworteingabe' : 'PIN') + ' nur über eine Backup-Datei zu retten.');
+
     return h('div.actions-col',
       h('p.hint', {}, 'Verschlüsselung ist aktiv (AES-256). Automatische Ordner-Backups werden mit dem Hauptschlüssel verschlüsselt und lassen sich mit ' + (Store.secretKind() === 'password' ? 'Ihrem Passwort' : 'Ihrer PIN') + ' wiederherstellen; manuelle Backups behalten ihr eigenes Passwort.'),
       biometricRow(),
       h('label.field', h('span.field-label', {}, 'Automatische Sperre bei Inaktivität'), lockSel),
       h('button.btn-plain.btn-block', { onclick: doLock }, 'Jetzt sperren'),
-      h('button.btn-plain.btn-block', { onclick: changePinFlow }, 'PIN / Passwort ändern')
+      h('button.btn-plain.btn-block', { onclick: changePinFlow }, 'PIN / Passwort ändern'),
+      recoveryLine,
+      h('button.btn-plain.btn-block', { onclick: function () { newRecoveryKeyFlow(); } },
+        Store.hasRecoveryKey() ? 'Neuen Wiederherstellungsschlüssel erzeugen …' : 'Wiederherstellungsschlüssel erzeugen …'),
+      h('div.danger-zone',
+        h('p.hint', {}, 'Gefahrenbereich'),
+        h('button.btn-plain.btn-block.danger-text', { onclick: function () { resetFlow(); } }, 'App zurücksetzen …'))
     );
   }
 

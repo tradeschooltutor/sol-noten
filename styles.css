@@ -354,6 +354,39 @@ textarea.input.note-area {
 @media (max-width: 480px) { .plan-select { max-width: 8.5rem; } }
 .plan-bar .row-gap { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 
+/* ---------- Wiederherstellungsschlüssel & Zurücksetzen ---------- */
+/* Der Schlüssel muss fehlerfrei abschreibbar sein: Festbreitenschrift,
+   großzügiger Zeichenabstand, Umbruch nur an den Bindestrichen. */
+.recovery-key {
+  font-family: ui-monospace, "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 1.15rem; font-weight: 700; letter-spacing: 0.08em;
+  text-align: center; word-break: break-all; line-height: 1.6;
+  background: var(--teal-soft); color: var(--teal-dark);
+  border: 1px dashed var(--teal); border-radius: 10px;
+  padding: 12px 10px; margin: 10px 0; user-select: all;
+}
+.recovery-key-print {
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 15pt; font-weight: 700; letter-spacing: 0.1em;
+  border: 1px dashed #333; padding: 4mm; margin: 4mm 0; text-align: center;
+}
+.recovery-actions { flex-wrap: wrap; }
+textarea.input.recovery-input {
+  font-family: ui-monospace, Consolas, monospace;
+  letter-spacing: 0.08em; text-transform: uppercase;
+  min-height: 64px; width: 100%; resize: vertical;
+}
+.recovery-group {
+  font-family: ui-monospace, Consolas, monospace;
+  letter-spacing: 0.12em; text-transform: uppercase; max-width: 12rem;
+}
+.reset-pending {
+  border-left: 3px solid var(--red);
+  border-radius: 0 var(--radius) var(--radius) 0;
+  background: var(--red-soft);
+}
+.reset-pending strong { color: var(--red); }
+
 /* Demo-Modus: dauerhaft sichtbares Band auf jeder Seite */
 .demo-banner {
   background: var(--amber); color: #fff; border-radius: var(--radius);

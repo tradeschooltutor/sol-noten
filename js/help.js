@@ -37,6 +37,7 @@
     { term: 'Unentschuldigte Fehlzeit', def: 'Fehlen ohne Entschuldigung. In der App vergibt eine erfasste Fehlzeit automatisch 0 Punkte in allen fünf Kriterien des Tages.' },
     { term: 'PWA', def: 'Progressive Web App. Eine Webseite, die sich wie eine App installieren lässt: eigenes Symbol, eigenes Fenster, offline nutzbar. SOL-Noten ist eine solche App und braucht daher keinen App Store.' },
     { term: 'Backup', def: 'Verschlüsselte Sicherungsdatei aller Daten. Nur mit ihr lassen sich Daten auf ein anderes Gerät übertragen oder nach einem Geräteverlust wiederherstellen.' },
+    { term: 'Wiederherstellungsschlüssel', def: 'Eine 24-stellige Zeichenfolge, die bei der Einrichtung erzeugt wird und dieselben Daten öffnet wie PIN oder Passwort. Sie ist der Ersatzweg in die App, wenn der normale Zugang vergessen wurde – notiert oder ausgedruckt, getrennt vom Gerät aufbewahrt. Die App zeigt ihn nur einmal an; später lässt sich nur ein neuer erzeugen, der den alten ungültig macht.' },
     { term: 'Verschlüsselung', def: 'Umwandlung der Daten in eine unlesbare Form, die sich nur mit dem richtigen Passwort zurückrechnen lässt. SOL-Noten verschlüsselt alle Daten im Gerätespeicher und in Backups.' },
     { term: 'Demo-Modus', def: 'Vorführmodus mit erfundenen Klassen und Bewertungen. Die echten Daten bleiben währenddessen unangetastet und sind nach dem Beenden sofort wieder da.' },
     { term: 'Lernmanagementsystem', def: 'Digitale Lernplattform der Schule, etwa Moodle, Logineo, Teams oder OneNote.' }
@@ -107,8 +108,9 @@
           title: 'Verschlüsselung, PIN/Passwort und eine wichtige Warnung',
           body: [
             { t: 'p', v: 'SOL-Noten speichert alle Daten {{Verschlüsselung|verschlüsselt}} – also in einer Form, die ohne Ihr Passwort unlesbar ist. Der Vorteil: Selbst wenn Ihr Gerät verloren geht oder in fremde Hände gerät, sind Namen und Noten geschützt. Ihre PIN oder Ihr Passwort ist dabei der einzige Schlüssel; er wird nirgends gespeichert, sondern bei jedem Entsperren aus Ihrer Eingabe neu berechnet. Ausführlich beschreibt das die [[help:ds-verschluesselung|Datenschutz-Kurzinformation]].' },
-            { t: 'warn', v: 'Wenn Sie PIN oder Passwort vergessen, sind Ihre Daten endgültig verloren. Es gibt keine Wiederherstellung – auch nicht durch den Entwickler. Das ist kein Versäumnis, sondern die Kehrseite echter {{Verschlüsselung}}: Ohne Passwort existiert kein Schlüssel zu den Daten.' },
-            { t: 'p', v: 'Zwei Empfehlungen daraus: Notieren Sie das Passwort an einem sicheren Ort außerhalb des Geräts, und erstellen Sie regelmäßig ein {{Backup}}. Ein Backup schützt zugleich gegen Geräteverlust, Defekt und versehentliches Löschen.' }
+            { t: 'warn', v: 'Wenn Sie PIN oder Passwort vergessen **und** den Wiederherstellungsschlüssel nicht mehr haben, sind Ihre Daten endgültig verloren. Es gibt keine Hintertür – auch nicht für den Entwickler. Das ist kein Versäumnis, sondern die Kehrseite echter {{Verschlüsselung}}: Ohne Schlüssel existiert kein Weg zu den Daten.' },
+            { t: 'p', v: 'Deshalb erzeugt die App direkt bei der Einrichtung einen {{Wiederherstellungsschlüssel}} – eine 24-stellige Zeichenfolge, die dieselben Daten öffnet. Sie wird **nur einmal** angezeigt; danach fragt die App zur Kontrolle zwei Abschnitte ab. Drucken Sie den Schlüssel aus oder notieren Sie ihn und bewahren Sie ihn getrennt vom Gerät auf – etwa zu Hause oder in einem Passwort-Manager. Wer ihn hat, kommt an die Daten.' },
+            { t: 'p', v: 'Drei Empfehlungen daraus: PIN bzw. Passwort außerhalb des Geräts notieren, den Wiederherstellungsschlüssel sicher verwahren und regelmäßig ein {{Backup}} anlegen. Ein Backup schützt zugleich gegen Geräteverlust, Defekt und versehentliches Löschen.' }
           ]
         },
         {
@@ -421,7 +423,23 @@
           title: 'Kann ich PIN oder Passwort ändern – und was, wenn ich es vergesse?',
           body: [
             { t: 'p', v: 'Ändern ja: Globale Einstellungen, Abschnitt „Zugangsschutz & Verschlüsselung“. Dort aktivieren Sie auch das Entsperren per Fingerabdruck oder Gesichtserkennung, sofern Ihr Gerät das unterstützt.' },
-            { t: 'warn', v: 'Vergessen bedeutet **endgültigen Datenverlust**. Es gibt keine Wiederherstellung, auch nicht durch den Entwickler – ohne Passwort existiert kein Schlüssel zu den {{Verschlüsselung|verschlüsselten}} Daten. Notieren Sie es außerhalb des Geräts und legen Sie regelmäßig ein {{Backup}} an.' }
+            { t: 'p', v: 'Vergessen ist kein Beinbruch, **solange Sie den {{Wiederherstellungsschlüssel}} haben**: Auf dem Sperrbildschirm tippen Sie „PIN vergessen?“ und dann „Schlüssel eingeben“. Die App öffnet sich, **alle Daten sind unverändert vorhanden**, und Sie legen anschließend einen neuen Zugang fest. Weil der benutzte Schlüssel damit im Umlauf ist (Zettel, Datei, Zwischenablage), erzeugt die App im selben Zug einen frischen.' },
+            { t: 'warn', v: 'Ohne PIN **und** ohne Wiederherstellungsschlüssel bedeutet Vergessen **endgültigen Datenverlust**. Es gibt keine Hintertür, auch nicht für den Entwickler – ohne Schlüssel existiert kein Weg zu den {{Verschlüsselung|verschlüsselten}} Daten. Dann hilft nur noch eine {{Backup|Backup-Datei}}.' },
+            { t: 'p', v: 'Einen neuen Schlüssel erzeugen Sie jederzeit in den [[app:settings|Globalen Einstellungen]] unter „Zugangsschutz & Verschlüsselung“ – auch dann, wenn schon einer existiert, etwa weil die alte Notiz verloren ging. Nötig ist dafür die Eingabe Ihrer PIN bzw. Ihres Passworts; der bisherige Schlüssel wird dabei ungültig.' }
+          ]
+        },
+        {
+          id: 'faq-reset',
+          title: 'Wie setze ich die App vollständig zurück?',
+          body: [
+            { t: 'p', v: 'Über die [[app:settings|Globalen Einstellungen]] („Zugangsschutz & Verschlüsselung“, Gefahrenbereich) oder – wenn Sie gar nicht mehr hineinkommen – auf dem Sperrbildschirm über „PIN vergessen?“. Das Zurücksetzen löscht alle Schuljahre, Klassen, Noten und Fotos auf diesem Gerät unwiderruflich. Backup-Dateien außerhalb der App bleiben erhalten.' },
+            { t: 'p', v: 'Der Ablauf ist bewusst zweistufig. Zuerst tippen Sie das Wort LÖSCHEN ein. Danach entscheidet sich, wie es weitergeht:' },
+            { t: 'ul', v: [
+              'Mit dem {{Wiederherstellungsschlüssel}} wird **sofort** zurückgesetzt – wer ihn hat, könnte die App ohnehin öffnen.',
+              'Ohne ihn wird das Zurücksetzen für **24 Stunden vorgemerkt**. In dieser Zeit erscheint auf dem Sperrbildschirm und auf der Startseite ein rotes Hinweisfeld, über das sich die Vormerkung mit einem Klick abbrechen lässt.'
+            ] },
+            { t: 'note', v: 'Die Wartezeit schützt vor einem naheliegenden Risiko: Ein unbeaufsichtigt liegendes Tablet ließe sich sonst in wenigen Sekunden leerräumen. Mit der Vormerkung fällt so ein Versuch auf, und ein Klick genügt, um ihn zu stoppen.' },
+            { t: 'warn', v: 'Sehen Sie den Hinweis „Zurücksetzen vorgemerkt“, ohne ihn selbst ausgelöst zu haben: Brechen Sie ab und ändern Sie anschließend Ihre PIN bzw. Ihr Passwort.' }
           ]
         },
         {
@@ -438,7 +456,7 @@
           body: [
             { t: 'p', v: 'Einzelne Kurse löschen Sie in den Kurs-Einstellungen im Gefahrenbereich, ganze Schuljahre in den Globalen Einstellungen unter „Schuljahre“. Beides verlangt eine bewusste Bestätigung – den Kursnamen beziehungsweise Ihr Passwort.' },
             { t: 'p', v: 'Vor dem Löschen eines Schuljahres empfiehlt sich ein Export: Die Notenübersichten lassen sich als Excel-Datei oder PDF archivieren.' },
-            { t: 'p', v: 'Das letzte verbliebene Schuljahr lässt sich nicht löschen. Wollen Sie ganz von vorn beginnen, hilft nur das vollständige Zurücksetzen der App – erreichbar auf dem Sperrbildschirm über „PIN vergessen?“ bzw. „Passwort vergessen?“. Dabei gehen alle Daten auf diesem Gerät unwiderruflich verloren.' }
+            { t: 'p', v: 'Das letzte verbliebene Schuljahr lässt sich nicht löschen. Wollen Sie ganz von vorn beginnen, hilft nur das vollständige Zurücksetzen der App – siehe [[help:faq-reset|das eigene Kapitel dazu]]. Dabei gehen alle Daten auf diesem Gerät unwiderruflich verloren.' }
           ]
         },
         {
@@ -515,7 +533,7 @@
           body: [
             { t: 'p', v: 'Alle Daten werden verschlüsselt gespeichert. Verschlüsseln bedeutet: Die Daten werden in eine unlesbare Form umgewandelt, die sich nur mit dem richtigen Passwort zurückrechnen lässt. Wer das Gerät in die Hand bekommt, sieht ohne Passwort also keine Namen und keine Noten.' },
             { t: 'p', v: 'Verwendet wird das Verfahren AES-256-GCM – derselbe Standard, den Banken und Behörden einsetzen. Das Passwort selbst wird nicht gespeichert; aus ihm wird der Schlüssel jedes Mal neu berechnet, und zwar absichtlich langsam (310.000 Rechenrunden), damit systematisches Durchprobieren aussichtslos wird.' },
-            { t: 'p', v: 'Auf Geräten mit Fingerabdruck- oder Gesichtserkennung kann das Entsperren zusätzlich darüber erfolgen.' }
+            { t: 'p', v: 'Auf Geräten mit Fingerabdruck- oder Gesichtserkennung kann das Entsperren zusätzlich darüber erfolgen. Ebenso öffnet der {{Wiederherstellungsschlüssel}} die Daten. Alle drei Wege führen zum selben Datenschlüssel; keiner von ihnen wird im Klartext gespeichert, sondern jeweils nur der damit verschlossene Datenschlüssel.' }
           ]
         },
         {

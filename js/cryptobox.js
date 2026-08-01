@@ -126,6 +126,52 @@
       obj.mode === 'pin-master' && obj.wrapped && obj.iv && obj.data);
   }
 
+  /* ---------- Wiederherstellungsschlüssel ---------- *
+   * Der Schlüssel ist ein zweites Geheimnis, mit dem derselbe Hauptschlüssel
+   * ein weiteres Mal verpackt wird (genau wie bei PIN und Biometrie). Er wird
+   * nirgends im Klartext gespeichert – nur der damit verpackte Hauptschlüssel.
+   * Alphabet ohne 0/O, 1/I/L: 32 Zeichen, also exakt 5 Bit je Zeichen und
+   * keine Verzerrung beim Ziehen aus einem Zufallsbyte (256 / 32 = 8).
+   * 24 Zeichen = 120 Bit – Erraten ist ausgeschlossen. */
+  /* Alphabet: Crockford-Base32 – ohne I, L, O und U. Genau 32 Zeichen, also
+     5 Bit je Zeichen und keine Verzerrung beim Ziehen aus einem Zufallsbyte
+     (256 / 32 = 8). 24 Zeichen = 120 Bit – Erraten ist ausgeschlossen. */
+  var RECOVERY_ALPHABET = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
+  var RECOVERY_LENGTH = 24;
+
+  function generateRecoveryKey() {
+    var bytes = randomBytes(RECOVERY_LENGTH);
+    var out = '';
+    for (var i = 0; i < RECOVERY_LENGTH; i++) {
+      out += RECOVERY_ALPHABET.charAt(bytes[i] % RECOVERY_ALPHABET.length);
+      if (i % 6 === 5 && i < RECOVERY_LENGTH - 1) out += '-';
+    }
+    return out;
+  }
+
+  /* Tolerant gegenüber Kleinschreibung, Leerzeichen und fehlenden bzw.
+     zusätzlichen Bindestrichen. Die typischen Verwechslungen werden nach
+     Crockford-Regel aufgelöst: O -> 0, I und L -> 1. */
+  function normalizeRecoveryKey(s) {
+    var up = String(s || '').toUpperCase();
+    var out = '';
+    for (var i = 0; i < up.length; i++) {
+      var c = up.charAt(i);
+      if (c === 'O') c = '0';
+      else if (c === 'I' || c === 'L') c = '1';
+      if (RECOVERY_ALPHABET.indexOf(c) > -1) out += c;
+    }
+    return out;
+  }
+
+  /* Anzeigeform mit Bindestrichen (für Wiederholung der Eingabe im Ausdruck). */
+  function formatRecoveryKey(s) {
+    var n = normalizeRecoveryKey(s);
+    return n.replace(/(.{6})(?=.)/g, '$1-');
+  }
+
+  function recoveryLength() { return RECOVERY_LENGTH; }
+
   /* ---------- Biometrie (WebAuthn) ---------- *
    * Prinzip: Wir erzeugen ein Passkey-Credential mit dem "prf"-Zusatz. Daraus
    * leitet das Gerät nach erfolgreicher biometrischer Prüfung ein stabiles
@@ -250,6 +296,10 @@
     generateMasterRaw: generateMasterRaw, importAesKey: importAesKey,
     encryptWithKey: encryptWithKey, decryptWithKey: decryptWithKey,
     wrapMaster: wrapMaster, unwrapMaster: unwrapMaster,
+    generateRecoveryKey: generateRecoveryKey,
+    normalizeRecoveryKey: normalizeRecoveryKey,
+    formatRecoveryKey: formatRecoveryKey,
+    recoveryLength: recoveryLength,
     biometricsSupported: biometricsSupported,
     platformAuthenticatorAvailable: platformAuthenticatorAvailable,
     bioRegister: bioRegister, bioGetSecretKey: bioGetSecretKey,
