@@ -70,7 +70,7 @@
 
   /* ================= App-Start ================= */
 
-  var APP_VERSION = '0.37.0';
+  var APP_VERSION = '0.38.0';
 
   /* ---------- PWA-Installation ----------
      Chrome/Edge/Android liefern `beforeinstallprompt`: Event abfangen und
@@ -199,24 +199,28 @@
      Getrennte Datenwelt: Der echte Zustand bleibt unangetastet liegen,
      die App arbeitet auf frisch erzeugten Beispieldaten. Beim Beenden
      wird die Demo restlos verworfen. */
+  /* Beenden des Demo-Modus – von zwei Stellen aus erreichbar: aus den
+     Globalen Einstellungen und direkt aus dem Demo-Band jeder Seite. */
+  function endDemoDialog() {
+    UI.confirmDialog('Demo-Modus beenden?',
+      'Die Beispieldaten werden verworfen und Ihre echten Daten wieder angezeigt.',
+      'Beenden').then(function (ok) {
+        if (!ok) return;
+        Store.endDemo().then(function () {
+          setActiveYear(null);
+          toast('Demo-Modus beendet – Ihre echten Daten sind wieder aktiv.');
+          go('home');
+        });
+      });
+  }
+
   function demoSection() {
     if (Store.isDemo()) {
       return h('div.actions-col',
         h('p.hint', {}, 'Der Demo-Modus ist aktiv. Alle sichtbaren Klassen, Kurse und Bewertungen sind erfunden. ' +
           'Ihre echten Daten sind unverändert gespeichert und werden beim Beenden wieder angezeigt. ' +
           'Änderungen in der Demo werden dabei verworfen.'),
-        h('button.btn-primary.btn-block', { onclick: function () {
-          UI.confirmDialog('Demo-Modus beenden?',
-            'Die Beispieldaten werden verworfen und Ihre echten Daten wieder angezeigt.',
-            'Beenden').then(function (ok) {
-              if (!ok) return;
-              Store.endDemo().then(function () {
-                setActiveYear(null);
-                toast('Demo-Modus beendet – Ihre echten Daten sind wieder aktiv.');
-                go('home');
-              });
-            });
-        } }, 'Demo-Modus beenden'));
+        h('button.btn-primary.btn-block', { onclick: endDemoDialog }, 'Demo-Modus beenden'));
     }
     return h('div.actions-col',
       h('p.hint', {}, 'Für Fortbildungen und Vorführungen: Die App zeigt dann zwei erfundene Klassen mit drei Kursen, ' +
@@ -256,6 +260,58 @@
         h('button.btn-primary.btn-block', { onclick: showIOSGuide }, 'Installations-Anleitung anzeigen'));
     }
     return installInstructions();
+  }
+
+  /* Wiederkehrende Erinnerung auf dem Startbildschirm, solange die App nicht
+     installiert ist. Takt: alle 3 Tage – bewusst kürzer als die etwa sieben
+     Tage, nach denen Safari die Daten nicht installierter Websites löscht.
+     In der installierten App erscheint sie nie. */
+  var INSTALL_REMIND_DAYS = 3;
+  var installOverlayChecked = false;
+
+  function daysSince(iso, todayISO) {
+    if (!iso) return Infinity;
+    var a = new Date(iso + 'T00:00:00');
+    var b = new Date(todayISO + 'T00:00:00');
+    if (isNaN(a) || isNaN(b)) return Infinity;
+    return Math.round((b - a) / 86400000);
+  }
+
+  function maybeShowInstallOverlay() {
+    if (installOverlayChecked) return;
+    installOverlayChecked = true;
+    if (isStandalone()) return;
+    /* Nur dort erinnern, wo eine Installation überhaupt möglich ist –
+       Firefox am PC kann es nicht und würde nur genervt werden. */
+    if (!deferredInstall && !isIOS()) return;
+    if (Store.isDemo()) return;
+    var st = S();
+    var today = Store.todayISO();
+    if (daysSince(st.settings.installRemindedAt, today) < INSTALL_REMIND_DAYS) return;
+    st.settings.installRemindedAt = today;
+    Store.save();
+
+    var body = [
+      h('p', {}, 'SOL-Noten läuft gerade im Browser. Als installierte App hätten Sie ein eigenes Symbol, ein eigenes Fenster ohne Browser-Leisten und könnten auch ohne Internetverbindung arbeiten.'),
+      isIOS()
+        ? h('p.warn-text', {}, 'Wichtig auf iPhone und iPad: Safari löscht die Daten nicht installierter Websites nach etwa sieben Tagen ohne Nutzung. Nach den Ferien könnten Ihre Noten also verschwunden sein.')
+        : h('p.hint', {}, 'Ihre bisherigen Eingaben bleiben bei der Installation erhalten.'),
+      h('p.hint', {}, 'Diese Erinnerung erscheint alle ' + INSTALL_REMIND_DAYS + ' Tage, bis die App installiert ist.')
+    ];
+
+    UI.modal('SOL-Noten als App installieren', body, [
+      { label: 'Später', value: 'later' },
+      { label: 'Mehr dazu', value: 'help' },
+      { label: deferredInstall ? 'App installieren' : 'Anleitung anzeigen', value: 'install', primary: true }
+    ]).then(function (choice) {
+      if (choice === 'install') {
+        if (deferredInstall) triggerInstall();
+        else if (isIOS()) showIOSGuide();
+        else UI.modal('SOL-Noten installieren', installInstructions(), [{ label: 'Schließen', value: true, primary: true }]);
+      } else if (choice === 'help') {
+        go('helpPage', { chapter: 'start-installation', back: { name: 'home', params: {} } });
+      }
+    });
   }
 
   /* Dezente, ausblendbare Einladung auf dem Startbildschirm. */
@@ -419,8 +475,10 @@
     try {
       var screen = view(route.params);
       if (Store.isDemo() && screen && screen.classList && screen.classList.contains('screen')) {
-        screen.insertBefore(h('div.demo-banner', {},
-          h('strong', {}, 'DEMO-MODUS'), ' – Beispieldaten, keine echten Schülerdaten'
+        screen.insertBefore(h('div.demo-banner.demo-banner-row', {},
+          h('span.demo-banner-text', {},
+            h('strong', {}, 'DEMO-MODUS'), ' – Beispieldaten, keine echten Schülerdaten'),
+          h('button.demo-banner-btn', { onclick: endDemoDialog }, 'Beenden')
         ), screen.firstChild);
       }
       appEl.appendChild(screen);
@@ -434,6 +492,9 @@
         }
         screen.appendChild(aboutBox());
       }
+      /* Erst nach dem Seitenaufbau, damit das Overlay über der fertigen
+         Startseite liegt und nicht während des Renderns eingreift. */
+      if (route.name === 'home' && !Store.isLocked()) maybeShowInstallOverlay();
     } catch (err) {
       console.error('Fehler beim Seitenaufbau:', err);
       clear(appEl);
@@ -5836,12 +5897,17 @@
       } }, String(n));
     }
     function box(label, sub) {
-      return h('div', { style: {
+      var el = h('div', { style: {
         width: '38px', height: '38px', borderRadius: '9px', border: LINE,
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         background: sub || '#eef1f2', fontSize: '12px', fontWeight: '700',
         color: 'var(--ink-soft, #555)', flexShrink: '0'
-      } }, label);
+      } });
+      /* Das Notiz-Symbol muss dem echten Button entsprechen – daher dasselbe
+         SVG wie in der Erfassungsliste, nicht eine Ersatzglyphe. */
+      if (label === NOTE_SVG) el.innerHTML = label;
+      else el.appendChild(document.createTextNode(label));
+      return el;
     }
     function pill(text, bg, fg) {
       return h('span', { style: {
@@ -5864,7 +5930,7 @@
         padding: '10px 12px'
       } },
         h('div', { style: { display: 'flex', alignItems: 'center', gap: '6px', flexShrink: '0' } },
-          box('AM'), num(1), box('✎', '#e9f2f1'), num(2)),
+          box('AM'), num(1), box(NOTE_SVG, '#fff'), num(2)),
         h('div', { style: { minWidth: '0', flex: '1' } },
           h('div', { style: { fontWeight: '600' } }, 'Meier, Anna'),
           h('div', { style: { display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', marginTop: '3px' } },

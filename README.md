@@ -1,4 +1,4 @@
-# SOL-Noten (Version 0.37.0 – Beta)
+# SOL-Noten (Version 0.38.0 – Beta)
 
 Notenverwaltung zum selbstorganisierten Lernen (SOL) als Progressive Web App (PWA).
 Basierend auf der Excel-Notenverwaltung V8.0 von Andreas Vandelaar.
@@ -71,6 +71,8 @@ Der Installationshinweis erscheint bereits bei der **Ersteinrichtung**, noch vor
 - **iPhone/iPad (Safari):** Apple stellt keinen Installationsdialog bereit; die App zeigt stattdessen eine Schritt-für-Schritt-Anleitung als Overlay oben rechts – in zwei geräteabhängigen Varianten: Auf dem iPad steht sie oben rechts, mit animiertem Pfeil nach oben auf das Teilen-Symbol der Safari-Leiste, und führt über „Mehr anzeigen" (Pfeilspitze nach unten) zum Ziel. Auf dem iPhone steht sie unten mittig, mit Pfeil nach unten auf das dort platzierte Teilen-Symbol; „Mehr anzeigen" entfällt, weil „Zum Home-Bildschirm" direkt im Menü erscheint. Beide Varianten bilden die Menüpunkte „Zum Home-Bildschirm" und „Hinzufügen" nach.
 - **Firefox am PC** unterstützt keine Installation von Web-Apps; SOL-Noten läuft dort normal im Browser.
 
+**Wiederkehrende Erinnerung:** Solange SOL-Noten nicht installiert ist, blendet der Startbildschirm alle drei Tage ein wegklickbares Overlay ein – mit „App installieren“ bzw. „Anleitung anzeigen“, „Mehr dazu“ (führt ins Hilfekapitel) und „Später“. Der Takt ist bewusst kürzer als die etwa sieben Tage, nach denen Safari die Daten nicht installierter Websites löscht. Das Overlay erscheint nicht in der installierten App, nicht im Demo-Modus und nicht dort, wo eine Installation gar nicht möglich ist (Firefox am PC). Der Zeitpunkt der letzten Erinnerung steht als `installRemindedAt` in den Einstellungen.
+
 Ist die App bereits installiert, zeigen beide Stellen das an und der Hinweis entfällt automatisch. Wurde der Hinweis auf dem Startbildschirm mit „Nicht mehr anzeigen" ausgeblendet, bleibt die Installation über die Globalen Einstellungen jederzeit erreichbar.
 
 ## Mehrere Sitzpläne je Kurs
@@ -97,7 +99,7 @@ Innerhalb der Lesebreite passt sich außerdem die Erfassungsliste auf „SoLei-P
 
 In den Globalen Einstellungen unter „Demo-Modus" startbar. Die App zeigt dann ausschließlich erfundene Daten: zwei Klassen (AK…A, AK…B – die Jahrgangszahl folgt dem laufenden Schuljahr) mit den Kursen KPA, KUP und WISO, je zwei Unterrichtstagen pro Woche, vollständig bewerteten Quartalen 1–3 und einem noch leeren 4. Quartal – so lassen sich alle Eingabemasken (SoLei-Punkte, Ergebnis-Uploads, Fehlzeiten, Quartalsnoten, Open Book Tests, Klausuren) live vorführen, ohne etwas löschen zu müssen. Enthalten sind unterschiedlich zuverlässige Schüler/innen mit glaubwürdig schwankenden Leistungen, unentschuldigte Fehlzeiten, Upload-Zählungen (5 Prüfungen je Quartal), je Halbjahr 4 Open Book Tests und 2 Klausuren (eine davon vollständig mit Aufgabenpunkten und Notenspiegel), Sitzpläne, Stundeninhalte und Kursnotizen. Der Kurs WISO zeigt zusätzlich verschobene Maximalpunkte (Q2 betont Sozialkompetenz, Q3 die mündliche Beteiligung) sowie Portfolionoten. Fotos werden bewusst keine erzeugt – der Sitzplan zeigt die Namensinitialen.
 
-**Ihre echten Daten sind dabei geschützt:** Sie bleiben unverändert gespeichert und werden während der Demo nicht angefasst; die App arbeitet auf einer getrennten Datenwelt, aus der nichts auf die Festplatte geschrieben wird. Ein oranges Band „DEMO-MODUS" läuft auf jeder Seite mit, damit in der Fortbildung niemand die beiden verwechselt. Beim Beenden werden alle Demo-Änderungen verworfen und die echten Daten sofort wieder angezeigt. Die Beispieldaten sind reproduzierbar – jeder Start erzeugt exakt dieselbe Demo, sodass Ablaufpläne und Screenshots gültig bleiben. Schuljahr, Quartale, alle Datumsangaben und die Jahrgangszahl der Klassennamen richten sich dabei nach dem heutigen Datum (Schuljahresbeginn: 15. August), die Demo veraltet also nicht.
+**Ihre echten Daten sind dabei geschützt:** Sie bleiben unverändert gespeichert und werden während der Demo nicht angefasst; die App arbeitet auf einer getrennten Datenwelt, aus der nichts auf die Festplatte geschrieben wird. Ein oranges Band „DEMO-MODUS" läuft auf jeder Seite mit, damit in der Fortbildung niemand die beiden verwechselt; rechts im Band steht ein Button „Beenden“, alternativ bleibt der Weg über die Globalen Einstellungen. Beim Beenden werden alle Demo-Änderungen verworfen und die echten Daten sofort wieder angezeigt. Die Beispieldaten sind reproduzierbar – jeder Start erzeugt exakt dieselbe Demo, sodass Ablaufpläne und Screenshots gültig bleiben. Schuljahr, Quartale, alle Datumsangaben und die Jahrgangszahl der Klassennamen richten sich dabei nach dem heutigen Datum (Schuljahresbeginn: 15. August), die Demo veraltet also nicht.
 
 ## Speicherverhalten
 

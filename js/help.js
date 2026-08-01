@@ -83,7 +83,7 @@
           id: 'start-installation',
           title: 'Warum sollte ich _SOL-Noten_ als App installieren?',
           body: [
-            { t: 'p', v: 'SOL-Noten ist eine so genannte {{PWA}} (Progressive Web App) – eine Website, die sich wie eine App installieren lässt. Sie läuft zwar auch im Browser, **du solltest sie aber am besten jetzt direkt auf deinem Gerät installieren. Dadurch hast du folgende Vorteile:**' },
+            { t: 'p', v: 'SOL-Noten ist eine so genannte {{PWA}} (Progressive Web App) – eine Website, die sich wie eine App installieren lässt. Sie läuft zwar auch im Browser, **Sie sollten sie aber am besten jetzt direkt auf Ihrem Gerät installieren. Dadurch haben Sie folgende Vorteile:**' },
             { t: 'ul', v: [
               '**Offline-Nutzung:** Die App funktioniert auch ohne aktive Internetverbindung (im Gegensatz zur Website im Browser).',
               '**Aufgeräumte Oberfläche:** Die PWA läuft in einem eigenen Fenster. Es wird kein Platz für die Bedienoberfläche des Browsers (z. B. die Adresszeile) verschwendet.',
@@ -97,7 +97,7 @@
               '**iPhone/iPad (Safari):** Teilen-Symbol antippen, dann „Zum Home-Bildschirm“. Die App zeigt dazu eine Anleitung mit Pfeil auf das richtige Symbol.',
               '**Firefox am PC** unterstützt die Installation nicht; dort läuft SOL-Noten im Browser weiter.'
             ] },
-            { t: 'p', v: 'Die Installation ist jederzeit nachholbar: [[app:settings|Globale Einstellungen]], Abschnitt „App-Installation“.' },
+            { t: 'p', v: 'Die Installation ist jederzeit nachholbar: [[app:settings|Globale Einstellungen]], Abschnitt „App-Installation“. Solange die App nicht installiert ist, erinnert der Startbildschirm alle drei Tage daran – bewusst häufiger als die etwa sieben Tage, nach denen Safari die Daten nicht installierter Websites löscht. Sobald die App installiert ist, erscheint die Erinnerung nicht mehr.' },
             { t: 'warn', v: 'Wenn Sie auf iPhone oder iPad **die App nicht installieren und stattdessen im Safari-Browser weiterarbeiten**, drohen Ihnen zwei Probleme. Erstens erscheinen diese Daten später nicht in der installierten App, weil beide getrennte Speicher haben. Zweitens – und das ist der gefährlichere Punkt – löscht Safari die Daten von Websites, die nicht auf dem Home-Bildschirm liegen, nach etwa sieben Tagen ohne Nutzung automatisch. Nach den Ferien könnten Ihre Noten also verschwunden sein.' },
             { t: 'p', v: 'Falls Sie bereits im Browser gearbeitet haben, gehen die Daten aber nicht verloren: Erstellen Sie **im Browser** ein {{Backup}} (Globale Einstellungen → Datensicherung), installieren Sie dann die App und spielen Sie das Backup dort wieder ein.' }
           ]
@@ -179,11 +179,13 @@
               '**2 – Kursnotiz:** Öffnet ein Textfeld für eine kurze Beobachtung zu dieser Person am eingestellten Datum (siehe unten).',
               '**3 – Punktesumme im Quartal:** Hier 9,3 von 15 möglichen Punkten. Diese Zahl ist die Summe der fünf Kriteriumsdurchschnitte – sie berücksichtigt also **alle** Kriterien, nicht nur das gerade geöffnete.',
               '**4 – Note zur Punktesumme:** Die Note, die sich aus 9,3 Punkten über den 15-Punkte-{{Bewertungsspiegel}} ergibt – hier 2,8. Es ist der aktuelle Zwischenstand der Note SL-Bogen, keine endgültige Note.',
-              '**5 – Durchschnitt im geöffneten Kriterium:** Das ø-Zeichen bezieht sich nur auf das Kriterium, das Sie gerade bewerten. Hier hat Anna Meier in diesem Kriterium bisher im Schnitt 3,0 Punkte je Vergabe erhalten.',
-              '**6 – Tipp-Buttons:** Die möglichen Punktwerte, abgeleitet aus den {{SoLei-Maximalpunkte|Maximalpunkten}} des Kriteriums (Maximum, ⅔, ⅓, 0).',
-              '**7 – Kursnotiz (aufgeklappt):** Der Text gehört zu dieser Person **und** zu dem oben eingestellten Datum.'
+              '**5 – Durchschnitt im geöffneten Kriterium:** Das ø-Zeichen bezieht sich nur auf das Kriterium, das Sie gerade bewerten. Hier hat Anna Meier in diesem Kriterium bisher im Schnitt 3,0 Punkte je Vergabe erhalten.'
             ] },
             { t: 'note', v: 'Die drei Zahlen ändern sich sofort mit jeder Vergabe. Sie sind als Orientierung während des Unterrichts gedacht – „wo steht diese Person gerade?“ –, nicht als Zeugnisnote.' },
+            { t: 'ul', v: [
+              '**6 – Tipp-Buttons:** Die möglichen Punktwerte, abgeleitet aus den {{SoLei-Maximalpunkte|Maximalpunkten}} des Kriteriums.',
+              '**7 – Kursnotiz (aufgeklappt):** Der Text gehört zu dieser Person **und** zu dem oben eingestellten Datum.'
+            ] },
             { t: 'p', v: '**Die Kursnotiz** (Symbol 2) ist eine kurze Beobachtung zu einer Person an einem Tag, zum Beispiel „hat heute die Gruppe gut moderiert“ oder „ohne Material erschienen“. Pro Person und Datum ist eine Notiz möglich; sie speichert sich beim Verlassen des Feldes, leerer Text löscht sie wieder. Wiedergefunden werden die Notizen auf „SoLei-Quartalsnoten“ und in der Einzelansicht des SoLei-Punktestands – also genau dann, wenn Sie die Quartalsnote festlegen oder ein Notengespräch vorbereiten. Ausführlicher beschreibt das [[help:faq-notizen|dieses Kapitel]].' },
             { t: 'note', v: 'Oben stellen Sie das Datum ein. Das {{Quartal}} ergibt sich immer aus diesem Datum – Sie können also problemlos nachtragen, was Sie im Unterricht nicht geschafft haben.' }
           ]
@@ -200,7 +202,7 @@
           id: 'faq-sitzplan',
           title: 'Wofür ist der Sitzplan gut?',
           body: [
-            { t: 'p', v: 'Er ist ein weiterer Weg zur Punktevergabe: Sie sehen die Klasse so, wie sie vor Ihnen sitzt, tippen auf eine Person und vergeben die Punkte. Im Modus „Sitzplan bearbeiten“ ordnen Sie die Plätze an, im Modus „SL-Punkte geben“ bewerten Sie.' },
+            { t: 'p', v: 'Er ist ein weiterer Weg zur SoLei-Punktevergabe: Sie sehen die Klasse so, wie sie vor Ihnen sitzt, tippen auf eine Person und vergeben die Punkte. Im Modus „Sitzplan bearbeiten“ ordnen Sie die Plätze an, im Modus „SL-Punkte geben“ bewerten Sie.' },
             { t: 'p', v: 'Wechselt die Klasse den Raum, legen Sie mehrere Sitzpläne an und schalten oben rechts um. Die Namen vergeben Sie frei – meist die Raumnummer. „Duplizieren“ übernimmt die aktuelle Anordnung als Ausgangspunkt.' },
             { t: 'p', v: 'Fotos sind optional. Ohne Fotos zeigt der Plan die Namenskürzel.' }
           ]
@@ -444,7 +446,7 @@
           title: 'Wie führe ich die App vor, ohne echte Daten zu zeigen?',
           body: [
             { t: 'p', v: 'Mit dem {{Demo-Modus}} in den [[app:settings|Globalen Einstellungen]]. Er zeigt zwei erfundene Klassen mit drei Kursen; die Quartale 1 bis 3 sind bewertet, das vierte ist leer, sodass Sie jede Eingabe live vorführen können.' },
-            { t: 'p', v: 'Ihre echten Daten bleiben unangetastet, ein oranges Band weist dauerhaft auf den Demo-Modus hin, und beim Beenden verschwinden alle Demo-Änderungen. Die Beispieldaten sind bei jedem Start identisch.' },
+            { t: 'p', v: 'Ihre echten Daten bleiben unangetastet, ein oranges Band weist dauerhaft auf den Demo-Modus hin, und beim Beenden verschwinden alle Demo-Änderungen. Beenden können Sie den Demo-Modus direkt über den Button „Beenden“ im orangen Band oder wie beim Starten über die Globalen Einstellungen. Die Beispieldaten sind bei jedem Start identisch; Schuljahr, Quartale und Klassennamen richten sich nach dem heutigen Datum.' },
             { t: 'warn', v: 'Im Demo-Modus wird nichts dauerhaft gespeichert – er ist nicht für die produktive Arbeit geeignet.' }
           ]
         },
