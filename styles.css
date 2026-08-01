@@ -84,7 +84,7 @@ body {
    Namen rutschen. */
 .card.course-box-row {
   display: flex; flex-direction: row; align-items: center;
-  justify-content: space-between;
+  justify-content: space-between; flex-wrap: wrap;
   gap: 10px; text-align: left; padding-top: 9px; padding-bottom: 9px;
 }
 /* Ohne min-width: 0 gilt für den Kursnamen die automatische Mindestbreite
@@ -93,7 +93,13 @@ body {
    die Zeile dann rechts aus der Karte heraus – auf dem Sitzplan sichtbar am
    abgeschnittenen „?“. Der Name darf stattdessen umbrechen. */
 .card.course-box-row > strong { min-width: 0; overflow-wrap: anywhere; }
-.card.course-box-row > .row-gap { flex-shrink: 0; }
+/* Die rechte Gruppe bekommt ihren Platz über `margin-left: auto` statt über
+   `justify-content` und darf im Notfall umbrechen – so bleibt sie in jedem
+   Fall innerhalb der Karte. */
+.card.course-box-row > .row-gap {
+  flex: 0 1 auto; min-width: 0; max-width: 100%;
+  flex-wrap: wrap; justify-content: flex-end; margin-left: auto;
+}
 .course-box-btn { min-height: 30px; padding: 4px 12px; font-size: 0.8rem; border-radius: 8px; }
 
 /* PWA-Installation: Banner auf dem Startbildschirm und Anleitungsschritte */
@@ -332,8 +338,19 @@ textarea.input.note-area {
 
 /* Sitzplan-Verwaltung: Auswahl und Aktionen */
 .plan-bar { flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
-/* Planauswahl in der Kursnamen-Box: kompakt, damit die Zeile nicht wächst. */
-.plan-select { max-width: 11rem; min-height: 34px; padding-top: 4px; padding-bottom: 4px; font-size: 0.85rem; flex-shrink: 0; }
+/* Planauswahl in der Kursnamen-Box: kompakt, damit die Zeile nicht wächst.
+   `width: auto` ist hier entscheidend: `.input` setzt `width: 100%`, und ein
+   Prozentwert bezieht sich auf die Breite des umgebenden `.row-gap` – die
+   wiederum erst aus dem Inhalt entsteht. Diese Rückbezüglichkeit lässt die
+   Auswahl breiter werden als ihren eigenen Platzbedarf und schiebt das
+   Fragezeichen aus der Karte, unabhängig davon, wie viel Platz zur Verfügung
+   steht (deshalb trat der Fehler auch auf dem PC auf). Mit `width: auto`
+   richtet sich die Auswahl nach ihrem Inhalt. */
+.plan-select {
+  width: auto; max-width: 11rem; min-height: 34px;
+  padding-top: 4px; padding-bottom: 4px; font-size: 0.85rem;
+  flex: 0 1 auto; min-width: 4rem;
+}
 @media (max-width: 480px) { .plan-select { max-width: 8.5rem; } }
 .plan-bar .row-gap { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 

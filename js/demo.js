@@ -129,8 +129,11 @@
       st.classes.push(cls);
       return cls;
     }
-    var clsA = makeClass('AK25A', NAMES_A);
-    var clsB = makeClass('AK25B', NAMES_B);
+    /* Auch die Klassennamen folgen dem Schuljahr (Jahrgang des Ausbildungs-
+       beginns), damit die Demo in späteren Jahren nicht veraltet wirkt. */
+    var jg = String(startYear).slice(2);
+    var clsA = makeClass('AK' + jg + 'A', NAMES_A);
+    var clsB = makeClass('AK' + jg + 'B', NAMES_B);
 
     /* Profile je Schüler/in – gelten über alle Kurse hinweg, damit eine
        Person in der Demo durchgängig glaubwürdig bleibt. */

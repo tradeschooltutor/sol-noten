@@ -70,7 +70,7 @@
 
   /* ================= App-Start ================= */
 
-  var APP_VERSION = '0.36.0';
+  var APP_VERSION = '0.37.0';
 
   /* ---------- PWA-Installation ----------
      Chrome/Edge/Android liefern `beforeinstallprompt`: Event abfangen und
@@ -1654,7 +1654,8 @@
   function folderPermissionBanner() {
     if (!Store.backupFolderNeedsPermission()) return null;
     return h('div.banner-info', {},
-      h('span', {}, 'Das automatische Ordner-Backup wartet auf Ihre Freigabe (der Browser verlangt sie einmal je Sitzung).'),
+      h('span', {}, 'Bitte erlauben Sie ', h('em', {}, 'SOL-Noten'),
+        ', das automatische Ordner-Backup durchzuführen (das ist einmal je Sitzung nötig).'),
       h('div.banner-actions',
         h('button.btn-small.btn-primary', { onclick: function () {
           Store.regrantBackupPermission().then(function (ok) {
@@ -1843,24 +1844,51 @@
       go('editCourse', { id: course.id });
     }
 
+    /* Derselbe Abschluss wie auf „SoLei-Quartalsnoten“, nur von hier aus
+       erreichbar – an genau der Stelle, an der danach „Schuljahr wieder
+       öffnen“ steht. Sichtbar, sobald der Kurs im 4. Quartal ist. */
+    function closeYear() {
+      UI.confirmDialog('Schuljahr abschließen?',
+        'Der Kurs wird als „Schuljahr abgeschlossen“ markiert. Alle Ansichten, Zeugnisnoten, Drucke und Nachträge bleiben weiterhin möglich; die Markierung lässt sich hier jederzeit wieder aufheben.',
+        'Schuljahr abschließen')
+        .then(function (ok) {
+          if (!ok) return;
+          course.completed = true;
+          Store.save();
+          toast('Das Schuljahr ist für diesen Kurs abgeschlossen.');
+          go('editCourse', { id: course.id });
+        });
+    }
+
+    var inFinalQuarter = course &&
+      Quarters.quarterForDate(Store.todayISO(), courseQuarters(course)) === 4;
+
     function delCourseFromSettings() {
       var cls = Store.classById(course.classId);
       var label = cls.name + ' · ' + course.subject;
+      /* Der Mittelpunkt „·“ liegt auf vielen Tastaturen nicht auf einer Taste.
+         Abgetippt wird deshalb „Klasse Fach“ mit einfachem Leerzeichen; beim
+         Vergleich werden Trennzeichen (·, -, –) und Mehrfach-Leerzeichen
+         vereinheitlicht und Groß-/Kleinschreibung ignoriert. */
+      var typeLabel = cls.name + ' ' + course.subject;
+      function normalize(s) {
+        return String(s || '').replace(/[·•\-–—]/g, ' ').replace(/\s+/g, ' ').trim().toLocaleLowerCase('de');
+      }
       var nEntries = S().soleiEntries.filter(function (e) { return e.courseId === course.id; }).length;
       /* Bewusste Reibung gegen versehentliches Löschen: Der Kursname muss zur
          Bestätigung abgetippt werden; sonst bleibt der Löschvorgang wirkungslos. */
       var confirmInput = h('input.input', { type: 'text', autocomplete: 'off',
-        placeholder: label, 'aria-label': 'Kursnamen zur Bestätigung eingeben' });
+        placeholder: typeLabel, 'aria-label': 'Kursnamen zur Bestätigung eingeben' });
       UI.modal('Kurs unwiderruflich löschen',
         [h('p', {}, 'Der Kurs „' + label + '“ wird mit allen ' + nEntries +
             ' Punktevergaben, Fehlzeiten und Ergebnis-Uploads gelöscht. Die Klasse und ihre Schülerliste bleiben erhalten.'),
-         h('p', {}, 'Diese Aktion kann nicht rückgängig gemacht werden. Tippen Sie zur Bestätigung den Kursnamen ein:'),
-         h('p.hint', {}, label),
+         h('p', {}, 'Diese Aktion kann nicht rückgängig gemacht werden. Tippen Sie zur Bestätigung Klasse und Fach ein:'),
+         h('p.hint', {}, typeLabel),
          h('label.field', {}, confirmInput)],
         [{ label: 'Abbrechen', value: false },
          { label: 'Endgültig löschen', value: true, danger: true,
            validate: function () {
-             if (confirmInput.value.trim() === label) return true;
+             if (normalize(confirmInput.value) === normalize(typeLabel)) return true;
              confirmInput.classList.add('input-flash');
              setTimeout(function () { confirmInput.classList.remove('input-flash'); }, 600);
              return false;
@@ -1891,7 +1919,9 @@
               'Quartalszeiträume dieses Kurses'),
             course.completed
               ? h('button.btn-plain.btn-block', { onclick: reopenYear }, 'Schuljahr wieder öffnen')
-              : null,
+              : (inFinalQuarter
+                  ? h('button.btn-plain.btn-block', { onclick: closeYear }, 'Schuljahr abschließen')
+                  : null),
             h('button.btn-plain.btn-block', { onclick: function () { go('editCourse', { from: course.id }); } },
               'Neuer Kurs für ein anderes Fach in dieser Klasse'),
             h('div.danger-zone',
@@ -4534,8 +4564,7 @@
       h('div.card.card-list', {}, list.length ? list : h('div.empty', h('p', {}, 'Noch keine Schüler/innen.'))),
       h('div.actions-col',
         h('button.btn-primary.btn-block', { onclick: function () { editStudent(null); } }, '+ Schüler/in hinzufügen'),
-        h('button.btn-primary.btn-block', { onclick: importStudents }, 'Aus Excel einfügen (Kopieren & Einfügen)'),
-        cls.students.length ? exportWarning() : null
+        h('button.btn-primary.btn-block', { onclick: importStudents }, 'Aus Excel einfügen (Kopieren & Einfügen)')
       )
     );
 
@@ -5791,6 +5820,75 @@
     return out;
   }
 
+  /* Beispieldarstellungen für die Hilfe („Screenshot ohne Screenshot“).
+     Bewusst vollständig mit Inline-Stilen aufgebaut: Das Druckfenster kennt
+     styles.css nicht, deshalb würde eine Nachbildung aus App-Klassen dort
+     unformatiert erscheinen. Die Ziffern verweisen auf die Erläuterungen
+     im Text darunter. */
+  function helpMock(key) {
+    var LINE = '1px solid ' + 'var(--line, #c8ccd0)';
+    function num(n) {
+      return h('span', { style: {
+        display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+        width: '17px', height: '17px', borderRadius: '50%', flexShrink: '0',
+        background: 'var(--ink-soft, #555)', color: '#fff',
+        fontSize: '10px', fontWeight: '700', lineHeight: '1'
+      } }, String(n));
+    }
+    function box(label, sub) {
+      return h('div', { style: {
+        width: '38px', height: '38px', borderRadius: '9px', border: LINE,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        background: sub || '#eef1f2', fontSize: '12px', fontWeight: '700',
+        color: 'var(--ink-soft, #555)', flexShrink: '0'
+      } }, label);
+    }
+    function pill(text, bg, fg) {
+      return h('span', { style: {
+        display: 'inline-block', padding: '2px 8px', borderRadius: '999px',
+        background: bg, color: fg, fontSize: '12px', fontWeight: '700'
+      } }, text);
+    }
+    function circle(text) {
+      return h('span', { style: {
+        display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+        width: '36px', height: '36px', borderRadius: '50%',
+        border: '2px solid ' + 'var(--line, #c8ccd0)', fontWeight: '700',
+        fontSize: '13px', flexShrink: '0'
+      } }, text);
+    }
+
+    if (key === 'solei-row') {
+      var row = h('div', { style: {
+        display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap',
+        padding: '10px 12px'
+      } },
+        h('div', { style: { display: 'flex', alignItems: 'center', gap: '6px', flexShrink: '0' } },
+          box('AM'), num(1), box('✎', '#e9f2f1'), num(2)),
+        h('div', { style: { minWidth: '0', flex: '1' } },
+          h('div', { style: { fontWeight: '600' } }, 'Meier, Anna'),
+          h('div', { style: { display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', marginTop: '3px' } },
+            pill('9,3/15', 'var(--ink-soft, #555)', '#fff'), num(3),
+            pill('2,8', '#f6ecd8', '#8a6516'), num(4),
+            h('span', { style: { fontSize: '13px', color: 'var(--ink-soft, #555)' } }, 'ø 3,0'), num(5))),
+        h('div', { style: { display: 'flex', alignItems: 'center', gap: '6px', flexShrink: '0' } },
+          circle('3'), circle('2'), circle('1'), circle('0'), num(6)));
+
+      var note = h('div', { style: { padding: '0 12px 10px' } },
+        h('div', { style: {
+          border: LINE, borderRadius: '10px', padding: '8px 10px',
+          background: '#fbfcfc', fontSize: '13px', color: 'var(--ink-soft, #555)',
+          display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap'
+        } }, 'Hat heute die Gruppe gut moderiert.', num(7)));
+
+      return h('div', { style: {
+        border: LINE, borderRadius: '12px', margin: '0 0 12px', overflow: 'hidden',
+        background: '#fff'
+      } }, row, note);
+    }
+    return null;
+  }
+
   /* Kapitelinhalt aufbauen. forPrint = ohne Interaktion, für das Druckfenster. */
   function helpBody(body, forPrint) {
     var wrap = h('div.help-body');
@@ -5808,6 +5906,9 @@
         wrap.appendChild(h('p.help-note', {}, helpText(b.v, defHost, forPrint)));
       } else if (b.t === 'warn') {
         wrap.appendChild(h('p.help-warn', {}, helpText(b.v, defHost, forPrint)));
+      } else if (b.t === 'mock') {
+        var mock = helpMock(b.v);
+        if (mock) wrap.appendChild(mock);
       } else {
         wrap.appendChild(h('p.help-p', {}, helpText(b.v, defHost, forPrint)));
       }

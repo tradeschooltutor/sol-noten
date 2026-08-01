@@ -98,7 +98,7 @@
               '**Firefox am PC** unterstützt die Installation nicht; dort läuft SOL-Noten im Browser weiter.'
             ] },
             { t: 'p', v: 'Die Installation ist jederzeit nachholbar: [[app:settings|Globale Einstellungen]], Abschnitt „App-Installation“.' },
-            { t: 'warn', v: 'Wenn Sie auf iPhone oder iPad zunächst **im Safari-Browser weiterarbeiten**, drohen Ihnen zwei Probleme. Erstens erscheinen diese Daten später nicht in der installierten App, weil beide getrennte Speicher haben. Zweitens – und das ist der gefährlichere Punkt – löscht Safari die Daten von Websites, die nicht auf dem Home-Bildschirm liegen, nach etwa sieben Tagen ohne Nutzung automatisch. Nach den Ferien könnten Ihre Noten also verschwunden sein.' },
+            { t: 'warn', v: 'Wenn Sie auf iPhone oder iPad **die App nicht installieren und stattdessen im Safari-Browser weiterarbeiten**, drohen Ihnen zwei Probleme. Erstens erscheinen diese Daten später nicht in der installierten App, weil beide getrennte Speicher haben. Zweitens – und das ist der gefährlichere Punkt – löscht Safari die Daten von Websites, die nicht auf dem Home-Bildschirm liegen, nach etwa sieben Tagen ohne Nutzung automatisch. Nach den Ferien könnten Ihre Noten also verschwunden sein.' },
             { t: 'p', v: 'Falls Sie bereits im Browser gearbeitet haben, gehen die Daten aber nicht verloren: Erstellen Sie **im Browser** ein {{Backup}} (Globale Einstellungen → Datensicherung), installieren Sie dann die App und spielen Sie das Backup dort wieder ein.' }
           ]
         },
@@ -172,6 +172,19 @@
             { t: 'p', v: 'Über „SoLei-Punkte vergeben“. Es gibt zwei Ansichten: **Ansicht Kriterium** zeigt alle Personen untereinander und Sie bewerten ein Kriterium für die ganze Gruppe – das ist der schnellste Weg im laufenden Unterricht. **Ansicht Schüler/in** zeigt alle fünf Kriterien einer Person auf einmal, dazu ein Notizfeld.' },
             { t: 'p', v: 'Ein Tipp auf den Punktewert genügt; es gibt keinen Speichern-Knopf. Haben Sie sich vertippt, tippen Sie einfach den richtigen Wert an – er ersetzt den alten.' },
             { t: 'p', v: 'Am PC können Sie auch die Tastatur benutzen: Zahlen eingeben, Enter bestätigt.' },
+            { t: 'p', v: '**Was in einer Zeile steht.** Neben dem Namen zeigt die App drei Zahlen, die den aktuellen Stand der Person zusammenfassen. So sieht eine Zeile in der Ansicht Kriterium aus (auf dem Smartphone stehen die Angaben untereinander statt nebeneinander):' },
+            { t: 'mock', v: 'solei-row' },
+            { t: 'ul', v: [
+              '**1 – Foto:** Erleichtert die Zuordnung von Namen und Gesichtern. Ohne Foto stehen dort die Initialen.',
+              '**2 – Kursnotiz:** Öffnet ein Textfeld für eine kurze Beobachtung zu dieser Person am eingestellten Datum (siehe unten).',
+              '**3 – Punktesumme im Quartal:** Hier 9,3 von 15 möglichen Punkten. Diese Zahl ist die Summe der fünf Kriteriumsdurchschnitte – sie berücksichtigt also **alle** Kriterien, nicht nur das gerade geöffnete.',
+              '**4 – Note zur Punktesumme:** Die Note, die sich aus 9,3 Punkten über den 15-Punkte-{{Bewertungsspiegel}} ergibt – hier 2,8. Es ist der aktuelle Zwischenstand der Note SL-Bogen, keine endgültige Note.',
+              '**5 – Durchschnitt im geöffneten Kriterium:** Das ø-Zeichen bezieht sich nur auf das Kriterium, das Sie gerade bewerten. Hier hat Anna Meier in diesem Kriterium bisher im Schnitt 3,0 Punkte je Vergabe erhalten.',
+              '**6 – Tipp-Buttons:** Die möglichen Punktwerte, abgeleitet aus den {{SoLei-Maximalpunkte|Maximalpunkten}} des Kriteriums (Maximum, ⅔, ⅓, 0).',
+              '**7 – Kursnotiz (aufgeklappt):** Der Text gehört zu dieser Person **und** zu dem oben eingestellten Datum.'
+            ] },
+            { t: 'note', v: 'Die drei Zahlen ändern sich sofort mit jeder Vergabe. Sie sind als Orientierung während des Unterrichts gedacht – „wo steht diese Person gerade?“ –, nicht als Zeugnisnote.' },
+            { t: 'p', v: '**Die Kursnotiz** (Symbol 2) ist eine kurze Beobachtung zu einer Person an einem Tag, zum Beispiel „hat heute die Gruppe gut moderiert“ oder „ohne Material erschienen“. Pro Person und Datum ist eine Notiz möglich; sie speichert sich beim Verlassen des Feldes, leerer Text löscht sie wieder. Wiedergefunden werden die Notizen auf „SoLei-Quartalsnoten“ und in der Einzelansicht des SoLei-Punktestands – also genau dann, wenn Sie die Quartalsnote festlegen oder ein Notengespräch vorbereiten. Ausführlicher beschreibt das [[help:faq-notizen|dieses Kapitel]].' },
             { t: 'note', v: 'Oben stellen Sie das Datum ein. Das {{Quartal}} ergibt sich immer aus diesem Datum – Sie können also problemlos nachtragen, was Sie im Unterricht nicht geschafft haben.' }
           ]
         },
@@ -187,7 +200,7 @@
           id: 'faq-sitzplan',
           title: 'Wofür ist der Sitzplan gut?',
           body: [
-            { t: 'p', v: 'Er ist der schnellste Weg zur Punktevergabe: Sie sehen die Klasse so, wie sie vor Ihnen sitzt, tippen auf eine Person und vergeben die Punkte. Im Modus „Sitzplan bearbeiten“ ordnen Sie die Plätze an, im Modus „SL-Punkte geben“ bewerten Sie.' },
+            { t: 'p', v: 'Er ist ein weiterer Weg zur Punktevergabe: Sie sehen die Klasse so, wie sie vor Ihnen sitzt, tippen auf eine Person und vergeben die Punkte. Im Modus „Sitzplan bearbeiten“ ordnen Sie die Plätze an, im Modus „SL-Punkte geben“ bewerten Sie.' },
             { t: 'p', v: 'Wechselt die Klasse den Raum, legen Sie mehrere Sitzpläne an und schalten oben rechts um. Die Namen vergeben Sie frei – meist die Raumnummer. „Duplizieren“ übernimmt die aktuelle Anordnung als Ausgangspunkt.' },
             { t: 'p', v: 'Fotos sind optional. Ohne Fotos zeigt der Plan die Namenskürzel.' }
           ]
@@ -316,10 +329,10 @@
         },
         {
           id: 'faq-maxpoints',
-          title: 'Wozu dienen die Maximalpunkte, und wann ändere ich sie?',
+          title: 'Wozu dienen die SoLei-Maximalpunkte, und wann ändere ich sie?',
           body: [
-            { t: 'p', v: 'Die {{SoLei-Maximalpunkte}} legen fest, wie viele Punkte je Kriterium und {{Quartal}} höchstens erreichbar sind. In Summe ergeben sie immer 15.' },
-            { t: 'p', v: 'Standardmäßig sind es 3 Punkte je Kriterium. Wollen Sie in einem Quartal einen Schwerpunkt setzen – etwa die Sozialkompetenz während einer Gruppenarbeitsphase stärker gewichten –, erhöhen Sie dort die Maximalpunkte und senken sie bei anderen Kriterien entsprechend.' },
+            { t: 'p', v: 'Die {{SoLei-Maximalpunkte}} in den Kurs-Einstellungen legen fest, wie viele Punkte je Kriterium und {{Quartal}} höchstens erreichbar sind. In Summe ergeben sie immer 15.' },
+            { t: 'p', v: 'Standardmäßig sind es 3 Punkte je Kriterium. Wollen Sie z. B. in einem Quartal eine Klasse motivieren, ruhiger zu arbeiten, können Sie für das Kriterium „Sozialkompetenz“ die Maximalpunktzahl von 3 auf 6 Punkte erhöhen und im Gegenzug die Maximalpunktzahl von zwei anderen Kriterien auf 1,5 Punkte senken. So kommen Sie in Summe wieder auf 15 Punkte.' },
             { t: 'p', v: 'Die Werte gelten je Quartal, Sie können also von Quartal zu Quartal andere Schwerpunkte setzen.' }
           ]
         },
@@ -423,7 +436,7 @@
           body: [
             { t: 'p', v: 'Einzelne Kurse löschen Sie in den Kurs-Einstellungen im Gefahrenbereich, ganze Schuljahre in den Globalen Einstellungen unter „Schuljahre“. Beides verlangt eine bewusste Bestätigung – den Kursnamen beziehungsweise Ihr Passwort.' },
             { t: 'p', v: 'Vor dem Löschen eines Schuljahres empfiehlt sich ein Export: Die Notenübersichten lassen sich als Excel-Datei oder PDF archivieren.' },
-            { t: 'p', v: 'Das letzte verbliebene Schuljahr lässt sich nicht löschen. Wollen Sie ganz von vorn beginnen, gibt es in den Globalen Einstellungen den vollständigen App-Reset.' }
+            { t: 'p', v: 'Das letzte verbliebene Schuljahr lässt sich nicht löschen. Wollen Sie ganz von vorn beginnen, hilft nur das vollständige Zurücksetzen der App – erreichbar auf dem Sperrbildschirm über „PIN vergessen?“ bzw. „Passwort vergessen?“. Dabei gehen alle Daten auf diesem Gerät unwiderruflich verloren.' }
           ]
         },
         {
@@ -576,7 +589,7 @@
 
   /* Reiner Text eines Kapitels – für Suche und Druck. */
   function plainText(body) {
-    return (body || []).map(function (b) {
+    return (body || []).filter(function (b) { return b.t !== 'mock'; }).map(function (b) {
       var v = Array.isArray(b.v) ? b.v.join(' ') : b.v;
       return String(v).replace(/\{\{(.+?)\}\}/g, '$1').replace(/\*\*/g, '');
     }).join(' ');
