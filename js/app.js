@@ -70,7 +70,7 @@
 
   /* ================= App-Start ================= */
 
-  var APP_VERSION = '0.35.0';
+  var APP_VERSION = '0.36.0';
 
   /* ---------- PWA-Installation ----------
      Chrome/Edge/Android liefern `beforeinstallprompt`: Event abfangen und
@@ -481,8 +481,13 @@
     if (extra && !(extra.tagName === 'SPAN' && !extra.hasChildNodes())) right.push(extra);
     /* Fragezeichen in der Titelzeile nur auf den Hauptebenen. Auf den
        Unterseiten der Kurse sitzt es stattdessen in der weißen Kursbox. */
-    var HEADER_HELP = ['home', 'course', 'settings', 'students', 'editCourse', 'yearTransfer', 'setupYear'];
-    if (HEADER_HELP.indexOf(route.name) > -1) {
+    var HEADER_HELP = ['home', 'course', 'settings', 'yearTransfer', 'setupYear'];
+    /* „Kurs anlegen“ hat noch keinen Kurs und damit keine Kursbox – dort bleibt
+       das Fragezeichen ausnahmsweise in der Titelzeile. Sobald ein Kurs
+       existiert (Kurs-Einstellungen), sitzt es allein in der Kursbox. */
+    var headerHelp = HEADER_HELP.indexOf(route.name) > -1 ||
+      (route.name === 'editCourse' && !(route.params && route.params.id));
+    if (headerHelp) {
       right.push(h('button.icon-btn', {
         onclick: function () {
           var back = { name: route.name, params: route.params };
@@ -4497,6 +4502,10 @@
 
   views.students = function (p) {
     var cls = Store.classById(p.classId);
+    /* Der Kurs, aus dem die Liste geöffnet wurde – seine Bezeichnung steht in
+       der weißen Box unter der Titelzeile, samt Fragezeichen. Ohne Kurs
+       (theoretischer Fall) genügt der Klassenname. */
+    var srcCourse = p.courseId ? Store.courseById(p.courseId) : null;
     var back = p.from === 'editCourse' && p.courseId
       ? { name: 'editCourse', params: { id: p.courseId } }
       : (p.courseId ? { name: 'course', params: { id: p.courseId } } : { name: 'home' });
@@ -4516,7 +4525,12 @@
       });
 
     return h('div.screen',
-      header('Schülerliste · ' + cls.name, back),
+      header('Schülerliste', back),
+      srcCourse
+        ? courseBox(srcCourse)
+        : h('div.card.card-tight.course-box.course-box-row',
+            h('strong', {}, cls.name),
+            helpBtn(Help.CONTEXT.students)),
       h('div.card.card-list', {}, list.length ? list : h('div.empty', h('p', {}, 'Noch keine Schüler/innen.'))),
       h('div.actions-col',
         h('button.btn-primary.btn-block', { onclick: function () { editStudent(null); } }, '+ Schüler/in hinzufügen'),
@@ -4759,7 +4773,9 @@
         });
         var lastToday = todays.length ? todays[todays.length - 1] : null;
 
-        /* Kursnotiz zum gewählten Datum: Symbol unter dem Foto, Feld darunter. */
+        /* Kursnotiz zum gewählten Datum: Symbol beim Foto (auf dem Smartphone
+           darunter, ab Tablet-Breite daneben – siehe .avatar-col in styles.css),
+           das Textfeld klappt unter der Zeile auf. */
         var note = Store.noteFor(course.id, stu.id, captureState.date);
         var noteOpen = captureState.noteOpen === stu.id;
         var noteBtn = h('button.note-btn' + (note ? '.has-note' : '') + (noteOpen ? '.open' : ''), {

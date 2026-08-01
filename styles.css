@@ -87,6 +87,13 @@ body {
   justify-content: space-between;
   gap: 10px; text-align: left; padding-top: 9px; padding-bottom: 9px;
 }
+/* Ohne min-width: 0 gilt für den Kursnamen die automatische Mindestbreite
+   (Breite des längsten Wortes). Zusammen mit der rechten Gruppe, die wegen
+   flex-shrink: 0 an Auswahl und Fragezeichen ebenfalls nicht schrumpft, läuft
+   die Zeile dann rechts aus der Karte heraus – auf dem Sitzplan sichtbar am
+   abgeschnittenen „?“. Der Name darf stattdessen umbrechen. */
+.card.course-box-row > strong { min-width: 0; overflow-wrap: anywhere; }
+.card.course-box-row > .row-gap { flex-shrink: 0; }
 .course-box-btn { min-height: 30px; padding: 4px 12px; font-size: 0.8rem; border-radius: 8px; }
 
 /* PWA-Installation: Banner auf dem Startbildschirm und Anleitungsschritte */
@@ -591,6 +598,16 @@ a.help-link strong::after { content: ' ↗'; font-weight: 400; color: var(--mute
 .tap-row > .photo-avatar { flex-shrink: 0; }
 .tap-substats { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 2px; }
 .tap-btns { display: flex; gap: 7px; flex-shrink: 0; }
+/* Ab Tablet-Breite steht die Zeile waagerecht: Foto – Notiz-Symbol – Name –
+   Kennzahlen. Auf dem Smartphone bleibt die gestapelte Anordnung, weil dort
+   der waagerechte Platz fehlt. `flex-wrap` sichert den Grenzfall ab: Passen
+   Name und Kennzahlen nicht nebeneinander (sehr lange Namen), rutschen die
+   Kennzahlen wie bisher unter den Namen – nie ein Überlauf. */
+@media (min-width: 720px) {
+  .avatar-col { flex-direction: row; gap: 8px; }
+  .tap-info { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 12px; }
+  .tap-info > .tap-substats { margin-top: 0; }
+}
 .tap-btn {
   width: var(--tap); height: var(--tap);
   border-radius: 50%;

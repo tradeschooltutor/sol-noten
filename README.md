@@ -1,4 +1,4 @@
-# SOL-Noten (Version 0.35.0 – Beta)
+# SOL-Noten (Version 0.36.0 – Beta)
 
 Notenverwaltung zum selbstorganisierten Lernen (SOL) als Progressive Web App (PWA).
 Basierend auf der Excel-Notenverwaltung V8.0 von Andreas Vandelaar.
@@ -85,11 +85,13 @@ Seiten: **Erste Schritte** (Reihenfolge beim Einrichten, Installation, PIN-Warnu
 
 Kapitel sind aufklappbar und im Glossar alphabetisch sortiert. Das FAQ hat ein Suchfeld, das Titel und Inhalt filtert und Treffer aufklappt.
 
-**Kontextbezogene Hilfe:** Jede Seite der App hat ein Fragezeichen, das direkt zum passenden FAQ-Kapitel springt und anschließend dorthin zurückführt, wo es angetippt wurde. Auf Startseite, Kursseite und Globalen Einstellungen sitzt es in der Titelzeile, auf den Unterseiten der Kurse rechts in der weißen Kursbox. Die Zuordnung steht als `CONTEXT` in `js/help.js`. Fachbegriffe in den Texten sind **antippbar** (nicht Hover – das funktioniert auf Tablets nicht): Ein Tipp klappt die Glossardefinition direkt darunter auf, ein × schließt sie. Gedruckte Fassungen tragen Version und Datum in der Kopfzeile; die Komplettanleitung beginnt mit einem Inhaltsverzeichnis. Das Drehbuch für das Erklärvideo wird separat geliefert und ist bewusst nicht Teil des Projektpakets.
+**Kontextbezogene Hilfe:** Jede Seite der App hat ein Fragezeichen, das direkt zum passenden FAQ-Kapitel springt und anschließend dorthin zurückführt, wo es angetippt wurde. Auf Startseite, Kursseite, Globalen Einstellungen, Schuljahreseinrichtung, Schuljahreswechsel und „Kurs anlegen“ sitzt es in der Titelzeile; auf allen Unterseiten eines Kurses – einschließlich Schülerliste und Kurs-Einstellungen – steht es rechts in der weißen Kursbox und **nur dort** (keine Dopplung in der Titelzeile). Die Zuordnung steht als `CONTEXT` in `js/help.js`. Fachbegriffe in den Texten sind **antippbar** (nicht Hover – das funktioniert auf Tablets nicht): Ein Tipp klappt die Glossardefinition direkt darunter auf, ein × schließt sie. Gedruckte Fassungen tragen Version und Datum in der Kopfzeile; die Komplettanleitung beginnt mit einem Inhaltsverzeichnis. Das Drehbuch für das Erklärvideo wird separat geliefert und ist bewusst nicht Teil des Projektpakets.
 
 ## Bildschirmbreite
 
 Die meisten Seiten stehen mittig in angenehmer Lesebreite (max. 760 px) – lange Zeilen wären auf großen Monitoren schlechter erfassbar. Die beiden tabellen- bzw. rasterlastigen Seiten **Sitzplan** und **Notenübersicht & Zeugnisnoten** nutzen dagegen die volle Fensterbreite (bis 1500 px): Auf PC/Mac und quer gehaltenen Tablets entfällt dort das horizontale Scrollen weitgehend, auf dem Smartphone ändert sich nichts.
+
+Innerhalb der Lesebreite passt sich außerdem die Erfassungsliste auf „SoLei-Punkte vergeben“ an: Ab 720 px Fensterbreite (Tablet, PC/Mac, Smartphone im Querformat) stehen Foto, Notiz-Symbol, Name und die Kennzahlen des Kriteriums (Punktesumme, Note, ø) **nebeneinander** in einer Zeile; darunter bleibt die gestapelte Smartphone-Anordnung erhalten. Bei sehr langen Namen brechen die Kennzahlen wie bisher unter den Namen um.
 
 ## Demo-Modus (Fortbildungen und Vorführungen)
 
