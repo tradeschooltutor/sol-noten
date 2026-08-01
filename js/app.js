@@ -70,7 +70,7 @@
 
   /* ================= App-Start ================= */
 
-  var APP_VERSION = '0.39.0';
+  var APP_VERSION = '0.40.0';
 
   /* ---------- PWA-Installation ----------
      Chrome/Edge/Android liefern `beforeinstallprompt`: Event abfangen und
@@ -260,6 +260,83 @@
         h('button.btn-primary.btn-block', { onclick: showIOSGuide }, 'Installations-Anleitung anzeigen'));
     }
     return installInstructions();
+  }
+
+  /* ================= Dauerhafter Speicher ================= *
+     Ohne diese Anfrage liegen die Daten im Modus „best-effort“: Der Browser
+     darf sie verwerfen, wenn der Gerätespeicher knapp wird – und zwar alle
+     eines Ursprungs auf einmal. Mit der Berechtigung räumt er sie zuletzt ab
+     und weist vorher darauf hin.
+
+     Bewusst ohne Anzeige in den Einstellungen: Gegen eine Ablehnung kann die
+     nutzende Person nichts tun außer die App zu installieren und zu benutzen.
+     Ein sichtbarer Zustand „nicht aktiv“ würde nur verunsichern.
+
+     Zur Wiederholung: `persist()` setzt in mehreren Browsern eine
+     vorausgegangene Nutzeraktion voraus. Ein Aufruf beim Seitenaufbau würde
+     deshalb scheitern, WEIL er automatisch erfolgt – nicht wegen der
+     Heuristik. Die fällige Anfrage hängt sich daher an den nächsten Klick
+     oder Tastendruck und entfernt sich danach wieder. */
+  var persistChecked = false;
+  var PERSIST_RETRY_EARLY = 7;   /* Tage, erste vier Versuche */
+  var PERSIST_RETRY_LATE = 30;   /* danach – Firefox zeigt je Anfrage einen Dialog */
+  var PERSIST_EARLY_TRIES = 4;
+
+  function persistSupported() {
+    return !!(navigator.storage && navigator.storage.persist && navigator.storage.persisted);
+  }
+
+  /* Fragt den Zustand ab und fordert bei Bedarf an. Promise -> bool. */
+  function requestPersistentStorage() {
+    if (!persistSupported()) return Promise.resolve(false);
+    return navigator.storage.persisted().then(function (already) {
+      if (already) return true;
+      return navigator.storage.persist();
+    }).catch(function () { return false; });
+  }
+
+  /* Ergebnis merken, damit die Wiederholung gestaffelt werden kann. */
+  function notePersistResult(granted) {
+    var st = S();
+    if (!st || !st.settings || Store.isDemo()) return granted;
+    if (granted) {
+      if (st.settings.persistTries || st.settings.persistAskedAt) {
+        delete st.settings.persistTries;
+        delete st.settings.persistAskedAt;
+        Store.save();
+      }
+      return granted;
+    }
+    st.settings.persistTries = (st.settings.persistTries || 0) + 1;
+    st.settings.persistAskedAt = Store.todayISO();
+    Store.save();
+    return granted;
+  }
+
+  function armPersistOnGesture() {
+    function fire() {
+      document.removeEventListener('pointerdown', fire, true);
+      document.removeEventListener('keydown', fire, true);
+      requestPersistentStorage().then(notePersistResult);
+    }
+    document.addEventListener('pointerdown', fire, true);
+    document.addEventListener('keydown', fire, true);
+  }
+
+  /* Einmal je Sitzung prüfen, ob eine erneute Anfrage fällig ist. */
+  function schedulePersistRetry() {
+    if (persistChecked) return;
+    persistChecked = true;
+    if (!persistSupported() || Store.isDemo()) return;
+    navigator.storage.persisted().then(function (already) {
+      if (already) { notePersistResult(true); return; }
+      var st = S();
+      if (!st || !st.settings) return;
+      var tries = st.settings.persistTries || 0;
+      var wait = tries < PERSIST_EARLY_TRIES ? PERSIST_RETRY_EARLY : PERSIST_RETRY_LATE;
+      if (daysSince(st.settings.persistAskedAt, Store.todayISO()) < wait) return;
+      armPersistOnGesture();
+    }).catch(function () {});
   }
 
   /* Wiederkehrende Erinnerung auf dem Startbildschirm, solange die App nicht
@@ -513,7 +590,10 @@
       }
       /* Erst nach dem Seitenaufbau, damit das Overlay über der fertigen
          Startseite liegt und nicht während des Renderns eingreift. */
-      if (route.name === 'home' && !Store.isLocked()) maybeShowInstallOverlay();
+      if (route.name === 'home' && !Store.isLocked()) {
+        maybeShowInstallOverlay();
+        schedulePersistRetry();
+      }
     } catch (err) {
       console.error('Fehler beim Seitenaufbau:', err);
       clear(appEl);
@@ -6796,6 +6876,10 @@
     ].concat(pins.nodes), [
       { label: 'Festlegen und verschlüsseln', value: true, primary: true, validate: pins.validate }
     ], { mandatory: true }).then(function () {
+      /* Sofort, noch vor der Schlüsselableitung: Die Nutzeraktion (Klick auf
+         den Modal-Button) ist nur kurz gültig, und `enableEncryption` rechnet
+         mit 310.000 PBKDF2-Runden spürbar lange. */
+      requestPersistentStorage().then(notePersistResult);
       Store.enableEncryption(pins.value(), pins.kind()).then(function () {
         UI.modal('Verschlüsselung aktiv', [
           h('p', {}, 'Alle Daten der App sind jetzt auf diesem Gerät verschlüsselt. Bewahren Sie Ihre Zugangsdaten (PIN / Passwort) an einem sicheren Ort auf (z. B. in einem Passwort-Manager).'),
@@ -6888,6 +6972,7 @@
           { label: 'Verschlüsselung aktivieren', value: true, primary: true, validate: pins.validate }
         ]).then(function (ok) {
           if (!ok) return;
+          requestPersistentStorage().then(notePersistResult);
           Store.enableEncryption(pins.value(), pins.kind()).then(function () {
             toast('Verschlüsselung ist aktiv. Die App fragt ' + (pins.kind() === 'password' ? 'das Passwort' : 'die PIN') + ' künftig beim Start ab.');
             return Store.createRecoveryKey(pins.value()).then(function (key) {

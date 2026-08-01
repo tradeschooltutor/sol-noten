@@ -469,6 +469,20 @@
           ]
         },
         {
+          id: 'faq-speicherdauer',
+          title: 'Wie lange bleiben meine Daten im Browser gespeichert?',
+          body: [
+            { t: 'p', v: 'Grundsätzlich unbegrenzt. Die Daten liegen im Speicher des Browsers und hängen an der Adresse der App, nicht am App-Symbol: Wer die {{PWA}} deinstalliert und neu installiert, findet auf PC und Android alles unverändert vor. **Auf iPhone und iPad ist das anders** – dort hat die installierte App einen eigenen Speicherbereich, und mit dem Symbol verschwinden auch die Daten.' },
+            { t: 'p', v: 'Es gibt drei Wege, auf denen die Daten dennoch verschwinden können:' },
+            { t: 'ul', v: [
+              '**Knapper Gerätespeicher.** Wird es eng, darf der Browser Daten von Websites verwerfen. SOL-Noten fordert deshalb bei der Einrichtung die Berechtigung „dauerhafter Speicher“ an; damit räumt der Browser die Daten zuletzt ab und weist vorher darauf hin. Die Vergabe entscheidet der Browser selbst – die Aussichten sind am besten, wenn die App installiert ist und regelmäßig genutzt wird.',
+              '**Safari nach sieben Tagen.** Wird SOL-Noten auf iPhone oder iPad **nicht installiert**, sondern nur im Safari-Browser benutzt, löscht Safari die Daten nach etwa sieben Tagen ohne Nutzung. Das ist der Hauptgrund für die Empfehlung, die App zu installieren.',
+              '**Löschen von Hand.** „Browserdaten löschen“, das Zurücksetzen des Geräts oder – auf dem iPad – das Entfernen des App-Symbols löschen alles. Dagegen kann keine Website etwas tun, und das ist auch richtig so: Die Hoheit über das Gerät bleibt bei Ihnen.'
+            ] },
+            { t: 'warn', v: 'Deshalb bleibt das {{Backup}} unverzichtbar. Es liegt außerhalb des Browserspeichers und übersteht alle drei Fälle – ebenso wie einen Gerätedefekt oder -verlust. Das automatische Ordner-Backup gibt es allerdings nur auf PC und Mac (Chrome/Edge); auf Tablets und Smartphones ist die regelmäßig gespeicherte Backup-Datei die einzige Sicherung.' }
+          ]
+        },
+        {
           id: 'faq-offline',
           title: 'Funktioniert die App ohne Internet?',
           body: [
@@ -533,6 +547,7 @@
           body: [
             { t: 'p', v: 'Alle Daten werden verschlüsselt gespeichert. Verschlüsseln bedeutet: Die Daten werden in eine unlesbare Form umgewandelt, die sich nur mit dem richtigen Passwort zurückrechnen lässt. Wer das Gerät in die Hand bekommt, sieht ohne Passwort also keine Namen und keine Noten.' },
             { t: 'p', v: 'Verwendet wird das Verfahren AES-256-GCM – derselbe Standard, den Banken und Behörden einsetzen. Das Passwort selbst wird nicht gespeichert; aus ihm wird der Schlüssel jedes Mal neu berechnet, und zwar absichtlich langsam (310.000 Rechenrunden), damit systematisches Durchprobieren aussichtslos wird.' },
+            { t: 'p', v: 'Die App bittet den Browser außerdem um dauerhaften Speicher, damit er die Daten nicht von sich aus verwirft, wenn der Gerätespeicher knapp wird. Auch damit bleibt das {{Backup}} nötig – gegen Löschen von Hand und gegen Gerätedefekte hilft nur die Sicherungsdatei.' },
             { t: 'p', v: 'Auf Geräten mit Fingerabdruck- oder Gesichtserkennung kann das Entsperren zusätzlich darüber erfolgen. Ebenso öffnet der {{Wiederherstellungsschlüssel}} die Daten. Alle drei Wege führen zum selben Datenschlüssel; keiner von ihnen wird im Klartext gespeichert, sondern jeweils nur der damit verschlossene Datenschlüssel.' }
           ]
         },
