@@ -413,6 +413,32 @@ textarea.input.recovery-input {
 
 /* ---------- Hilfebereich ---------- */
 .help-btn { width: 32px; height: 32px; min-height: 32px; border-radius: 8px; font-size: 1rem; font-weight: 700; flex-shrink: 0; }
+/* In der weißen Kursbox trägt das Fragezeichen die Akzentfarbe des gewählten
+   Farbschemas – dort ist es der einzige Bedienpunkt und darf auffallen. */
+.course-box-row .help-btn {
+  color: var(--teal); border-color: var(--teal); background: var(--teal-soft);
+}
+.course-box-row .help-btn:active { background: var(--teal); color: #fff; }
+
+/* Wechsel zwischen den vier Hilfeseiten, direkt unter der Titelzeile. */
+.help-nav { display: flex; flex-wrap: wrap; gap: 8px; }
+.help-nav-btn {
+  flex: 1 1 auto; min-width: 0; min-height: 40px;
+  padding: 8px 10px; border-radius: 10px; cursor: pointer;
+  border: 1px solid var(--teal); background: var(--teal-soft); color: var(--teal-dark);
+  font: inherit; font-size: 0.82rem; line-height: 1.2; text-align: center;
+}
+.help-nav-btn:active { background: var(--teal); color: #fff; }
+.help-nav-btn.active {
+  background: var(--teal); border-color: var(--teal); color: #fff; font-weight: 700;
+}
+/* Gruppenüberschrift innerhalb einer Kapitelliste. */
+.help-group-head {
+  padding: 12px 14px 6px; font-size: 0.78rem; font-weight: 700;
+  letter-spacing: 0.06em; text-transform: uppercase; color: var(--teal);
+  border-top: 1px solid var(--line);
+}
+.card-list > .help-group-head:first-child { border-top: 0; padding-top: 4px; }
 .help-inline-q {
   display: inline-flex; align-items: center; justify-content: center;
   width: 20px; height: 20px; border: 1px solid var(--line); border-radius: 6px;

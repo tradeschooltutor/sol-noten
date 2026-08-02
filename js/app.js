@@ -70,7 +70,7 @@
 
   /* ================= App-Start ================= */
 
-  var APP_VERSION = '0.40.0';
+  var APP_VERSION = '0.41.0';
 
   /* ---------- PWA-Installation ----------
      Chrome/Edge/Android liefern `beforeinstallprompt`: Event abfangen und
@@ -610,6 +610,25 @@
 
   /* Wiederverwendbarer „Über diese App“-Kasten. */
   function aboutBox() {
+    /* Der Haftungshinweis steht offen, bis er einmal bewusst zugeklappt wird –
+       die Entscheidung merkt sich die App dauerhaft. */
+    var st = S();
+    var collapsed = !!(st && st.settings && st.settings.disclaimerCollapsed);
+    var det = h('details.pct-details',
+      h('summary', {}, 'Haftungshinweis'),
+      h('p.hint', {}, DISCLAIMER_TEXT),
+      (st && st.settings && st.settings.disclaimerAcceptedAt
+        ? h('p.hint', {}, 'Bestätigt am ' + UI.fmtDate(st.settings.disclaimerAcceptedAt.slice(0, 10)) + '.')
+        : null));
+    if (!collapsed) det.setAttribute('open', 'open');
+    det.addEventListener('toggle', function () {
+      var now = !det.open;
+      if (!st || !st.settings || Store.isDemo()) return;
+      if (!!st.settings.disclaimerCollapsed === now) return;
+      st.settings.disclaimerCollapsed = now;
+      Store.save();
+    });
+
     return h('div.about-box',
       h('div.section-head', {}, 'Über diese App'),
       h('div.card',
@@ -618,12 +637,7 @@
           h('a', { href: 'mailto:vandelaar@live.de' }, 'vandelaar@live.de'), '.'),
         h('p.hint', {}, 'Version ' + APP_VERSION + ' · © 2026 Andreas Vandelaar'),
         h('p.hint', {}, 'Alle Daten sind verschlüsselt und bleiben ausschließlich auf diesem Gerät. Sie können die Daten durch verschlüsselte Backups auf andere Geräte übertragen.'),
-        h('details.pct-details',
-          h('summary', {}, 'Haftungshinweis anzeigen'),
-          h('p.hint', {}, DISCLAIMER_TEXT),
-          (S().settings.disclaimerAcceptedAt
-            ? h('p.hint', {}, 'Bestätigt am ' + UI.fmtDate(S().settings.disclaimerAcceptedAt.slice(0, 10)) + '.')
-            : null))
+        det
       )
     );
   }
@@ -3703,6 +3717,9 @@
       '.help-print-page h2{font-size:13pt;margin:0 0 2mm;}' +
       '.help-chapter-print{page-break-inside:avoid;margin:0 0 4mm;}' +
       '.help-chapter-print h3{font-size:11pt;margin:0 0 1mm;}' +
+      '.help-chapter-print h4{font-size:11pt;margin:0 0 1mm;}' +
+      '.help-group-print{font-size:10pt;letter-spacing:0.06em;text-transform:uppercase;' +
+        'margin:5mm 0 2mm;padding-bottom:1mm;border-bottom:1px solid #999;page-break-after:avoid;}' +
       '.help-p,.help-list,.help-steps{font-size:10pt;line-height:1.45;margin:0 0 2mm;}' +
       '.help-note,.help-warn{font-size:10pt;padding:1.5mm 3mm;border-left:2pt solid #333;margin:0 0 2mm;}' +
       '.help-toc{page-break-after:always;font-size:10pt;}' +
@@ -6150,7 +6167,12 @@
         h('ol', {}, pages.map(function (pg) {
           return h('li', {}, pg.title,
             pg.chapters.length
-              ? h('ul', {}, pg.chapters.map(function (c) { return h('li', {}, c.title); }))
+              ? h('ul', {}, Help.groupedChapters(pg).map(function (grp) {
+                  return grp.title
+                    ? h('li', {}, h('strong', {}, grp.title),
+                        h('ul', {}, grp.chapters.map(function (c) { return h('li', {}, c.title); })))
+                    : h('li', {}, h('ul', {}, grp.chapters.map(function (c) { return h('li', {}, c.title); })));
+                }))
               : null);
         }))));
     }
@@ -6166,10 +6188,13 @@
             h('p.help-p', {}, g.def)));
         });
       } else {
-        pg.chapters.forEach(function (c) {
-          sec.appendChild(h('div.help-chapter-print',
-            h('h3', {}, helpTitle(c.title)),
-            helpBody(c.body, true)));
+        Help.groupedChapters(pg).forEach(function (grp) {
+          if (grp.title) sec.appendChild(h('h3.help-group-print', {}, grp.title));
+          grp.chapters.forEach(function (c) {
+            sec.appendChild(h('div.help-chapter-print',
+              h('h4', {}, helpTitle(c.title)),
+              helpBody(c.body, true)));
+          });
         });
       }
       host.appendChild(sec);
@@ -6214,6 +6239,22 @@
     );
   };
 
+  /* Wechsel zwischen den vier Hilfeseiten. Steht auf jeder Unterseite direkt
+     unter der Titelzeile, die dort immer „Hilfe“ heißt – welche Seite offen
+     ist, zeigt die hervorgehobene Schaltfläche. */
+  function helpNav(currentId, back) {
+    return h('div.card.card-tight.help-nav', {}, Help.PAGES.map(function (pg) {
+      var active = pg.id === currentId;
+      return h('button.help-nav-btn' + (active ? '.active' : ''), {
+        'aria-current': active ? 'page' : null,
+        onclick: function () {
+          if (active) return;
+          go('helpPage', { id: pg.id, back: back });
+        }
+      }, pg.navTitle || pg.title);
+    }));
+  }
+
   /* ---- Einzelne Hilfeseite ---- */
   views.helpPage = function (p) {
     /* Aufruf über ein Kapitel (Fragezeichen) oder über die Seiten-ID. */
@@ -6229,7 +6270,8 @@
 
     if (page.isGlossary) {
       return h('div.screen',
-        header(page.title, back),
+        header('Hilfe', back),
+        helpNav(page.id, back),
         h('div.card.card-tight', h('p.hint', {}, page.lead)),
         h('div.card.card-list', {}, Help.GLOSSARY.map(function (g) {
           return h('details.help-chapter',
@@ -6243,16 +6285,31 @@
       );
     }
 
-    var chapters = page.chapters.map(function (c) {
-      var det = h('details.help-chapter' + (c.id === openChapter ? '.open-target' : ''),
-        h('summary', {}, helpTitle(c.title)));
-      if (c.id === openChapter) det.setAttribute('open', 'open');
-      det.appendChild(helpBody(c.body, false));
-      det._searchText = (c.title + ' ' + Help.plainText(c.body)).toLowerCase();
-      return det;
+    /* Kapitel gruppiert aufbauen. `groups` merkt sich zu jeder Überschrift
+       ihre Kapitel, damit die Suche leere Gruppen ausblenden kann. */
+    var chapters = [];
+    var listNodes = [];
+    var groupBlocks = [];
+    Help.groupedChapters(page).forEach(function (grp) {
+      var headNode = null;
+      if (grp.title) {
+        headNode = h('div.help-group-head', {}, grp.title);
+        listNodes.push(headNode);
+      }
+      var own = grp.chapters.map(function (c) {
+        var det = h('details.help-chapter' + (c.id === openChapter ? '.open-target' : ''),
+          h('summary', {}, helpTitle(c.title)));
+        if (c.id === openChapter) det.setAttribute('open', 'open');
+        det.appendChild(helpBody(c.body, false));
+        det._searchText = (c.title + ' ' + (grp.title || '') + ' ' + Help.plainText(c.body)).toLowerCase();
+        listNodes.push(det);
+        chapters.push(det);
+        return det;
+      });
+      if (headNode) groupBlocks.push({ head: headNode, items: own });
     });
 
-    var listHost = h('div.card.card-list', {}, chapters);
+    var listHost = h('div.card.card-list', {}, listNodes);
     var emptyHint = h('p.hint.search-empty', { style: { display: 'none' } },
       'Kein Kapitel gefunden. Versuchen Sie einen anderen Begriff.');
 
@@ -6275,12 +6332,18 @@
           else if (q) det.removeAttribute('open');
         });
         emptyHint.style.display = hits ? 'none' : '';
+        /* Überschrift nur zeigen, wenn in der Gruppe noch etwas übrig ist. */
+        groupBlocks.forEach(function (g) {
+          var visible = g.items.some(function (det) { return det.style.display !== 'none'; });
+          g.head.style.display = visible ? '' : 'none';
+        });
       });
       searchBar = h('div.card.card-tight', searchInput);
     }
 
     var screen = h('div.screen',
-      header(page.title, back),
+      header('Hilfe', back),
+      helpNav(page.id, back),
       h('div.card.card-tight', h('p.hint', {}, page.lead)),
       searchBar,
       listHost,
@@ -6383,12 +6446,39 @@
       snapHost.appendChild(h('p.hint', {}, 'Interne Sicherungsstände (automatisch, je einer pro Tag) – stellen Fehlbedienungen wieder her, ersetzen aber kein Backup auf einem anderen Gerät:'));
       keys.slice(0, 5).forEach(function (k) {
         snapHost.appendChild(h('button.btn-plain.btn-block', { onclick: function () {
-          UI.confirmDialog('Stand vom ' + UI.fmtDate(k) + ' wiederherstellen?',
-            'Alle Änderungen seit diesem Stand gehen verloren.', 'Wiederherstellen', true)
-            .then(function (ok) {
-              if (!ok) return;
+          /* Wiederherstellen verwirft alle Eingaben seit diesem Stand – also
+             dieselbe Reibung wie beim Löschen eines Schuljahres. */
+          var secured = Store.isEncrypted();
+          var pwInput = h('input.input', { type: 'password',
+            autocomplete: 'current-password',
+            placeholder: Store.secretKind() === 'password' ? 'Passwort' : 'PIN' });
+          var err = h('p.hint.error-text');
+          UI.modal('Stand vom ' + UI.fmtDate(k) + ' wiederherstellen?', [
+            h('p', {}, 'Der gespeicherte Stand vom ' + UI.fmtDate(k) + ' ersetzt die aktuellen Daten. Alle Änderungen seit diesem Stand gehen verloren.'),
+            secured
+              ? h('label.field', h('span.field-label', {}, 'Zur Bestätigung: PIN / Passwort der App'), pwInput)
+              : null,
+            err
+          ], [
+            { label: 'Abbrechen', value: false },
+            { label: 'Wiederherstellen', value: true, danger: true,
+              validate: function () {
+                if (secured && !pwInput.value) {
+                  err.textContent = 'Bitte geben Sie zur Bestätigung Ihre PIN bzw. Ihr Passwort ein.';
+                  return false;
+                }
+                return true;
+              } }
+          ]).then(function (ok) {
+            if (!ok) return;
+            Store.verifySecret(pwInput.value).then(function (valid) {
+              if (!valid) {
+                UI.modal('Nicht wiederhergestellt', h('p', {}, 'Die eingegebene PIN bzw. das Passwort ist nicht korrekt. Die Daten wurden nicht verändert.'));
+                return;
+              }
               Store.restoreSnapshot(k).then(function () { toast('Stand wiederhergestellt.'); go('home'); });
             });
+          });
         } }, 'Stand vom ' + UI.fmtDate(k) + ' wiederherstellen'));
       });
     });

@@ -137,6 +137,16 @@
     /* ---------------------------------------------------------------- */
     {
       id: 'faq',
+      groups: [
+        'Erste Orientierung',
+        'Sonstige Leistungen (SoLei)',
+        'Weitere Prüfungsleistungen',
+        'Auswertung',
+        'Kurs-Einstellungen',
+        'Klassen & Schuljahre',
+        'Globale Einstellungen',
+        'Gerät & Technik'
+      ],
       title: 'FAQ',
       lead: 'Häufige Fragen zu allen Funktionen – über das Suchfeld schnell zu finden.',
       searchable: true,
@@ -144,6 +154,7 @@
         /* ===== Grundlagen ===== */
         {
           id: 'faq-startseite',
+          group: 'Erste Orientierung',
           title: 'Was sehe ich auf der Startseite?',
           body: [
             { t: 'p', v: 'Alle Kurse des ausgewählten Schuljahres als Kacheln. Ein Kurs ist immer eine Klasse in einem Fach – dieselbe Klasse kann also mehrere Kurse haben. Ein Tipp auf die Kachel öffnet den Kurs.' },
@@ -152,6 +163,7 @@
         },
         {
           id: 'faq-kursseite',
+          group: 'Erste Orientierung',
           title: 'Wie ist die Kursseite aufgebaut?',
           body: [
             { t: 'p', v: 'In drei Bereiche. **Sonstige Leistungen** enthält alles, was im laufenden Unterricht entsteht: Punkte vergeben, Sitzplan, Punktestand, {{Ergebnis-Uploads}}, Fehlzeiten und Quartalsnoten. **Weitere Prüfungsleistungen** umfasst {{OBT}} und Klausuren. **Auswertung** führt zur Notenübersicht mit den {{Zeugnisnote|Zeugnisnoten}}.' },
@@ -160,6 +172,7 @@
         },
         {
           id: 'faq-solei-note',
+          group: 'Sonstige Leistungen (SoLei)',
           title: 'Wie entsteht die SoLei-Note?',
           body: [
             { t: 'p', v: 'Über das {{Quartal}} vergeben Sie Punkte in den fünf {{SoLei-Kriterien}}. Am Quartalsende bildet die App je Kriterium den Durchschnitt Ihrer Vergaben, addiert diese fünf Durchschnitte und erhält so eine Summe von höchstens 15 Punkten. Aus dieser Summe wird über den 15-Punkte-{{Bewertungsspiegel}} die Note.' },
@@ -169,6 +182,7 @@
         },
         {
           id: 'faq-punkte',
+          group: 'Sonstige Leistungen (SoLei)',
           title: 'Wie vergebe ich SoLei-Punkte im Unterricht?',
           body: [
             { t: 'p', v: 'Über „SoLei-Punkte vergeben“. Es gibt zwei Ansichten: **Ansicht Kriterium** zeigt alle Personen untereinander und Sie bewerten ein Kriterium für die ganze Gruppe – das ist der schnellste Weg im laufenden Unterricht. **Ansicht Schüler/in** zeigt alle fünf Kriterien einer Person auf einmal, dazu ein Notizfeld.' },
@@ -189,11 +203,12 @@
               '**7 – Kursnotiz (aufgeklappt):** Der Text gehört zu dieser Person **und** zu dem oben eingestellten Datum.'
             ] },
             { t: 'p', v: '**Die Kursnotiz** (Symbol 2) ist eine kurze Beobachtung zu einer Person an einem Tag, zum Beispiel „hat heute die Gruppe gut moderiert“ oder „ohne Material erschienen“. Pro Person und Datum ist eine Notiz möglich; sie speichert sich beim Verlassen des Feldes, leerer Text löscht sie wieder. Wiedergefunden werden die Notizen auf „SoLei-Quartalsnoten“ und in der Einzelansicht des SoLei-Punktestands – also genau dann, wenn Sie die Quartalsnote festlegen oder ein Notengespräch vorbereiten. Ausführlicher beschreibt das [[help:faq-notizen|dieses Kapitel]].' },
-            { t: 'note', v: 'Oben stellen Sie das Datum ein. Das {{Quartal}} ergibt sich immer aus diesem Datum – Sie können also problemlos nachtragen, was Sie im Unterricht nicht geschafft haben.' }
+            { t: 'note', v: 'Die Eingabe erfolgt standardmäßig zum aktuellen **Datum**. Sie können jedoch auch ein anderes Datum auswählen (Auswahlfeld oben links), um Eintragungen nachzuholen. Ihre Eintragungen wirken sich anhand des ausgewählten Datums automatisch auf die passende {{Quartal|Quartalsnote}} aus.' }
           ]
         },
         {
           id: 'faq-notizen',
+          group: 'Sonstige Leistungen (SoLei)',
           title: 'Wie halte ich Beobachtungen zu einzelnen Personen fest?',
           body: [
             { t: 'p', v: 'In der Ansicht Schüler/in auf der Seite „SoLei-Punkte vergeben“ steht unter den fünf Kriterien ein Notizfeld. Pro Person und Datum ist eine Notiz möglich; sie speichert sich beim Verlassen des Feldes, leerer Text löscht sie wieder.' },
@@ -202,6 +217,7 @@
         },
         {
           id: 'faq-sitzplan',
+          group: 'Sonstige Leistungen (SoLei)',
           title: 'Wofür ist der Sitzplan gut?',
           body: [
             { t: 'p', v: 'Er ist ein weiterer Weg zur SoLei-Punktevergabe: Sie sehen die Klasse so, wie sie vor Ihnen sitzt, tippen auf eine Person und vergeben die Punkte. Im Modus „Sitzplan bearbeiten“ ordnen Sie die Plätze an, im Modus „SL-Punkte geben“ bewerten Sie.' },
@@ -211,6 +227,7 @@
         },
         {
           id: 'faq-fotos',
+          group: 'Sonstige Leistungen (SoLei)',
           title: 'Wie funktionieren die Fotos, und ist das datenschutzkonform?',
           body: [
             { t: 'p', v: 'Fotos erfassen Sie im Reiter „Fotos verwalten“ auf der Sitzplan-Seite. Sie werden verkleinert und wie alle anderen Daten {{Verschlüsselung|verschlüsselt}} auf dem Gerät gespeichert – sie verlassen es nicht.' },
@@ -220,6 +237,7 @@
         },
         {
           id: 'faq-uploads',
+          group: 'Sonstige Leistungen (SoLei)',
           title: 'Was sind Ergebnis-Uploads, und wie zähle ich sie?',
           body: [
             { t: 'p', v: 'Wenn Ihre Schüler/innen die Aufgabe haben, ihre Arbeitsergebnisse in das {{Lernmanagementsystem}} der Schule hochzuladen (z. B. Moodle/Logineo, OneNote, Teams), können Sie das in die Bewertung einfließen lassen. Dafür gibt es zwei Wege:' },
@@ -233,6 +251,7 @@
         },
         {
           id: 'faq-fehlzeiten',
+          group: 'Sonstige Leistungen (SoLei)',
           title: 'Wie erfasse ich unentschuldigte Fehlzeiten?',
           body: [
             { t: 'p', v: 'Über „Unentschuldigte Fehlzeiten“. In der **Ansicht Schüler/in** tippen Sie im Raster die Tage an, an denen jemand gefehlt hat; in der **Ansicht Datum** erfassen Sie einen Tag für mehrere Personen gleichzeitig.' },
@@ -242,6 +261,7 @@
         },
         {
           id: 'faq-unterrichtstage',
+          group: 'Kurs-Einstellungen',
           title: 'Wie hinterlege ich die Unterrichtstage, und was bringt das?',
           body: [
             { t: 'p', v: 'In den Kurs-Einstellungen unter „Unterrichtstage“ wählen Sie die Wochentage, an denen der Kurs stattfindet. Danach zeigen die Fehlzeiten-Ansicht und die Stundeninhalte nur noch diese Tage.' },
@@ -251,6 +271,7 @@
         },
         {
           id: 'faq-stundeninhalte',
+          group: 'Sonstige Leistungen (SoLei)',
           title: 'Wie halte ich Unterrichtsinhalte fest?',
           body: [
             { t: 'p', v: 'Über das Buch-Symbol rechts oben in der weißen Box auf der Kursseite. Sie sehen die Termine des gewählten Quartals und tragen zu jedem den Inhalt ein; gespeichert wird automatisch.' },
@@ -260,6 +281,7 @@
         },
         {
           id: 'faq-punktestand',
+          group: 'Auswertung',
           title: 'Wo sehe ich den aktuellen Stand einer Person?',
           body: [
             { t: 'p', v: 'Auf „SoLei-Punktestand“. Die Listenansicht zeigt für alle Personen die Punktesumme von 15 und die daraus errechnete Note, am Ende der Liste den Klassendurchschnitt.' },
@@ -269,6 +291,7 @@
         },
         {
           id: 'faq-quartalsnoten',
+          group: 'Auswertung',
           title: 'Wie schließe ich ein Quartal ab?',
           body: [
             { t: 'p', v: 'Auf „SoLei-Quartalsnoten“. Dort steht je Person die aus den Punkten errechnete Note, darunter die Kursnotizen des Quartals als Entscheidungshilfe. Optional tragen Sie eine {{Portfolio}}- oder mündliche Prüfungsnote ein, die verrechnet wird.' },
@@ -277,6 +300,7 @@
         },
         {
           id: 'faq-obt',
+          group: 'Weitere Prüfungsleistungen',
           title: 'Wie erfasse ich Open Book Tests?',
           body: [
             { t: 'p', v: 'Auf der Seite „Open Book Tests“ wählen Sie Halbjahr und Test und tragen je Person den erreichten **Prozentwert** ein. Die Note ergibt sich daraus über den Prozent-{{Bewertungsspiegel}}; gespeichert wird automatisch.' },
@@ -286,6 +310,7 @@
         },
         {
           id: 'faq-klausuren',
+          group: 'Weitere Prüfungsleistungen',
           title: 'Wie bewerte ich eine Klausur?',
           body: [
             { t: 'p', v: 'Es gibt zwei Verfahren, umschaltbar in den Globalen Einstellungen unter „Klausurbewertung“:' },
@@ -299,6 +324,7 @@
         },
         {
           id: 'faq-klausur-druck',
+          group: 'Weitere Prüfungsleistungen',
           title: 'Wie drucke ich Bewertungsbögen in der Reihenfolge meines Korrekturstapels?',
           body: [
             { t: 'p', v: 'Die App merkt sich, in welcher Reihenfolge Sie die Personen zuerst bewertet haben. Stellen Sie die Sortierung von „Alphabet“ auf „Eingabe“ um, stehen sie genau in der Reihenfolge Ihres Stapels – und die Bewertungsbögen kommen in derselben Ordnung aus dem Drucker.' },
@@ -307,6 +333,7 @@
         },
         {
           id: 'faq-zeugnisnoten',
+          group: 'Auswertung',
           title: 'Wie kommt die Zeugnisnote zustande?',
           body: [
             { t: 'p', v: 'Auf „Notenübersicht & Zeugnisnoten“ führt die App alles zusammen: SoLei-Quartalsnoten, {{OBT}} und Klausuren. Aus der in den Kurs-Einstellungen festgelegten {{Gewichtung}} – standardmäßig 40 % sonstige Leistungen, 20 % Open Book Tests, 40 % Klausuren – berechnet sie einen **Vorschlag** für Halbjahr und Schuljahr.' },
@@ -316,6 +343,7 @@
         },
         {
           id: 'faq-bewertungsspiegel',
+          group: 'Kurs-Einstellungen',
           title: 'Kann ich die Notenschlüssel anpassen?',
           body: [
             { t: 'p', v: 'Ja, in den Globalen Einstellungen. Der **15-Punkte-Spiegel** wandelt die SoLei-Punktesumme in eine Note, der **Prozent-Spiegel** die Prozentwerte von Open Book Tests und Klausuren.' },
@@ -324,6 +352,7 @@
         },
         {
           id: 'faq-kurseinstellungen',
+          group: 'Kurs-Einstellungen',
           title: 'Was stelle ich je Kurs ein?',
           body: [
             { t: 'p', v: 'In den Kurs-Einstellungen: Klasse und Fach, Anzahl der Open Book Tests und Klausuren, die {{Gewichtung}} für die Zeugnisnote, das Kriterium für die {{Ergebnis-Uploads}} und die Unterrichtstage.' },
@@ -333,6 +362,7 @@
         },
         {
           id: 'faq-maxpoints',
+          group: 'Kurs-Einstellungen',
           title: 'Wozu dienen die SoLei-Maximalpunkte, und wann ändere ich sie?',
           body: [
             { t: 'p', v: 'Die {{SoLei-Maximalpunkte}} in den Kurs-Einstellungen legen fest, wie viele Punkte je Kriterium und {{Quartal}} höchstens erreichbar sind. In Summe ergeben sie immer 15.' },
@@ -342,6 +372,7 @@
         },
         {
           id: 'faq-quartalszeitraeume',
+          group: 'Kurs-Einstellungen',
           title: 'Kann ich die Quartalszeiträume ändern?',
           body: [
             { t: 'p', v: 'Ja. Die App schlägt sie aus dem ersten Schultag und den Schulferien vor – je etwa zehn Schulwochen. In den Kurs-Einstellungen unter „Quartalszeiträume dieses Kurses“ passen Sie Anfang und Ende von Hand an, etwa bei abweichendem Blockbeginn.' },
@@ -350,6 +381,7 @@
         },
         {
           id: 'faq-schuelerliste',
+          group: 'Klassen & Schuljahre',
           title: 'Wie pflege ich die Schülerliste?',
           body: [
             { t: 'p', v: 'Über die Kurs-Einstellungen, Punkt „Schülerliste bearbeiten“. Namen können Sie einzeln eintragen oder über „Aus Excel einfügen“ als Block übernehmen – letzteres ist bei ganzen Klassen deutlich schneller.' },
@@ -359,6 +391,7 @@
         },
         {
           id: 'faq-zweiter-kurs',
+          group: 'Klassen & Schuljahre',
           title: 'Wie lege ich einen zweiten Kurs für dieselbe Klasse an?',
           body: [
             { t: 'p', v: 'In den Kurs-Einstellungen über „Neuer Kurs für ein anderes Fach in dieser Klasse“. Die Klasse ist dann bereits ausgewählt, die Schülerliste samt Fotos wird weiterverwendet.' },
@@ -368,6 +401,7 @@
         /* ===== Schuljahr, Sicherung, Geräte ===== */
         {
           id: 'faq-schuljahr',
+          group: 'Klassen & Schuljahre',
           title: 'Wie lege ich ein neues Schuljahr an?',
           body: [
             { t: 'p', v: 'In den [[app:settings|Globalen Einstellungen]] unter „Schuljahre“. Die App schlägt den ersten Schultag als ersten Werktag nach den Sommerferien vor und berechnet daraus die vier {{Quartal|Quartale}}.' },
@@ -376,6 +410,7 @@
         },
         {
           id: 'faq-schuljahreswechsel',
+          group: 'Klassen & Schuljahre',
           title: 'Wie übernehme ich Klassen ins neue Schuljahr?',
           body: [
             { t: 'p', v: 'Über den Schuljahreswechsel-Assistenten: neues Schuljahr anlegen, dann „Aus einem früheren Schuljahr übernehmen“. Sie wählen die Kurse aus, die weiterlaufen sollen.' },
@@ -385,6 +420,7 @@
         },
         {
           id: 'faq-backup',
+          group: 'Globale Einstellungen',
           title: 'Wie sichere ich meine Daten?',
           body: [
             { t: 'p', v: 'In den [[app:settings|Globalen Einstellungen]] unter „Datensicherung“. Das {{Backup}} ist verschlüsselt und enthält alle Schuljahre, Kurse, Bewertungen und Fotos.' },
@@ -399,6 +435,7 @@
         },
         {
           id: 'faq-zweites-geraet',
+          group: 'Globale Einstellungen',
           title: 'Wie bekomme ich meine Daten auf ein zweites Gerät?',
           body: [
             { t: 'p', v: 'Über ein {{Backup}}: Auf dem ersten Gerät ein Backup erstellen, die Datei auf das zweite Gerät übertragen (USB-Stick, Cloud-Ordner, E-Mail an sich selbst) und dort in den Globalen Einstellungen einspielen.' },
@@ -407,6 +444,7 @@
         },
         {
           id: 'faq-plattformen',
+          group: 'Gerät & Technik',
           title: 'Was ist auf welchem Gerät anders?',
           body: [
             { t: 'ul', v: [
@@ -420,6 +458,7 @@
         },
         {
           id: 'faq-pin',
+          group: 'Globale Einstellungen',
           title: 'Kann ich PIN oder Passwort ändern – und was, wenn ich es vergesse?',
           body: [
             { t: 'p', v: 'Ändern ja: Globale Einstellungen, Abschnitt „Zugangsschutz & Verschlüsselung“. Dort aktivieren Sie auch das Entsperren per Fingerabdruck oder Gesichtserkennung, sofern Ihr Gerät das unterstützt.' },
@@ -430,6 +469,7 @@
         },
         {
           id: 'faq-reset',
+          group: 'Globale Einstellungen',
           title: 'Wie setze ich die App vollständig zurück?',
           body: [
             { t: 'p', v: 'Über die [[app:settings|Globalen Einstellungen]] („Zugangsschutz & Verschlüsselung“, Gefahrenbereich) oder – wenn Sie gar nicht mehr hineinkommen – auf dem Sperrbildschirm über „PIN vergessen?“. Das Zurücksetzen löscht alle Schuljahre, Klassen, Noten und Fotos auf diesem Gerät unwiderruflich. Backup-Dateien außerhalb der App bleiben erhalten.' },
@@ -444,6 +484,7 @@
         },
         {
           id: 'faq-export',
+          group: 'Auswertung',
           title: 'Wie exportiere ich Noten nach Excel oder als PDF?',
           body: [
             { t: 'p', v: 'Auf „Notenübersicht & Zeugnisnoten“ finden Sie „Als Excel-Datei exportieren“ und „Drucken / als PDF speichern“. Für ganze Schuljahre gibt es in den Globalen Einstellungen unter „Schuljahre“ den „Excel-Export aller Schuljahresdaten“ mit allen Rohdaten je Kurs.' },
@@ -452,6 +493,7 @@
         },
         {
           id: 'faq-schuljahr-loeschen',
+          group: 'Globale Einstellungen',
           title: 'Wie werde ich alte Daten wieder los?',
           body: [
             { t: 'p', v: 'Einzelne Kurse löschen Sie in den Kurs-Einstellungen im Gefahrenbereich, ganze Schuljahre in den Globalen Einstellungen unter „Schuljahre“. Beides verlangt eine bewusste Bestätigung – den Kursnamen beziehungsweise Ihr Passwort.' },
@@ -461,6 +503,7 @@
         },
         {
           id: 'faq-demo',
+          group: 'Globale Einstellungen',
           title: 'Wie führe ich die App vor, ohne echte Daten zu zeigen?',
           body: [
             { t: 'p', v: 'Mit dem {{Demo-Modus}} in den [[app:settings|Globalen Einstellungen]]. Er zeigt zwei erfundene Klassen mit drei Kursen; die Quartale 1 bis 3 sind bewertet, das vierte ist leer, sodass Sie jede Eingabe live vorführen können.' },
@@ -470,6 +513,7 @@
         },
         {
           id: 'faq-speicherdauer',
+          group: 'Globale Einstellungen',
           title: 'Wie lange bleiben meine Daten im Browser gespeichert?',
           body: [
             { t: 'p', v: 'Grundsätzlich unbegrenzt. Die Daten liegen im Speicher des Browsers und hängen an der Adresse der App, nicht am App-Symbol: Wer die {{PWA}} deinstalliert und neu installiert, findet auf PC und Android alles unverändert vor. **Auf iPhone und iPad ist das anders** – dort hat die installierte App einen eigenen Speicherbereich, und mit dem Symbol verschwinden auch die Daten.' },
@@ -479,11 +523,14 @@
               '**Safari nach sieben Tagen.** Wird SOL-Noten auf iPhone oder iPad **nicht installiert**, sondern nur im Safari-Browser benutzt, löscht Safari die Daten nach etwa sieben Tagen ohne Nutzung. Das ist der Hauptgrund für die Empfehlung, die App zu installieren.',
               '**Löschen von Hand.** „Browserdaten löschen“, das Zurücksetzen des Geräts oder – auf dem iPad – das Entfernen des App-Symbols löschen alles. Dagegen kann keine Website etwas tun, und das ist auch richtig so: Die Hoheit über das Gerät bleibt bei Ihnen.'
             ] },
-            { t: 'warn', v: 'Deshalb bleibt das {{Backup}} unverzichtbar. Es liegt außerhalb des Browserspeichers und übersteht alle drei Fälle – ebenso wie einen Gerätedefekt oder -verlust. Das automatische Ordner-Backup gibt es allerdings nur auf PC und Mac (Chrome/Edge); auf Tablets und Smartphones ist die regelmäßig gespeicherte Backup-Datei die einzige Sicherung.' }
+            { t: 'warn', v: 'Deshalb bleibt das {{Backup}} unverzichtbar. Es liegt außerhalb des Browserspeichers und übersteht alle drei Fälle – ebenso wie einen Gerätedefekt oder -verlust.' },
+            { t: 'p', v: 'Nicht verwechseln sollten Sie damit die **internen Sicherungsstände**, die die App automatisch anlegt (einer je Tag, die letzten 14). Die gibt es auf jedem Gerät, und sie helfen zuverlässig gegen Fehlbedienungen – ein versehentlich gelöschter Kurs etwa lässt sich darüber zurückholen. Sie liegen aber im selben Browserspeicher wie die Echtdaten und verschwinden deshalb in allen drei oben genannten Fällen mit. Als Schutz vor Datenverlust taugen sie nicht.' },
+            { t: 'p', v: 'Das **automatische Ordner-Backup** schreibt dagegen echte Dateien in einen Ordner Ihrer Wahl und übersteht alles davon. Es setzt allerdings eine Browser-Schnittstelle voraus, die nicht überall vorhanden ist: Chrome und Edge bieten sie an (auch auf Android), Safari auf iPad und iPhone nicht. Verlassen Sie sich dabei nicht auf Listen – die App prüft es selbst: Erscheint in den [[app:settings|Globalen Einstellungen]] unter „Datensicherung“ der Button „Automatisches Backup: Ordner wählen“, ist es auf Ihrem Gerät möglich. Erscheint stattdessen ein Hinweistext, erinnert die App alle sieben Tage an ein Backup von Hand – und dann ist die selbst gespeicherte Backup-Datei die einzige echte Sicherung.' }
           ]
         },
         {
           id: 'faq-offline',
+          group: 'Gerät & Technik',
           title: 'Funktioniert die App ohne Internet?',
           body: [
             { t: 'p', v: 'Ja, nach der Installation vollständig. Die App lädt aus dem Gerätespeicher, und alle Daten liegen ohnehin lokal.' },
@@ -492,6 +539,7 @@
         },
         {
           id: 'faq-update',
+          group: 'Gerät & Technik',
           title: 'Wie bekomme ich Aktualisierungen?',
           body: [
             { t: 'p', v: 'Automatisch. Sobald eine neue Fassung vorliegt und Sie online sind, erscheint oben ein Hinweis mit dem Button „Jetzt aktualisieren“. Ihre Daten bleiben dabei unverändert erhalten.' },
@@ -500,6 +548,7 @@
         },
         {
           id: 'faq-fehler',
+          group: 'Gerät & Technik',
           title: 'Etwas funktioniert nicht – was kann ich tun?',
           body: [
             { t: 'p', v: 'Erscheint eine Fehlermeldung beim Seitenaufbau, sind Ihre Daten davon nicht betroffen; die Meldung betrifft nur die Anzeige. Verlassen Sie die Seite und öffnen Sie sie erneut.' },
@@ -623,6 +672,25 @@
   }
 
   /* Reiner Text eines Kapitels – für Suche und Druck. */
+  /* Kapitel einer Seite nach Gruppen sortiert. Seiten ohne `groups` liefern
+     eine einzige Gruppe ohne Überschrift – so bleibt der Aufrufcode gleich.
+     Die Reihenfolge folgt `page.groups`, nicht der Reihenfolge im Quelltext. */
+  function groupedChapters(page) {
+    if (!page || !page.chapters) return [];
+    if (!page.groups || !page.groups.length) {
+      return [{ title: null, chapters: page.chapters }];
+    }
+    var out = [];
+    page.groups.forEach(function (g) {
+      var list = page.chapters.filter(function (c) { return c.group === g; });
+      if (list.length) out.push({ title: g, chapters: list });
+    });
+    /* Sicherheitsnetz: ein Kapitel ohne (gültige) Gruppe geht nicht verloren. */
+    var rest = page.chapters.filter(function (c) { return page.groups.indexOf(c.group) === -1; });
+    if (rest.length) out.push({ title: 'Sonstiges', chapters: rest });
+    return out;
+  }
+
   function plainText(body) {
     return (body || []).filter(function (b) { return b.t !== 'mock'; }).map(function (b) {
       var v = Array.isArray(b.v) ? b.v.join(' ') : b.v;
@@ -633,6 +701,6 @@
   return {
     PAGES: PAGES, GLOSSARY: GLOSSARY, CONTEXT: CONTEXT,
     glossaryFor: glossaryFor, pageById: pageById, chapterById: chapterById,
-    plainText: plainText
+    plainText: plainText, groupedChapters: groupedChapters
   };
 });
