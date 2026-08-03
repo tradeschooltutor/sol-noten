@@ -202,17 +202,8 @@
               '**6 – Tipp-Buttons:** Die möglichen Punktwerte, abgeleitet aus den {{SoLei-Maximalpunkte|Maximalpunkten}} des Kriteriums.',
               '**7 – Kursnotiz (aufgeklappt):** Der Text gehört zu dieser Person **und** zu dem oben eingestellten Datum.'
             ] },
-            { t: 'p', v: '**Die Kursnotiz** (Symbol 2) ist eine kurze Beobachtung zu einer Person an einem Tag, zum Beispiel „hat heute die Gruppe gut moderiert“ oder „ohne Material erschienen“. Pro Person und Datum ist eine Notiz möglich; sie speichert sich beim Verlassen des Feldes, leerer Text löscht sie wieder. Wiedergefunden werden die Notizen auf „SoLei-Quartalsnoten“ und in der Einzelansicht des SoLei-Punktestands – also genau dann, wenn Sie die Quartalsnote festlegen oder ein Notengespräch vorbereiten. Ausführlicher beschreibt das [[help:faq-notizen|dieses Kapitel]].' },
+            { t: 'p', v: '**Die Kursnotiz** (Symbol 2) ist eine kurze Beobachtung zu einer Person an einem Tag, zum Beispiel „hat heute die Gruppe gut moderiert“ oder „ohne Material erschienen“. Pro Person und Datum ist eine Notiz möglich; sie speichert sich beim Verlassen des Feldes, leerer Text löscht sie wieder. Wiedergefunden werden die Notizen auf „SoLei-Quartalsnoten“ und in der Einzelansicht des SoLei-Punktestands – also genau dann, wenn Sie die Quartalsnote festlegen oder ein Notengespräch vorbereiten.' },
             { t: 'note', v: 'Die Eingabe erfolgt standardmäßig zum aktuellen **Datum**. Sie können jedoch auch ein anderes Datum auswählen (Auswahlfeld oben links), um Eintragungen nachzuholen. Ihre Eintragungen wirken sich anhand des ausgewählten Datums automatisch auf die passende {{Quartal|Quartalsnote}} aus.' }
-          ]
-        },
-        {
-          id: 'faq-notizen',
-          group: 'Sonstige Leistungen (SoLei)',
-          title: 'Wie halte ich Beobachtungen zu einzelnen Personen fest?',
-          body: [
-            { t: 'p', v: 'In der Ansicht Schüler/in auf der Seite „SoLei-Punkte vergeben“ steht unter den fünf Kriterien ein Notizfeld. Pro Person und Datum ist eine Notiz möglich; sie speichert sich beim Verlassen des Feldes, leerer Text löscht sie wieder.' },
-            { t: 'p', v: 'Wieder finden Sie die Notizen an zwei Stellen: auf „SoLei-Quartalsnoten“ unter der jeweiligen Person und auf „SoLei-Punktestand“ in der Einzelansicht – dort also genau dann, wenn Sie die Quartalsnote festlegen oder ein Gespräch vorbereiten.' }
           ]
         },
         {
@@ -445,7 +436,7 @@
         {
           id: 'faq-plattformen',
           group: 'Gerät & Technik',
-          title: 'Was ist auf welchem Gerät anders?',
+          title: 'Welche Unterschiede gibt es zwischen den verschiedenen Endgeräten?',
           body: [
             { t: 'ul', v: [
               '**Installation:** PC/Android per Button in einem Schritt; iPhone/iPad über Safari, Teilen-Symbol, „Zum Home-Bildschirm“. Firefox am PC kann nicht installieren.',
@@ -462,9 +453,9 @@
           title: 'Kann ich PIN oder Passwort ändern – und was, wenn ich es vergesse?',
           body: [
             { t: 'p', v: 'Ändern ja: Globale Einstellungen, Abschnitt „Zugangsschutz & Verschlüsselung“. Dort aktivieren Sie auch das Entsperren per Fingerabdruck oder Gesichtserkennung, sofern Ihr Gerät das unterstützt.' },
-            { t: 'p', v: 'Vergessen ist kein Beinbruch, **solange Sie den {{Wiederherstellungsschlüssel}} haben**: Auf dem Sperrbildschirm tippen Sie „PIN vergessen?“ und dann „Schlüssel eingeben“. Die App öffnet sich, **alle Daten sind unverändert vorhanden**, und Sie legen anschließend einen neuen Zugang fest. Weil der benutzte Schlüssel damit im Umlauf ist (Zettel, Datei, Zwischenablage), erzeugt die App im selben Zug einen frischen.' },
+            { t: 'p', v: 'Vergessen ist kein Beinbruch, **solange Sie den** {{Wiederherstellungsschlüssel}} **haben**: Auf dem Sperrbildschirm tippen Sie „PIN vergessen?“ und dann „Schlüssel eingeben“. Die App öffnet sich, **alle Daten sind unverändert vorhanden**, und Sie legen anschließend einen neuen Zugang fest. Weil der benutzte Schlüssel damit im Umlauf ist (Zettel, Datei, Zwischenablage), erzeugt die App im selben Zug einen frischen.' },
             { t: 'warn', v: 'Ohne PIN **und** ohne Wiederherstellungsschlüssel bedeutet Vergessen **endgültigen Datenverlust**. Es gibt keine Hintertür, auch nicht für den Entwickler – ohne Schlüssel existiert kein Weg zu den {{Verschlüsselung|verschlüsselten}} Daten. Dann hilft nur noch eine {{Backup|Backup-Datei}}.' },
-            { t: 'p', v: 'Einen neuen Schlüssel erzeugen Sie jederzeit in den [[app:settings|Globalen Einstellungen]] unter „Zugangsschutz & Verschlüsselung“ – auch dann, wenn schon einer existiert, etwa weil die alte Notiz verloren ging. Nötig ist dafür die Eingabe Ihrer PIN bzw. Ihres Passworts; der bisherige Schlüssel wird dabei ungültig.' }
+            { t: 'p', v: 'Falls Sie Ihren Wiederherstellungsschlüssel verlegt haben: Einen neuen Schlüssel erzeugen Sie jederzeit in den [[app:settings|Globalen Einstellungen]] unter „Zugangsschutz & Verschlüsselung“. Der alte Schlüssel wird dadurch ungültig. Nötig ist dafür die Eingabe Ihrer PIN bzw. Ihres Passworts.' }
           ]
         },
         {
@@ -489,6 +480,16 @@
           body: [
             { t: 'p', v: 'Auf „Notenübersicht & Zeugnisnoten“ finden Sie „Als Excel-Datei exportieren“ und „Drucken / als PDF speichern“. Für ganze Schuljahre gibt es in den Globalen Einstellungen unter „Schuljahre“ den „Excel-Export aller Schuljahresdaten“ mit allen Rohdaten je Kurs.' },
             { t: 'warn', v: 'Exportierte Dateien sind – anders als das {{Backup}} – **nicht verschlüsselt** und enthalten Namen und Noten im Klartext. Speichern Sie sie nur auf geschützten Geräten und versenden Sie sie nicht ungeschützt.' }
+          ]
+        },
+        {
+          id: 'faq-klasse-loeschen',
+          group: 'Klassen & Schuljahre',
+          title: 'Wie lösche ich eine Klasse, die ich versehentlich angelegt habe?',
+          body: [
+            { t: 'p', v: 'In den [[app:settings|Globalen Einstellungen]] unter „Datensicherung“ im Gefahrenbereich über „Klasse löschen …“. Zur Auswahl stehen dort **nur Klassen, die in keinem Kurs verwendet werden**. Zur Bestätigung ist Ihre PIN bzw. Ihr Passwort nötig.' },
+            { t: 'p', v: 'Erscheint die gewünschte Klasse nicht in der Liste, hängt noch mindestens ein Kurs daran. Löschen Sie diesen zuerst in den Kurs-Einstellungen des betreffenden Kurses; danach steht die Klasse zur Auswahl.' },
+            { t: 'note', v: 'Diese Reihenfolge ist Absicht: Ein Kurs ohne Schülerliste wäre nicht mehr benutzbar. Fotos werden beim Löschen nur entfernt, wenn dieselbe Person in keiner anderen Klasse mehr vorkommt – nach einem [[help:faq-schuljahreswechsel|Schuljahreswechsel]] bleiben sie also erhalten.' }
           ]
         },
         {
@@ -540,7 +541,7 @@
         {
           id: 'faq-update',
           group: 'Gerät & Technik',
-          title: 'Wie bekomme ich Aktualisierungen?',
+          title: 'Wie bekomme ich Aktualisierungen der App?',
           body: [
             { t: 'p', v: 'Automatisch. Sobald eine neue Fassung vorliegt und Sie online sind, erscheint oben ein Hinweis mit dem Button „Jetzt aktualisieren“. Ihre Daten bleiben dabei unverändert erhalten.' },
             { t: 'p', v: 'Die installierte Version sehen Sie ganz unten auf jeder Seite unter „Über diese App“.' }
@@ -570,6 +571,7 @@
     /* ---------------------------------------------------------------- */
     {
       id: 'datenschutz',
+      navTitle: 'Datenschutz',
       title: 'Datenschutz-Kurzinformation',
       lead: 'Technische Information als Grundlage für die schulische Datenschutzprüfung – zum Ausdrucken.',
       printTitle: 'SOL-Noten – Datenschutz-Kurzinformation',

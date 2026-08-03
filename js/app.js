@@ -70,7 +70,7 @@
 
   /* ================= App-Start ================= */
 
-  var APP_VERSION = '0.41.0';
+  var APP_VERSION = '0.42.0';
 
   /* ---------- PWA-Installation ----------
      Chrome/Edge/Android liefern `beforeinstallprompt`: Event abfangen und
@@ -1281,8 +1281,7 @@
           ? h('p', {}, 'Für dieses Gerät ist ein ', h('strong', {}, 'Wiederherstellungsschlüssel'),
               ' hinterlegt. Mit ihm kommen Sie sofort wieder hinein, und ', h('strong', {}, 'alle Daten bleiben erhalten'), '.')
           : h('p', {}, 'Für dieses Gerät ist kein Wiederherstellungsschlüssel hinterlegt. Es bleibt nur das Zurücksetzen und anschließend das Einspielen einer Backup-Datei.'),
-        h('p.hint', {}, 'Das Zurücksetzen löscht alle Daten auf diesem Gerät unwiderruflich und wird erst nach ' +
-          Store.resetWaitHours() + ' Stunden ausgeführt.')
+        h('p.hint', {}, 'Das verhindert, dass Unbefugte die App zurücksetzen.')
       ];
       var buttons = [{ label: 'Abbrechen', value: false }];
       if (hasKey) buttons.push({ label: 'Schlüssel eingeben', value: 'key', primary: true });
@@ -5927,6 +5926,77 @@
     printNode(wrap, true, sanitizeFilename('SOL-Noten_' + year.name + '_Notenuebersichten'));
   }
 
+  /* ---------- Klasse löschen (Gefahrenbereich) ---------- */
+
+  /* Nur Klassen ohne Kurs sind löschbar. Eine Klasse mit Kurs zu entfernen
+     hinterließe Kurse ohne Schülerliste – deshalb steht hier statt einer
+     Warnung schlicht keine Auswahl zur Verfügung. */
+  function classDeleteDialog() {
+    var st = S();
+    var free = Store.classesWithoutCourses(null);
+    if (!free.length) {
+      var blocked = st.classes.length;
+      UI.modal('Klasse löschen', h('div', {},
+        h('p', {}, blocked
+          ? 'Alle vorhandenen Klassen werden derzeit in mindestens einem Kurs verwendet und lassen sich deshalb nicht löschen.'
+          : 'Es sind keine Klassen angelegt.'),
+        blocked
+          ? h('p.hint', {}, 'Löschen Sie zuerst die zugehörigen Kurse (Kurs-Einstellungen → Gefahrenbereich). Danach steht die Klasse hier zur Auswahl.')
+          : null));
+      return;
+    }
+
+    var sel = h('select.input', {}, free.map(function (k) {
+      var y = Store.yearById(k.yearId);
+      return h('option', { value: k.id },
+        k.name + ' (' + ((y && y.name) || 'ohne Schuljahr') + ', ' +
+        ((k.students || []).length) + ' Schüler/innen)');
+    }));
+    var pwInput = h('input.input', { type: 'password', autocomplete: 'current-password',
+      placeholder: 'PIN / Passwort der App' });
+    var err = h('p.hint.error-text');
+    var secured = Store.isEncrypted();
+
+    UI.modal('Klasse unwiderruflich löschen', [
+      h('p', {}, 'Die gewählte Klasse wird mit ihrer Schülerliste gelöscht. Zur Auswahl stehen nur Klassen, die in keinem Kurs verwendet werden.'),
+      h('p', {}, 'Fotos werden nur entfernt, wenn die Schüler/innen in keiner anderen Klasse mehr vorkommen. Diese Aktion kann nicht rückgängig gemacht werden.'),
+      h('label.field', h('span.field-label', {}, 'Klasse'), sel),
+      secured
+        ? h('label.field', h('span.field-label', {}, 'Zur Bestätigung: PIN / Passwort der App'), pwInput)
+        : null,
+      err
+    ], [
+      { label: 'Abbrechen', value: false },
+      { label: 'Endgültig löschen', value: true, danger: true,
+        validate: function () {
+          if (secured && !pwInput.value) {
+            err.textContent = 'Bitte geben Sie zur Bestätigung Ihre PIN bzw. Ihr Passwort ein.';
+            return false;
+          }
+          return true;
+        } }
+    ]).then(function (ok) {
+      if (!ok) return;
+      var classId = sel.value;
+      var clsName = (Store.classById(classId) || {}).name || '';
+      Store.verifySecret(pwInput.value).then(function (valid) {
+        if (!valid) {
+          UI.modal('Löschen abgebrochen', h('p', {}, 'Die eingegebene PIN bzw. das Passwort ist nicht korrekt. Die Klasse wurde nicht gelöscht.'));
+          return;
+        }
+        Store.deleteClass(classId).then(function (removed) {
+          UI.modal('Klasse gelöscht', h('div', {},
+            h('p', {}, 'Die Klasse „' + clsName + '“ wurde gelöscht.'),
+            h('p.hint', {}, 'Entfernt: ' + removed.students + ' Einträge der Schülerliste' +
+              (removed.photos ? ', ' + removed.photos + ' Fotos' : '') + '.')
+          )).then(render);
+        }).catch(function (e) {
+          UI.modal('Nicht gelöscht', h('p', {}, e.message));
+        });
+      });
+    });
+  }
+
   /* ---------- Schuljahr löschen (Gefahrenbereich) ---------- */
 
   function yearDeleteDialog() {
@@ -6028,7 +6098,14 @@
         });
         out.push(btn);
       } else if (part.indexOf('**') === 0) {
-        out.push(h('strong', {}, part.slice(2, -2)));
+        /* Der Inhalt wird erneut durch helpText geschickt: Ohne das erschienen
+           Glossarbegriffe und Verweise innerhalb von Fettschrift als roher
+           Text mit sichtbaren geschweiften Klammern. */
+        var strong = h('strong');
+        helpText(part.slice(2, -2), defHost, forPrint).forEach(function (n) {
+          strong.appendChild(typeof n === 'string' ? document.createTextNode(n) : n);
+        });
+        out.push(strong);
       } else if (part.charAt(0) === '_' && part.charAt(part.length - 1) === '_' && part.length > 2) {
         out.push(h('em', {}, part.slice(1, -1)));
       } else {
@@ -6285,31 +6362,28 @@
       );
     }
 
-    /* Kapitel gruppiert aufbauen. `groups` merkt sich zu jeder Überschrift
-       ihre Kapitel, damit die Suche leere Gruppen ausblenden kann. */
+    /* Je Gruppe eine eigene Karte, die Überschrift steht außerhalb davon auf
+       dem Seitenhintergrund – so trennen sich die Gruppen sichtbar, statt in
+       einer durchgehenden weißen Fläche zu verschwimmen. */
     var chapters = [];
-    var listNodes = [];
+    var listHost = h('div.help-groups');
     var groupBlocks = [];
     Help.groupedChapters(page).forEach(function (grp) {
-      var headNode = null;
-      if (grp.title) {
-        headNode = h('div.help-group-head', {}, grp.title);
-        listNodes.push(headNode);
-      }
       var own = grp.chapters.map(function (c) {
         var det = h('details.help-chapter' + (c.id === openChapter ? '.open-target' : ''),
           h('summary', {}, helpTitle(c.title)));
         if (c.id === openChapter) det.setAttribute('open', 'open');
         det.appendChild(helpBody(c.body, false));
         det._searchText = (c.title + ' ' + (grp.title || '') + ' ' + Help.plainText(c.body)).toLowerCase();
-        listNodes.push(det);
         chapters.push(det);
         return det;
       });
-      if (headNode) groupBlocks.push({ head: headNode, items: own });
+      var head = grp.title ? h('div.section-head.help-group-head', {}, grp.title) : null;
+      var card = h('div.card.card-list', {}, own);
+      var block = h('div.help-group', {}, head, card);
+      listHost.appendChild(block);
+      groupBlocks.push({ block: block, items: own });
     });
-
-    var listHost = h('div.card.card-list', {}, listNodes);
     var emptyHint = h('p.hint.search-empty', { style: { display: 'none' } },
       'Kein Kapitel gefunden. Versuchen Sie einen anderen Begriff.');
 
@@ -6332,10 +6406,10 @@
           else if (q) det.removeAttribute('open');
         });
         emptyHint.style.display = hits ? 'none' : '';
-        /* Überschrift nur zeigen, wenn in der Gruppe noch etwas übrig ist. */
+        /* Gruppe samt Überschrift ausblenden, wenn nichts übrig bleibt. */
         groupBlocks.forEach(function (g) {
           var visible = g.items.some(function (det) { return det.style.display !== 'none'; });
-          g.head.style.display = visible ? '' : 'none';
+          g.block.style.display = visible ? '' : 'none';
         });
       });
       searchBar = h('div.card.card-tight', searchInput);
@@ -6554,6 +6628,7 @@
           exportWarning()),
         h('div.danger-zone',
           h('p.hint', {}, 'Gefahrenbereich'),
+          h('button.btn-plain.btn-block.danger-text', { onclick: classDeleteDialog }, 'Klasse löschen …'),
           h('button.btn-plain.btn-block.danger-text', { onclick: yearDeleteDialog }, 'Schuljahr löschen …'))
       ),
 

@@ -420,25 +420,26 @@ textarea.input.recovery-input {
 }
 .course-box-row .help-btn:active { background: var(--teal); color: #fff; }
 
-/* Wechsel zwischen den vier Hilfeseiten, direkt unter der Titelzeile. */
+/* Wechsel zwischen den vier Hilfeseiten, direkt unter der Titelzeile.
+   Auf dem Smartphone zwei Reihen zu zwei Schaltflächen, ab 560 px alle vier
+   nebeneinander. Gleiche Höhe ergibt sich aus dem Flex-Standard `stretch`. */
 .help-nav { display: flex; flex-wrap: wrap; gap: 8px; }
 .help-nav-btn {
-  flex: 1 1 auto; min-width: 0; min-height: 40px;
+  flex: 1 1 calc(50% - 4px); min-width: 0; min-height: 40px;
   padding: 8px 10px; border-radius: 10px; cursor: pointer;
   border: 1px solid var(--teal); background: var(--teal-soft); color: var(--teal-dark);
   font: inherit; font-size: 0.82rem; line-height: 1.2; text-align: center;
 }
+@media (min-width: 560px) { .help-nav-btn { flex: 1 1 0; } }
 .help-nav-btn:active { background: var(--teal); color: #fff; }
 .help-nav-btn.active {
   background: var(--teal); border-color: var(--teal); color: #fff; font-weight: 700;
 }
-/* Gruppenüberschrift innerhalb einer Kapitelliste. */
-.help-group-head {
-  padding: 12px 14px 6px; font-size: 0.78rem; font-weight: 700;
-  letter-spacing: 0.06em; text-transform: uppercase; color: var(--teal);
-  border-top: 1px solid var(--line);
-}
-.card-list > .help-group-head:first-child { border-top: 0; padding-top: 4px; }
+/* Kapitelgruppen: je Gruppe eine eigene Karte, die Überschrift steht darüber
+   auf dem Seitenhintergrund. Der Abstand entspricht dem Abstand der Karten
+   untereinander (`gap` von `.screen`). */
+.help-groups { display: flex; flex-direction: column; gap: 14px; }
+.help-group-head { color: var(--teal); }
 .help-inline-q {
   display: inline-flex; align-items: center; justify-content: center;
   width: 20px; height: 20px; border: 1px solid var(--line); border-radius: 6px;

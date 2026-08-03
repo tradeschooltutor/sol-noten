@@ -866,6 +866,48 @@
      Fotos werden nur entfernt, wenn die Schüler-ID in KEINER verbliebenen
      Klasse mehr vorkommt – nach einem Schuljahreswechsel behalten Schüler ihre
      IDs, ihre Fotos müssen das Löschen des Altjahres also überleben. */
+  /* Klassen, die in keinem Kurs mehr verwendet werden, löschen. Die Prüfung
+     liegt bewusst hier und nicht nur in der Oberfläche: Eine Klasse mit Kurs
+     zu entfernen hinterließe Kurse ohne Schülerliste. */
+  function classesWithoutCourses(yearId) {
+    return state.classes.filter(function (k) {
+      if (yearId && k.yearId !== yearId) return false;
+      return !state.courses.some(function (c) { return c.classId === k.id; });
+    });
+  }
+
+  function classCourseCount(classId) {
+    return state.courses.filter(function (c) { return c.classId === classId; }).length;
+  }
+
+  function deleteClass(classId) {
+    var cls = classById(classId);
+    if (!cls) return Promise.reject(new Error('Die Klasse wurde nicht gefunden.'));
+    var used = classCourseCount(classId);
+    if (used > 0) {
+      return Promise.reject(new Error('Die Klasse wird noch in ' + used +
+        (used === 1 ? ' Kurs' : ' Kursen') + ' verwendet. Löschen Sie zuerst diese Kurse.'));
+    }
+    var removed = { students: (cls.students || []).length };
+    state.classes = state.classes.filter(function (k) { return k.id !== classId; });
+    /* Sitzpläne der Klasse hängen an Kursen – ohne Kurs gibt es keine. */
+    save();
+    /* Fotos nur löschen, wenn die Schüler-ID in keiner anderen Klasse mehr
+       vorkommt (nach einem Schuljahreswechsel behalten Schüler ihre IDs). */
+    var keep = {};
+    state.classes.forEach(function (k) {
+      (k.students || []).forEach(function (s) { keep[s.id] = true; });
+    });
+    return photoKeys().then(function (keys) {
+      var chain = Promise.resolve();
+      var photos = 0;
+      keys.forEach(function (id) {
+        if (!keep[id]) { photos++; chain = chain.then(function () { return deletePhoto(id); }); }
+      });
+      return chain.then(function () { removed.photos = photos; return removed; });
+    }).catch(function () { removed.photos = 0; return removed; });
+  }
+
   function deleteYear(yearId) {
     if (state.schoolYears.length <= 1) {
       return Promise.reject(new Error('Das letzte verbliebene Schuljahr kann nicht gelöscht werden.'));
@@ -1250,6 +1292,8 @@
     exportJSON: exportJSON, importJSON: importJSON, parseBackup: parseBackup, applyImport: applyImport,
     listSnapshots: listSnapshots, restoreSnapshot: restoreSnapshot, transferYear: transferYear,
     verifySecret: verifySecret, deleteYear: deleteYear,
+    deleteClass: deleteClass, classesWithoutCourses: classesWithoutCourses,
+    classCourseCount: classCourseCount,
     noteFor: noteFor, setNote: setNote, notesFor: notesFor,
     lessonContentFor: lessonContentFor, setLessonContent: setLessonContent,
     lessonContentsFor: lessonContentsFor,
