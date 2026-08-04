@@ -70,7 +70,7 @@
 
   /* ================= App-Start ================= */
 
-  var APP_VERSION = '0.47.0';
+  var APP_VERSION = '0.48.0';
 
   /* ---------- PWA-Installation ----------
      Chrome/Edge/Android liefern `beforeinstallprompt`: Event abfangen und
@@ -87,7 +87,22 @@
 
   window.addEventListener('appinstalled', function () {
     deferredInstall = null;
-    toast('SOL-Noten wurde als App installiert. Sie finden sie jetzt bei Ihren Apps bzw. auf dem Home-Bildschirm.');
+    /* Der Browser-Tab bleibt nach der Installation offen. Wer hier
+       weiterarbeitet, merkt nicht, dass er nicht in der App ist – und auf
+       iPhone/iPad hätte er sogar einen getrennten Datenbestand. Deshalb ein
+       unübersehbarer Hinweis statt eines Toasts, und ein Vermerk im Zustand,
+       damit auch spätere Browser-Besuche darauf hinweisen. */
+    var st = S();
+    if (st && st.settings && !Store.isDemo()) {
+      st.settings.appInstalledAt = new Date().toISOString();
+      Store.save();
+    }
+    UI.modal('Fertig – bitte jetzt zur App wechseln', [
+      h('p', {}, 'SOL-Noten ist installiert. Sie finden das Symbol bei Ihren Apps bzw. auf dem Home-Bildschirm.'),
+      h('p', {}, h('strong', {}, 'Schließen Sie dieses Browser-Fenster und arbeiten Sie ab jetzt in der App.')),
+      h('p.hint', {}, 'Das ist nicht nur Bequemlichkeit: In der App bleiben Ihre Daten dauerhaft gespeichert. Auf iPhone und iPad hat der Browser sogar einen eigenen, getrennten Datenbestand – dort Erfasstes taucht in der App nicht auf.')
+    ], [{ label: 'Verstanden', value: true, primary: true }], { mandatory: true })
+      .then(function () { if (route && route.name !== 'loading') render(); });
     if (route && route.name !== 'loading') render();
   });
 
@@ -397,6 +412,7 @@
     if (!deferredInstall && !isIOS()) return;
     if (Store.isDemo()) return;
     var st = S();
+    if (st.settings.appInstalledAt) return; /* installiert – der Hinweis führt jetzt zur App, nicht zur Installation */
     var today = Store.todayISO();
     if (daysSince(st.settings.installRemindedAt, today) < INSTALL_REMIND_DAYS) return;
     st.settings.installRemindedAt = today;
@@ -444,10 +460,27 @@
         } }, 'Nicht mehr anzeigen')));
   }
 
+  /* Die App ist installiert, gearbeitet wird aber im Browser. Dieser Hinweis
+     ist bewusst NICHT ausblendbar: Er verschwindet, sobald man in der App
+     arbeitet, und genau dorthin soll er führen. */
+  function browserDespiteInstallBanner() {
+    if (isStandalone()) return null;
+    var st = S();
+    if (!st || !st.settings || !st.settings.appInstalledAt) return null;
+    return h('div.card.card-tight.reset-pending',
+      h('strong', {}, 'Sie arbeiten im Browser, nicht in der App'),
+      h('p.hint', {}, 'SOL-Noten ist auf diesem Gerät installiert. Öffnen Sie die App über ihr Symbol – dort sind Ihre Daten dauerhaft gespeichert. ' +
+        (isIOS()
+          ? 'Auf iPhone und iPad haben Browser und App getrennte Datenbestände: Was Sie hier erfassen, fehlt in der App.'
+          : 'Diese Ansicht können Sie danach schließen.')));
+  }
+
   /* Dezente, ausblendbare Einladung auf dem Startbildschirm. */
   function installBanner() {
     var st = S();
-    if (isStandalone() || (st.settings && st.settings.installHintDismissed)) return null;
+    /* Nach erfolgter Installation nicht mehr zur Installation einladen –
+       dann übernimmt browserDespiteInstallBanner(). */
+    if (isStandalone() || (st.settings && (st.settings.installHintDismissed || st.settings.appInstalledAt))) return null;
     if (!deferredInstall && !isIOS()) return null;
     return h('div.card.card-tight.install-banner',
       h('p.hint', {}, 'Tipp: SOL-Noten lässt sich als App installieren – mit eigenem Symbol auf dem Startbildschirm.'),
@@ -1653,6 +1686,7 @@
       backupBanner(),
       folderPermissionBanner(),
       resetPendingBanner(),
+      browserDespiteInstallBanner(),
       recoveryMissingBanner(),
       installBanner(),
       h('div.row-between',
@@ -7466,13 +7500,33 @@
 
   /* ================= Wiederherstellungsschlüssel ================= */
 
-  /* Textdatei ablegen (nicht JSON – der Schlüssel soll lesbar bleiben). */
-  function saveTextFile(name, text) {
-    var blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
-    var a = h('a', { href: URL.createObjectURL(blob), download: name });
-    document.body.appendChild(a);
-    a.click();
-    setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 500);
+  /* Textdatei ablegen. Bewusst über denselben Weg wie das Backup
+     (Store.downloadTextAs): Ein eigener Blob-Download scheiterte in der
+     installierten Chrome-App stillschweigend. Wo das Gerät Dateien teilen
+     kann, wird zusätzlich das Teilen-Menü angeboten – auf Mobilgeräten ist
+     das der verlässlichere Weg. */
+  function canShareFiles() {
+    try {
+      return !!(navigator.canShare && navigator.share &&
+        navigator.canShare({ files: [new File(['x'], 'x.txt', { type: 'text/plain' })] }));
+    } catch (e) { return false; }
+  }
+
+  function saveTextFile(name, text, onDone) {
+    var shareName = /\.txt$/i.test(name) ? name : name + '.txt';
+    if (canShareFiles()) {
+      var file = new File([text], shareName, { type: 'text/plain' });
+      navigator.share({ files: [file], title: shareName }).then(function () {
+        if (onDone) onDone('Datei weitergegeben.');
+      }).catch(function (err) {
+        if (err && err.name === 'AbortError') return;
+        Store.downloadTextAs(shareName, text);
+        if (onDone) onDone('In Ihren Downloads gespeichert.');
+      });
+      return;
+    }
+    Store.downloadTextAs(name, text);
+    if (onDone) onDone('In Ihren Downloads gespeichert.');
   }
 
   function recoveryPlainText(key) {
@@ -7517,8 +7571,9 @@
         h('div.row-gap.recovery-actions',
           h('button.btn-small.btn-plain', { onclick: function () { printRecoveryKey(key); } }, 'Drucken'),
           h('button.btn-small.btn-plain', { onclick: function () {
-            saveTextFile('SOL-Noten-Wiederherstellungsschluessel.txt', recoveryPlainText(key));
-          } }, 'Als Datei speichern'),
+            saveTextFile('SOL-Noten-Wiederherstellungsschluessel.txt', recoveryPlainText(key),
+              function (msg) { copyMsg.textContent = msg; });
+          } }, canShareFiles() ? 'Als Datei sichern / teilen' : 'Als Datei speichern'),
           h('button.btn-small.btn-plain', { onclick: function () {
             if (navigator.clipboard && navigator.clipboard.writeText) {
               navigator.clipboard.writeText(key).then(function () {
@@ -7537,9 +7592,15 @@
         .then(askCheck);
     }
 
+    /* Bereits eingetippte Abschnitte überleben den Umweg „Schlüssel noch
+       einmal anzeigen“ – alles neu tippen zu müssen wäre reine Schikane. */
+    var typed = ['', ''];
+
     function askCheck() {
-      var in1 = h('input.input.recovery-group', { type: 'text', autocomplete: 'off', spellcheck: 'false', placeholder: '6 Zeichen' });
-      var in2 = h('input.input.recovery-group', { type: 'text', autocomplete: 'off', spellcheck: 'false', placeholder: '6 Zeichen' });
+      var in1 = h('input.input.recovery-group', { type: 'text', value: typed[0], autocomplete: 'off', spellcheck: 'false', placeholder: '6 Zeichen' });
+      var in2 = h('input.input.recovery-group', { type: 'text', value: typed[1], autocomplete: 'off', spellcheck: 'false', placeholder: '6 Zeichen' });
+      in1.addEventListener('input', function () { typed[0] = in1.value; });
+      in2.addEventListener('input', function () { typed[1] = in2.value; });
       var err = h('p.hint.error-text');
       function group(el) { return CryptoBox.normalizeRecoveryKey(el.value); }
       UI.modal('Kontrolle: Haben Sie den Schlüssel notiert?', [

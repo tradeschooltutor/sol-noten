@@ -1,4 +1,4 @@
-# SOL-Noten (Version 0.47.0 – Beta)
+# SOL-Noten (Version 0.48.0 – Beta)
 
 Notenverwaltung zum selbstorganisierten Lernen (SOL) als Progressive Web App (PWA).
 Basierend auf der Excel-Notenverwaltung V8.0 von Andreas Vandelaar.
@@ -73,6 +73,8 @@ Der Installationshinweis erscheint bereits bei der **Ersteinrichtung**, noch vor
 - **PC/Android (Chrome, Edge):** Die App bietet einen eigenen Button „App installieren" an – auf dem Startbildschirm (ausblendbarer Hinweis) und in den Globalen Einstellungen unter „App-Installation". Er öffnet den nativen Installationsdialog des Browsers.
 - **iPhone/iPad (Safari):** Apple stellt keinen Installationsdialog bereit; die App zeigt stattdessen eine Schritt-für-Schritt-Anleitung als Overlay oben rechts – in zwei geräteabhängigen Varianten: Auf dem iPad steht sie oben rechts, mit animiertem Pfeil nach oben auf das Teilen-Symbol der Safari-Leiste, und führt über „Mehr anzeigen" (Pfeilspitze nach unten) zum Ziel. Auf dem iPhone steht sie unten mittig, mit Pfeil nach unten auf das dort platzierte Teilen-Symbol; „Mehr anzeigen" entfällt, weil „Zum Home-Bildschirm" direkt im Menü erscheint. Beide Varianten bilden die Menüpunkte „Zum Home-Bildschirm" und „Hinzufügen" nach.
 - **Firefox am PC** unterstützt keine Installation von Web-Apps; SOL-Noten läuft dort normal im Browser.
+
+**Nach der Installation:** Das Browser-Fenster bleibt offen – ein unabweisbarer Hinweis fordert zum Wechsel auf, `settings.appInstalledAt` wird gesetzt, und solange danach im Browser gearbeitet wird, steht auf der Startseite ein **nicht ausblendbares** Band („Sie arbeiten im Browser, nicht in der App"). Es verschwindet von selbst, sobald die App im Standalone-Modus läuft. Installations-Einladung und 3-Tage-Erinnerung sind ab dann deaktiviert.
 
 **Wiederkehrende Erinnerung:** Solange SOL-Noten nicht installiert ist, blendet der Startbildschirm alle drei Tage ein wegklickbares Overlay ein – mit „App installieren“ bzw. „Anleitung anzeigen“, „Mehr dazu“ (führt ins Hilfekapitel) und „Später“. Der Takt ist bewusst kürzer als die etwa sieben Tage, nach denen Safari die Daten nicht installierter Websites löscht. Das Overlay erscheint nicht in der installierten App, nicht im Demo-Modus und nicht dort, wo eine Installation gar nicht möglich ist (Firefox am PC). Der Zeitpunkt der letzten Erinnerung steht als `installRemindedAt` in den Einstellungen.
 
