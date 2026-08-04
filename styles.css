@@ -394,9 +394,14 @@ textarea.input.recovery-input {
   color: var(--ink-soft); cursor: not-allowed; opacity: 0.75;
 }
 .partner-hint { border-left: 3px solid var(--teal); border-radius: 0 var(--radius) var(--radius) 0; }
+/* Kurs-Export/-Import: kurze Beschriftungen unter einer eigenen Überschrift,
+   damit beide auch auf schmalen Bildschirmen einzeilig nebeneinander passen. */
+.share-head { margin-top: 2px; }
 .share-row { display: flex; gap: 8px; }
-.share-row .share-btn { flex: 1 1 0; min-width: 0; }
-@media (max-width: 480px) { .share-row { flex-direction: column; } .share-row .share-btn { flex: none; } }
+.share-row .share-btn {
+  flex: 1 1 0; min-width: 0; font-size: 0.9rem;
+  padding-left: 8px; padding-right: 8px; white-space: nowrap;
+}
 
 /* Demo-Modus: dauerhaft sichtbares Band auf jeder Seite */
 .demo-banner {

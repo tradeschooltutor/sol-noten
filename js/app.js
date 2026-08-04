@@ -70,7 +70,7 @@
 
   /* ================= App-Start ================= */
 
-  var APP_VERSION = '0.46.0';
+  var APP_VERSION = '0.46.1';
 
   /* ---------- PWA-Installation ----------
      Chrome/Edge/Android liefern `beforeinstallprompt`: Event abfangen und
@@ -1651,9 +1651,13 @@
               : null)
         : h('div.course-grid', {}, courses.map(courseTile)),
       h('button.btn-primary.btn-block', { onclick: function () { go('editCourse', {}); } }, '+ Kurs anlegen'),
+      h('div.section-head.share-head', {}, 'Teamteaching'),
       h('div.row-gap.share-row',
-        h('button.btn-plain.share-btn', { onclick: courseShareExportDialog }, 'Kurs-Export (Teamteaching)'),
-        h('button.btn-plain.share-btn', { onclick: courseShareImportDialog }, 'Kurs-Import (Teamteaching)')),
+        /* Beide Handler bewusst gekapselt: Direkt als onclick übergeben,
+           bekämen sie das MouseEvent als ersten Parameter – und der ist bei
+           courseShareImportDialog der Dateiinhalt. */
+        h('button.btn-plain.share-btn', { onclick: function () { courseShareExportDialog(); } }, 'Kurs-Export'),
+        h('button.btn-plain.share-btn', { onclick: function () { courseShareImportDialog(); } }, 'Kurs-Import')),
       h('button.btn-plain.btn-block', { onclick: function () { go('settings', { back: { name: 'home' } }); } }, 'Globale Einstellungen')
     );
     return screen;
@@ -1970,7 +1974,7 @@
       h('div.actions-col',
         h('button.btn-plain.btn-block', { onclick: function () { go('students', { classId: course.classId, courseId: course.id, from: 'editCourse' }); } },
           'Schülerliste ansehen (' + cls.students.length + ')'),
-        h('button.btn-plain.btn-block', { onclick: courseShareImportDialog },
+        h('button.btn-plain.btn-block', { onclick: function () { courseShareImportDialog(); } },
           'Kurs-Abgleich importieren (neue Datei der Kollegin / des Kollegen)'),
         h('div.danger-zone',
           h('p.hint', {}, 'Gefahrenbereich'),
@@ -7150,7 +7154,10 @@
   /* presetText: Inhalt einer über das Teilen-Ziel hereingereichten Datei –
      dann entfällt die Dateiauswahl und es geht direkt zum Kurs-Passwort. */
   function courseShareImportDialog(presetText) {
-    if (presetText !== undefined) {
+    /* Nur eine echte Zeichenkette ist ein Dateiinhalt. Der Typtest fängt
+       zusätzlich ab, dass die Funktion versehentlich direkt als
+       Ereignisbehandler verwendet wird. */
+    if (typeof presetText === 'string') {
       handleFileText(presetText);
       return;
     }
@@ -7332,7 +7339,12 @@
   /* Import bei der Notengeberin (Lehrkraft 1). presetEnv: bereits gelesener
      Umschlag aus dem Teilen-Eingang. */
   function pointsShareImportDialog(presetEnv) {
-    if (presetEnv) { askPw(presetEnv); return; }
+    /* Wie beim Kurs-Import: nur ein echtes Umschlag-Objekt zählt, kein
+       versehentlich übergebenes MouseEvent. */
+    if (presetEnv && typeof presetEnv === 'object' && presetEnv.data && presetEnv.iv) {
+      askPw(presetEnv);
+      return;
+    }
     var fileInput = h('input', { type: 'file',
       accept: '.solpunkte,.txt,.json,application/json,text/plain', style: { display: 'none' } });
     fileInput.addEventListener('change', function () {
