@@ -70,7 +70,7 @@
 
   /* ================= App-Start ================= */
 
-  var APP_VERSION = '0.46.1';
+  var APP_VERSION = '0.47.0';
 
   /* ---------- PWA-Installation ----------
      Chrome/Edge/Android liefern `beforeinstallprompt`: Event abfangen und
@@ -470,14 +470,32 @@
       navigator.serviceWorker.register('sw.js').then(function (reg) {
         /* Beim Start aktiv nach einer neuen Version suchen */
         if (reg.update) reg.update().catch(function () {});
+
+        /* Eine bereits fertig installierte Version kann beim Registrieren
+           schon warten – dann kommt `updatefound` nicht mehr, und der Hinweis
+           bliebe aus. Das erklärt Fenster, die tagelang offen bleiben (PC). */
+        if (reg.waiting && navigator.serviceWorker.controller) showUpdateBanner();
+
         reg.addEventListener('updatefound', function () {
           var nw = reg.installing;
           if (!nw) return;
           nw.addEventListener('statechange', function () {
-            if (nw.state === 'activated' && navigator.serviceWorker.controller) {
+            if ((nw.state === 'installed' || nw.state === 'activated') &&
+                navigator.serviceWorker.controller) {
               showUpdateBanner();
             }
           });
+        });
+
+        /* Am PC bleibt das Fenster oft tagelang offen; ohne Neustart würde
+           nie nach einer neuen Version gesucht. Deshalb bei jeder Rückkehr
+           zur App prüfen, höchstens aber einmal pro Stunde. */
+        var lastCheck = Date.now();
+        document.addEventListener('visibilitychange', function () {
+          if (document.visibilityState !== 'visible') return;
+          if (Date.now() - lastCheck < 3600000) return;
+          lastCheck = Date.now();
+          if (reg.update) reg.update().catch(function () {});
         });
       }).catch(function () {});
     }
@@ -5183,10 +5201,18 @@
         var e = Store.entriesFor(course.id, stu.id, q);
         var stat = Calc.quarterStatus(e.byCriterion);
         var grade = Calc.gradeFor15(stat.sum, S().settings.grading15);
+        /* Nur EIGENE Vergaben sind hier bearbeitbar. Importierte Vergaben der
+           zweiten Lehrkraft (src) stehen daneben und bleiben unberührt –
+           sonst würde die eigene Vergabe desselben Tages durch die importierte
+           verdeckt und beim nächsten Tipp überschrieben. Beide zählen in
+           `entriesFor` gleichberechtigt in den Kriteriumsdurchschnitt. */
         var todays = e.list.filter(function (x) {
-          return x.criterion === ci && x.date === captureState.date;
+          return x.criterion === ci && x.date === captureState.date && !x.src;
         });
         var lastToday = todays.length ? todays[todays.length - 1] : null;
+        var partnerToday = e.list.filter(function (x) {
+          return x.criterion === ci && x.date === captureState.date && x.src;
+        });
 
         /* Kursnotiz zum gewählten Datum: Symbol beim Foto (auf dem Smartphone
            darunter, ab Tablet-Breite daneben – siehe .avatar-col in styles.css),
@@ -5224,7 +5250,8 @@
             h('div.tap-substats',
               h('span.sum-pill.small', {}, Calc.fmt(stat.sum, 1) + '/15'),
               stat.rated > 0 ? h('span.grade-pill.small.g' + Math.round(grade.g), {}, Calc.fmt(grade.g)) : null,
-              stat.averages[ci] !== null ? h('span.hint', {}, 'ø ' + Calc.fmt(stat.averages[ci], 1)) : null
+              stat.averages[ci] !== null ? h('span.hint', {}, 'ø ' + Calc.fmt(stat.averages[ci], 1)) : null,
+              partnerChip(partnerToday)
             )
           ),
           h('div.tap-btns', {}, taps.map(function (v) {
@@ -5259,12 +5286,14 @@
       var rows = names.map(function (n, ci) {
         var max = course.maxPoints[q][ci];
         var taps = Calc.tapValues(max);
-        var todays = e.list.filter(function (x) { return x.criterion === ci && x.date === captureState.date; });
+        var todays = e.list.filter(function (x) { return x.criterion === ci && x.date === captureState.date && !x.src; });
         var lastToday = todays.length ? todays[todays.length - 1] : null;
+        var partnerToday = e.list.filter(function (x) { return x.criterion === ci && x.date === captureState.date && x.src; });
         return h('div.tap-row' + (captureState.kbActive === ci ? '.key-active' : ''),
           h('div.tap-info',
             h('div.student-name', {}, n),
-            stat.averages[ci] !== null ? h('span.hint', {}, 'ø ' + Calc.fmt(stat.averages[ci], 1)) : h('span.hint', {}, '–')
+            stat.averages[ci] !== null ? h('span.hint', {}, 'ø ' + Calc.fmt(stat.averages[ci], 1)) : h('span.hint', {}, '–'),
+            partnerChip(partnerToday)
           ),
           h('div.tap-btns', {}, taps.map(function (v) {
             var isSet = lastToday && lastToday.points === v;
@@ -5302,6 +5331,15 @@
             h('span.field-label', {}, 'Kursnotiz (' + UI.fmtDate(captureState.date) + ')'),
             noteTa))
       );
+    }
+
+    /* Kennzeichen für Vergaben der zweiten Lehrkraft am selben Tag: sichtbar,
+       aber nicht bedienbar – geändert wird sie auf deren Gerät. */
+    function partnerChip(list) {
+      if (!list || !list.length) return null;
+      var label = course.partnerLabel || 'Kollegin/Kollege';
+      return h('span.partner-chip', { title: 'Vergabe von ' + label + ' (nur dort änderbar)' },
+        label + ': ' + list.map(function (x) { return Calc.fmt(x.points, 1); }).join(', '));
     }
 
     /* Punktevergabe: pro Kriterium und Tag gilt der letzte Tipp (Korrektur statt Doppelvergabe). */
@@ -5361,7 +5399,7 @@
       var t = kbTarget();
       if (!t.stu || t.ci == null) return;
       var e = Store.entriesFor(course.id, t.stu.id, q);
-      var todays = e.list.filter(function (x) { return x.criterion === t.ci && x.date === captureState.date; });
+      var todays = e.list.filter(function (x) { return x.criterion === t.ci && x.date === captureState.date && !x.src; });
       var lastToday = todays.length ? todays[todays.length - 1] : null;
       if (lastToday && lastToday.points === points) return; /* unverändert */
       if (lastToday) {

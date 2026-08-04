@@ -500,7 +500,8 @@
               'Die importierten Vergaben zählen in Punktesumme, Note und Diagrammen **gleichberechtigt** mit – die Gewichtung ergibt sich automatisch daraus, wie viel jede Lehrkraft tatsächlich bewertet hat.',
               'Importierte Kursnotizen tragen die Beschriftung der Kollegin bzw. des Kollegen, z.\u202fB. „[Meier] hat die Gruppe gut moderiert“.',
               'Ein **doppelter Import derselben Datei ist folgenlos**, und eine korrigierte Datei ersetzt die frühere vollständig: Beim Import werden zunächst alle früher importierten Vergaben dieser Quelle im betroffenen Quartal entfernt und dann die aus der Datei eingesetzt. Eigene Vergaben, Fehlzeiten, Uploads und Notizen der Notengeberin bleiben dabei immer unangetastet.',
-              'Das Quartal jeder Vergabe wird beim Import aus dem **Datum** nach den Zeiträumen der Notengeberin neu bestimmt – nicht aus der Datei übernommen.'
+              'Das Quartal jeder Vergabe wird beim Import aus dem **Datum** nach den Zeiträumen der Notengeberin neu bestimmt – nicht aus der Datei übernommen.',
+              'Bewerten **beide Lehrkräfte am selben Tag dasselbe Kriterium**, bleiben beide Vergaben erhalten und zählen beide in den Durchschnitt. Auf „SoLei-Punkte vergeben“ bearbeiten Sie immer nur Ihre eigene; die importierte steht als Kennzeichen daneben (z.\u202fB. „Meier: 2“) und ist nur auf deren Gerät änderbar.'
             ] }
           ]
         },

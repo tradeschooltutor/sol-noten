@@ -1471,11 +1471,22 @@
     save();
     return e;
   }
+  /* Importierte Vergaben (src) sind auf diesem Gerät nicht änderbar – sie
+     gehören der zweiten Lehrkraft und würden beim nächsten Import ohnehin
+     ersetzt. Ein stiller Schutz, falls doch einmal eine Oberfläche darauf
+     zugreift. */
+  function isForeign(id) {
+    var e = state.soleiEntries.find(function (x) { return x.id === id; });
+    return !!(e && e.src);
+  }
+
   function updateEntry(id, points, dateISO) {
+    if (isForeign(id)) return;
     var e = state.soleiEntries.find(function (x) { return x.id === id; });
     if (e) { e.points = points; e.date = dateISO; save(); }
   }
   function deleteEntry(id) {
+    if (isForeign(id)) return;
     var i = state.soleiEntries.findIndex(function (x) { return x.id === id; });
     if (i >= 0) { state.soleiEntries.splice(i, 1); save(); }
   }

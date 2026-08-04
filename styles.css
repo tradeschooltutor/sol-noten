@@ -1160,3 +1160,11 @@ button:focus-visible, .input:focus-visible, select:focus-visible {
   font-size: 0.95rem; line-height: 1.2;
 }
 .grid-btn-full { grid-column: 1 / -1; }
+
+/* Vergabe der zweiten Lehrkraft am selben Tag: sichtbar, aber nicht bedienbar. */
+.partner-chip {
+  display: inline-block; padding: 1px 7px; border-radius: 999px;
+  background: var(--teal-soft); color: var(--teal-dark);
+  border: 1px dashed var(--teal);
+  font-size: 0.72rem; font-weight: 700; white-space: nowrap;
+}
