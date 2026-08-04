@@ -70,7 +70,7 @@
 
   /* ================= App-Start ================= */
 
-  var APP_VERSION = '0.42.0';
+  var APP_VERSION = '0.43.0';
 
   /* ---------- PWA-Installation ----------
      Chrome/Edge/Android liefern `beforeinstallprompt`: Event abfangen und
@@ -1616,6 +1616,9 @@
               : null)
         : h('div.course-grid', {}, courses.map(courseTile)),
       h('button.btn-primary.btn-block', { onclick: function () { go('editCourse', {}); } }, '+ Kurs anlegen'),
+      h('div.row-gap.share-row',
+        h('button.btn-plain.share-btn', { onclick: courseShareExportDialog }, 'Kurs-Export (Teamteaching)'),
+        h('button.btn-plain.share-btn', { onclick: courseShareImportDialog }, 'Kurs-Import (Teamteaching)')),
       h('button.btn-plain.btn-block', { onclick: function () { go('settings', { back: { name: 'home' } }); } }, 'Globale Einstellungen')
     );
     return screen;
@@ -1892,12 +1895,85 @@
     );
   }
 
+  /* ================= Partnerkurs: Einstellungen (nur ansehen) ================= */
+
+  function partnerCourseSettings(course, p) {
+    var st = S();
+    var cls = Store.classById(course.classId);
+    var quarters = courseQuarters(course);
+    var q = course.currentQuarter || 1;
+    var max = (course.maxPoints && course.maxPoints[q]) || [];
+    var WD = { 1: 'Mo', 2: 'Di', 3: 'Mi', 4: 'Do', 5: 'Fr', 6: 'Sa' };
+
+    function tdText() {
+      if (!Array.isArray(course.teachingDays) || !course.teachingDays.length) return 'alle Tage außer Sonntag';
+      return course.teachingDays.map(function (seg) {
+        var days = (seg.days || []).map(function (d) { return WD[d] || d; }).join(', ');
+        return seg.from ? 'ab ' + UI.fmtDate(seg.from) + ': ' + days : days;
+      }).join(' · ');
+    }
+
+    return h('div.screen',
+      header('Kurs-Einstellungen', p.id ? { name: 'course', params: { id: p.id } } : { name: 'home' }),
+      courseBox(course),
+      h('div.card',
+        h('p.hint', {}, h('strong', {}, 'Partnerkurs (Teamteaching). '),
+          'Diese Einstellungen werden von der Lehrkraft gepflegt, welche die Note vergibt. Änderungen erhalten Sie über einen neuen Kurs-Import.'),
+        h('div.field', h('span.field-label', {}, 'Klasse'), h('p', {}, cls.name)),
+        h('div.field', h('span.field-label', {}, 'Fach'), h('p', {}, course.subject)),
+        h('div.field', h('span.field-label', {}, 'Maximalpunkte (' + q + '. Quartal)'),
+          h('p', {}, st.settings.criteriaNames.map(function (n, i) {
+            return n + ': ' + (typeof max[i] === 'number' ? String(max[i]).replace('.', ',') : '–');
+          }).join(' · '))),
+        h('div.field', h('span.field-label', {}, 'Quartalszeiträume'),
+          h('p', {}, quarters.map(function (qq, i) {
+            return (i + 1) + '. ' + UI.fmtDate(qq.start) + ' – ' + UI.fmtDate(qq.end);
+          }).join(' · '))),
+        h('div.field', h('span.field-label', {}, 'Unterrichtstage'), h('p', {}, tdText()))
+      ),
+      h('div.section-head', {}, 'Weitere Kurs-Verwaltung'),
+      h('div.actions-col',
+        h('button.btn-plain.btn-block', { onclick: function () { go('students', { classId: course.classId, courseId: course.id, from: 'editCourse' }); } },
+          'Schülerliste ansehen (' + cls.students.length + ')'),
+        h('button.btn-plain.btn-block', { onclick: courseShareImportDialog },
+          'Kurs-Abgleich importieren (neue Datei der Kollegin / des Kollegen)'),
+        h('div.danger-zone',
+          h('p.hint', {}, 'Gefahrenbereich'),
+          h('button.btn-plain.btn-block.danger-text', { onclick: function () { delPartnerCourse(course); } }, 'Kurs löschen …'))
+      )
+    );
+  }
+
+  function delPartnerCourse(course) {
+    var cls = Store.classById(course.classId);
+    var nEntries = S().soleiEntries.filter(function (e) { return e.courseId === course.id; }).length;
+    UI.confirmDialog('Partnerkurs löschen?',
+      'Der Kurs „' + cls.name + ' · ' + course.subject + '“ wird mit allen ' + nEntries +
+      ' Punktevergaben von diesem Gerät gelöscht. Das Gerät Ihrer Kollegin bzw. Ihres Kollegen ist nicht betroffen. Diese Aktion kann nicht rückgängig gemacht werden.',
+      'Endgültig löschen', true).then(function (ok) {
+        if (!ok) return;
+        var st = S();
+        st.courses = st.courses.filter(function (c) { return c.id !== course.id; });
+        st.soleiEntries = st.soleiEntries.filter(function (e) { return e.courseId !== course.id; });
+        st.notes = (st.notes || []).filter(function (n) { return n.courseId !== course.id; });
+        /* Stundeninhalte hängen am Kursobjekt und verschwinden mit ihm. */
+        Store.save();
+        toast('Partnerkurs gelöscht.');
+        go('home');
+      });
+  }
+
   /* ================= Kurs anlegen / bearbeiten ================= */
 
   views.editCourse = function (p) {
     var st = S();
     var year = Store.yearById(activeYearId());
     var course = p.id ? Store.courseById(p.id) : null;
+
+    /* Partnerkurs (Teamteaching): alle geteilten Einstellungen sind hier
+       schreibgeschützt – es gibt genau eine Quelle für die Skala, nämlich
+       den Export der Notengeberin. Statt des Formulars eine Ansichtsseite. */
+    if (course && course.sharedRole === 'partner') return partnerCourseSettings(course, p);
 
     /* Neuanlage aus einem bestehenden Kurs heraus („Neuer Kurs für ein anderes
        Fach in dieser Klasse"): `tpl` liefert die Vorbelegung. Übernommen werden
@@ -2184,7 +2260,7 @@
         h('div.field',
           h('span.field-label', {}, 'Unterrichtstage (optional)'),
           tdArea,
-          h('p.hint', {}, 'Wenn Wochentage gewählt sind, zeigt „Unentschuldigte Fehlzeiten“ in der Schüler-Ansicht nur noch diese Tage. Stundenplanänderungen bilden Sie mit „+ Änderung ab Datum“ ab. Ohne Auswahl bleibt das bisherige Verhalten (alle Tage außer Sonntag).')),
+          h('p.hint', {}, 'Wenn Wochentage gewählt sind, zeigt „Unentschuldigte Fehlzeiten“ in der Schüler-Ansicht nur noch diese Tage. Stundenplanänderungen bilden Sie mit „+ Änderung ab Datum“ ab. Ohne Auswahl bleibt das bisherige Verhalten (alle Tage außer Sonntag). Tragen Sie alle Unterrichtstage des Kurses ein, auch die von Kolleg/innen, mit denen Sie im Teamteaching unterrichten – sonst lassen sich an diesen Tagen keine Fehlzeiten erfassen.')),
         status,
         h('button.btn-primary.btn-block', { onclick: saveCourse }, course ? 'Änderungen speichern' : 'Kurs anlegen')
       ),
@@ -2212,6 +2288,18 @@
     var due = !course.completed &&
       Quarters.quarterChangeDue(Store.todayISO(), q, quarters);
 
+    /* Partnerkurs (Teamteaching): Lehrkraft 2 vergibt hier nur SoLei-Punkte.
+       Alles, was die Notengeberin pflegt, ist ausgegraut statt versteckt –
+       so bleibt sichtbar, dass es diese Funktionen gibt und wo sie liegen. */
+    var partner = course.sharedRole === 'partner';
+    function lockedBtn(label, block) {
+      return h('button.btn-primary.grid-btn.grid-btn-locked' + (block ? '.btn-block' : ''),
+        { disabled: 'disabled' }, label);
+    }
+    function gridBtn(label, view, params) {
+      return h('button.btn-primary.grid-btn', { onclick: function () { go(view, params); } }, label);
+    }
+
     return h('div.screen',
       header(cls.name + ' · ' + course.subject, { name: 'home' }),
       due ? quarterHint(course, quarters) : null,
@@ -2228,36 +2316,34 @@
           })
         )
       ),
+      partner
+        ? h('div.card.card-tight.partner-hint',
+            h('p.hint', {}, h('strong', {}, 'Partnerkurs (Teamteaching): '),
+              'Die ausgegrauten Buttons werden von der Lehrkraft gepflegt, welche die Note vergibt.'))
+        : null,
       h('div.section-head', {}, 'Sonstige Leistungen'),
       h('div.card.card-tight.solei-card',
         h('div.course-actions-grid',
-          h('button.btn-primary.grid-btn', { onclick: function () { go('capture', { id: course.id }); } },
-            'SoLei-Punkte vergeben'),
-          h('button.btn-primary.grid-btn', { onclick: function () { go('seating', { id: course.id }); } },
-            'Sitzplan'),
-          h('button.btn-primary.grid-btn', { onclick: function () { go('pointstand', { id: course.id }); } },
-            'SoLei-Punktestand'),
-          h('button.btn-primary.grid-btn', { onclick: function () { go('uploads', { id: course.id }); } },
-            'Ergebnis-Uploads'),
-          h('button.btn-primary.grid-btn', { onclick: function () { go('absences', { id: course.id }); } },
-            'Unentschuldigte Fehlzeiten'),
-          h('button.btn-primary.grid-btn', { onclick: function () { go('quarterReview', { id: course.id, quarter: q }); } },
-            'SoLei-Quartalsnoten')
+          gridBtn('SoLei-Punkte vergeben', 'capture', { id: course.id }),
+          gridBtn('Sitzplan', 'seating', { id: course.id }),
+          gridBtn('SoLei-Punktestand', 'pointstand', { id: course.id }),
+          partner ? lockedBtn('Ergebnis-Uploads') : gridBtn('Ergebnis-Uploads', 'uploads', { id: course.id }),
+          partner ? lockedBtn('Unentschuldigte Fehlzeiten') : gridBtn('Unentschuldigte Fehlzeiten', 'absences', { id: course.id }),
+          partner ? lockedBtn('SoLei-Quartalsnoten') : gridBtn('SoLei-Quartalsnoten', 'quarterReview', { id: course.id, quarter: q })
         )
       ),
       h('div.section-head', {}, 'Weitere Prüfungsleistungen'),
       h('div.card.card-tight.solei-card',
         h('div.course-actions-grid',
-          h('button.btn-primary.grid-btn', { onclick: function () { go('obt', { id: course.id }); } },
-            'Open Book Tests'),
-          h('button.btn-primary.grid-btn', { onclick: function () { go('klausuren', { id: course.id }); } },
-            'Klausuren')
+          partner ? lockedBtn('Open Book Tests') : gridBtn('Open Book Tests', 'obt', { id: course.id }),
+          partner ? lockedBtn('Klausuren') : gridBtn('Klausuren', 'klausuren', { id: course.id })
         )
       ),
       h('div.section-head', {}, 'Auswertung'),
       h('div.card.card-tight.solei-card',
-        h('button.btn-primary.btn-block.grid-btn', { onclick: function () { gradesState.mode = 'class'; gradesState.studentIdx = 0; go('grades', { id: course.id }); } },
-          'Notenübersicht & Zeugnisnoten')
+        partner ? lockedBtn('Notenübersicht & Zeugnisnoten', true)
+          : h('button.btn-primary.btn-block.grid-btn', { onclick: function () { gradesState.mode = 'class'; gradesState.studentIdx = 0; go('grades', { id: course.id }); } },
+              'Notenübersicht & Zeugnisnoten')
       ),
       h('button.btn-plain.btn-block.course-settings-btn', { onclick: function () { go('editCourse', { id: course.id }); } },
         'Kurs-Einstellungen'),
@@ -6883,6 +6969,195 @@
                 'Endgültig löschen', true).then(function (ok) { if (ok) performReset(); });
             } }, 'Jetzt zurücksetzen')
           : null));
+  }
+
+  /* ================= Teamteaching: Kurs teilen ================= */
+
+  /* Export bei Lehrkraft 1: Kurs wählen, gemeinsames Kurs-Passwort festlegen,
+     verschlüsselte .solkurs-Datei erzeugen. Auf Geräten mit Teilen-Menü wird
+     zusätzlich „Teilen“ angeboten. */
+  function courseShareExportDialog() {
+    var st = S();
+    var year = Store.yearById(activeYearId());
+    var own = st.courses.filter(function (c) {
+      return c.yearId === year.id && c.sharedRole !== 'partner';
+    });
+    if (!own.length) {
+      UI.modal('Kurs für Teamteaching exportieren',
+        h('p', {}, 'In diesem Schuljahr gibt es noch keinen Kurs, der exportiert werden könnte. Partnerkurse (importierte Kurse) lassen sich nicht erneut exportieren.'));
+      return;
+    }
+    var sel = h('select.input', {}, own.map(function (c) {
+      var cls = Store.classById(c.classId);
+      return h('option', { value: c.id }, (cls ? cls.name : '?') + ' · ' + c.subject);
+    }));
+    var pw1 = h('input.input', { type: 'password', autocomplete: 'new-password', placeholder: 'Mindestens 8 Zeichen' });
+    var pw2 = h('input.input', { type: 'password', autocomplete: 'new-password', placeholder: 'Wiederholen' });
+    var err = h('p.hint.error-text');
+    UI.modal('Kurs für Teamteaching exportieren', [
+      h('p', {}, 'Die Datei enthält Schülerliste (nur Namen), Maximalpunkte, Quartalszeiträume und Unterrichtstage des Kurses – keine Bewertungen, Fotos oder Kontaktdaten. Ihre Kollegin bzw. Ihr Kollege importiert sie als Partnerkurs.'),
+      h('label.field', h('span.field-label', {}, 'Kurs'), sel),
+      h('p', {}, 'Vereinbaren Sie ein gemeinsames ', h('strong', {}, 'Kurs-Passwort'), '. Es schützt diese Datei und später die Punkte-Dateien am Quartalsende.'),
+      h('label.field', h('span.field-label', {}, 'Kurs-Passwort'), pw1),
+      h('label.field', h('span.field-label', {}, 'Kurs-Passwort wiederholen'), pw2),
+      err
+    ], [
+      { label: 'Abbrechen', value: false },
+      { label: 'Exportieren', value: true, primary: true, validate: function () {
+          if (pw1.value.length < 8) { err.textContent = 'Das Kurs-Passwort braucht mindestens 8 Zeichen.'; return false; }
+          if (pw1.value !== pw2.value) { err.textContent = 'Die Passwörter stimmen nicht überein.'; return false; }
+          return true;
+        } }
+    ]).then(function (ok) {
+      if (!ok) return;
+      Store.courseShareExport(sel.value, pw1.value).then(function (res) {
+        deliverShareFile(res.fileName, JSON.stringify(res.envelope),
+          'Kurs-Datei erstellt. Übermitteln Sie sie an Ihre Kollegin bzw. Ihren Kollegen – das Kurs-Passwort bitte auf einem anderen Weg mitteilen.');
+      }).catch(function (e) {
+        UI.modal('Export fehlgeschlagen', h('p', {}, e.message));
+      });
+    });
+  }
+
+  /* Datei ausliefern: Teilen-Menü, wenn das Gerät Dateien teilen kann
+     (Tablets/Smartphones), sonst normaler Download. */
+  function deliverShareFile(fileName, text, doneMsg) {
+    var file = null;
+    try { file = new File([text], fileName, { type: 'application/json' }); } catch (e) {}
+    if (file && navigator.canShare && navigator.canShare({ files: [file] }) && navigator.share) {
+      UI.modal('Datei übermitteln', [
+        h('p', {}, 'Wie möchten Sie die Datei „' + fileName + '“ weitergeben?'),
+        h('p.hint', {}, '„Teilen“ öffnet das Teilen-Menü des Geräts (z. B. E-Mail oder Messenger). „Speichern“ legt die Datei in Ihren Downloads ab.')
+      ], [
+        { label: 'Speichern', value: 'save' },
+        { label: 'Teilen', value: 'share', primary: true }
+      ]).then(function (choice) {
+        if (choice === 'share') {
+          navigator.share({ files: [file], title: fileName }).then(function () {
+            toast(doneMsg);
+          }).catch(function () { /* Abbruch des Teilen-Menüs ist kein Fehler */ });
+        } else if (choice === 'save') {
+          Store.downloadTextAs(fileName, text);
+          toast(doneMsg);
+        }
+      });
+      return;
+    }
+    Store.downloadTextAs(fileName, text);
+    toast(doneMsg);
+  }
+
+  /* Import bei Lehrkraft 2: Datei wählen, Kurs-Passwort eingeben, Vorschau
+     bestätigen. Wiederholter Import derselben Kurs-Beziehung wirkt als
+     Abgleich (Nachzügler, geänderte Maximalpunkte usw.). */
+  function courseShareImportDialog() {
+    var fileInput = h('input', { type: 'file', accept: '.solkurs,.json,application/json', style: { display: 'none' } });
+    fileInput.addEventListener('change', function () {
+      var f = fileInput.files[0]; fileInput.value = '';
+      if (!f) return;
+      if (f.size > 10 * 1024 * 1024) {
+        UI.modal('Import abgelehnt', h('p', {}, 'Die Datei ist unerwartet groß und wurde aus Sicherheitsgründen abgelehnt.'));
+        return;
+      }
+      var reader = new FileReader();
+      reader.onload = function () {
+        var env;
+        try {
+          env = JSON.parse(String(reader.result));
+        } catch (e) {
+          UI.modal('Import fehlgeschlagen', h('p', {}, 'Die Datei ist keine gültige Kurs-Datei.'));
+          return;
+        }
+        if (env && env.kind && env.kind !== Share.FORMAT) {
+          UI.modal('Falsche Datei', h('p', {}, 'Das ist keine Kurs-Datei für Teamteaching. Backups spielen Sie über die Globalen Einstellungen ein.'));
+          return;
+        }
+        askSharePassword(env);
+      };
+      reader.readAsText(f);
+    });
+    document.body.appendChild(fileInput);
+    UI.modal('Kurs aus Teamteaching importieren', [
+      h('p', {}, 'Wählen Sie die Kurs-Datei (.solkurs), die Sie von der Lehrkraft erhalten haben, die die Note vergibt – z. B. aus Ihren Downloads.'),
+      h('p.hint', {}, 'Der importierte Kurs wird als Partnerkurs angelegt: Sie vergeben darin SoLei-Punkte; Fehlzeiten, Uploads, Prüfungen und Noten pflegt Ihre Kollegin bzw. Ihr Kollege.')
+    ], [
+      { label: 'Abbrechen', value: false },
+      { label: 'Datei wählen', value: true, primary: true }
+    ]).then(function (ok) {
+      if (ok) fileInput.click();
+      else fileInput.remove();
+    });
+
+    function askSharePassword(env) {
+      var pw = h('input.input', { type: 'password', autocomplete: 'off', placeholder: 'Kurs-Passwort' });
+      var err = h('p.hint.error-text');
+      UI.modal('Kurs-Passwort eingeben', [
+        h('p', {}, 'Geben Sie das gemeinsam vereinbarte Kurs-Passwort ein.'),
+        h('label.field', {}, pw), err
+      ], [
+        { label: 'Abbrechen', value: false },
+        { label: 'Weiter', value: true, primary: true, validate: function () {
+            if (pw.value) return true;
+            err.textContent = 'Bitte geben Sie das Kurs-Passwort ein.';
+            return false;
+          } }
+      ]).then(function (ok) {
+        fileInput.remove();
+        if (!ok) return;
+        Store.courseShareInspect(env, pw.value).then(showPlan).catch(function (e) {
+          UI.modal('Import fehlgeschlagen', h('p', {}, /Entschlüsselung/.test(e.message)
+            ? 'Die Datei ließ sich nicht entschlüsseln. Prüfen Sie das Kurs-Passwort.'
+            : e.message));
+        });
+      });
+    }
+
+    function showPlan(inspect) {
+      var plan = inspect.plan;
+      var lines = [];
+      lines.push(h('p', {}, plan.mode === 'create'
+        ? 'Es wird ein neuer Partnerkurs angelegt:'
+        : 'Der vorhandene Partnerkurs wird abgeglichen:'));
+      lines.push(h('p', {}, h('strong', {}, plan.className + ' · ' + plan.subject),
+        ' (Schuljahr ' + plan.yearName + ')'));
+      if (plan.mode === 'create') {
+        lines.push(h('p.hint', {}, plan.studentsNew.length + ' Schüler/innen werden übernommen.'));
+      } else {
+        lines.push(h('p.hint', {},
+          plan.studentsKept + ' Schüler/innen unverändert' +
+          (plan.studentsNew.length ? ', ' + plan.studentsNew.length + ' neu' : '') + '.'));
+        if (plan.settingsChanged.length) {
+          lines.push(h('p.hint', {}, 'Aktualisierte Einstellungen: ' + plan.settingsChanged.join(', ') + '.'));
+        } else {
+          lines.push(h('p.hint', {}, 'Die geteilten Einstellungen sind unverändert.'));
+        }
+      }
+      if (plan.studentsMissing.length) {
+        lines.push(h('p.warn-text', {},
+          plan.studentsMissing.length + ' Schüler/innen stehen nicht mehr in der Datei: ' +
+          plan.studentsMissing.map(function (s) { return s.lastName + ', ' + s.firstName; }).join('; ') +
+          '. Sie bleiben mit ihren Punkten erhalten und können bei Bedarf über die Schülerliste entfernt werden.'));
+      }
+      if (plan.criteriaMismatch) {
+        lines.push(h('p.warn-text', {}, 'Hinweis: Die Kriterienbezeichnungen auf diesem Gerät weichen von denen der Kollegin bzw. des Kollegen ab. Die Punkte sind davon nicht betroffen, aber die Anzeigen unterscheiden sich. Gleichen Sie die Bezeichnungen in den Globalen Einstellungen an.'));
+      }
+      lines.push(h('p', {}, 'Bewertungen auf diesem Gerät bleiben in jedem Fall unangetastet.'));
+      UI.modal('Import-Vorschau', lines, [
+        { label: 'Abbrechen', value: false },
+        { label: plan.mode === 'create' ? 'Kurs anlegen' : 'Abgleichen', value: true, primary: true }
+      ]).then(function (ok) {
+        if (!ok) return;
+        Store.courseShareApply(inspect).then(function (sum) {
+          toast(sum.mode === 'create'
+            ? 'Partnerkurs „' + sum.className + ' · ' + sum.subject + '“ angelegt.'
+            : 'Partnerkurs abgeglichen' + (sum.added ? ' – ' + sum.added + ' Schüler/innen ergänzt.' : '.'));
+          if (sum.yearCreated) setActiveYear(null);
+          go('course', { id: sum.courseId });
+        }).catch(function (e) {
+          UI.modal('Import fehlgeschlagen', h('p', {}, e.message));
+        });
+      });
+    }
   }
 
   /* ================= Wiederherstellungsschlüssel ================= */

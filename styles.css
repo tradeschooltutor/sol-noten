@@ -387,6 +387,17 @@ textarea.input.recovery-input {
 }
 .reset-pending strong { color: var(--red); }
 
+/* ---------- Teamteaching ---------- */
+/* Gesperrte Buttons im Partnerkurs: sichtbar, aber eindeutig inaktiv. */
+.grid-btn-locked, .grid-btn-locked:active {
+  background: var(--line); border-color: var(--line);
+  color: var(--ink-soft); cursor: not-allowed; opacity: 0.75;
+}
+.partner-hint { border-left: 3px solid var(--teal); border-radius: 0 var(--radius) var(--radius) 0; }
+.share-row { display: flex; gap: 8px; }
+.share-row .share-btn { flex: 1 1 0; min-width: 0; }
+@media (max-width: 480px) { .share-row { flex-direction: column; } .share-row .share-btn { flex: none; } }
+
 /* Demo-Modus: dauerhaft sichtbares Band auf jeder Seite */
 .demo-banner {
   background: var(--amber); color: #fff; border-radius: var(--radius);
@@ -421,9 +432,13 @@ textarea.input.recovery-input {
 .course-box-row .help-btn:active { background: var(--teal); color: #fff; }
 
 /* Wechsel zwischen den vier Hilfeseiten, direkt unter der Titelzeile.
+   Der Selektor muss `.card.help-nav` lauten: `.card` setzt
+   `flex-direction: column`, und eine spätere Regel mit gleicher Spezifität
+   ändert daran nichts, solange sie die Richtung nicht selbst setzt – sonst
+   stehen die vier Schaltflächen untereinander.
    Auf dem Smartphone zwei Reihen zu zwei Schaltflächen, ab 560 px alle vier
    nebeneinander. Gleiche Höhe ergibt sich aus dem Flex-Standard `stretch`. */
-.help-nav { display: flex; flex-wrap: wrap; gap: 8px; }
+.card.help-nav { display: flex; flex-direction: row; flex-wrap: wrap; gap: 8px; }
 .help-nav-btn {
   flex: 1 1 calc(50% - 4px); min-width: 0; min-height: 40px;
   padding: 8px 10px; border-radius: 10px; cursor: pointer;
@@ -439,7 +454,9 @@ textarea.input.recovery-input {
    auf dem Seitenhintergrund. Der Abstand entspricht dem Abstand der Karten
    untereinander (`gap` von `.screen`). */
 .help-groups { display: flex; flex-direction: column; gap: 14px; }
-.help-group-head { color: var(--teal); }
+/* `.section-head` zieht sich mit -6px an die Karte darunter heran; hier soll
+   die Überschrift dagegen sichtbar abgesetzt sein. */
+.help-group-head { color: var(--teal); margin: 2px 4px 6px; }
 .help-inline-q {
   display: inline-flex; align-items: center; justify-content: center;
   width: 20px; height: 20px; border: 1px solid var(--line); border-radius: 6px;

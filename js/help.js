@@ -483,6 +483,21 @@
           ]
         },
         {
+          id: 'faq-teamteaching',
+          group: 'Klassen & Schuljahre',
+          title: 'Wie arbeiten zwei Lehrkräfte im selben Kurs zusammen (Teamteaching)?',
+          body: [
+            { t: 'p', v: 'Unterrichten zwei Lehrkräfte denselben Kurs, vergeben beide SoLei-Punkte auf ihren eigenen Geräten. Eine Lehrkraft („Notengeberin“) führt den Kurs vollständig – Fehlzeiten, Ergebnis-Uploads, Prüfungen, Quartals- und Zeugnisnoten. Die zweite Lehrkraft arbeitet in einem **Partnerkurs**, der nur die Punktevergabe, den Sitzplan und den Punktestand enthält.' },
+            { t: 'steps', v: [
+              'Die Notengeberin exportiert den Kurs: Startseite → „Kurs-Export (Teamteaching)“. Dabei vereinbaren beide ein gemeinsames **Kurs-Passwort** (mündlich oder auf einem anderen Weg als die Datei).',
+              'Die Datei (.solkurs) wird übermittelt – per Teilen-Menü, E-Mail oder USB-Stick. Sie ist verschlüsselt und enthält nur Namen der Schüler/innen und Kurseinstellungen, keine Bewertungen, Fotos oder Kontaktdaten.',
+              'Die zweite Lehrkraft importiert sie: Startseite → „Kurs-Import (Teamteaching)“. Nach Kurs-Passwort und Vorschau entsteht der Partnerkurs.'
+            ] },
+            { t: 'p', v: 'Kommen später Schüler/innen dazu oder ändern sich Maximalpunkte, Quartalszeiträume oder Unterrichtstage, exportiert die Notengeberin einfach erneut; der zweite Import wirkt als **Abgleich** – vorhandene Punkte bleiben unangetastet. Im Partnerkurs sind diese Einstellungen deshalb nicht änderbar: Es gibt genau eine Quelle für die Bewertungsskala, ein stilles Auseinanderlaufen ist ausgeschlossen.' },
+            { t: 'note', v: 'Die Zusammenführung der vergebenen Punkte am Quartalsende (Punkte-Export bei der zweiten Lehrkraft, Punkte-Import bei der Notengeberin) folgt in einer kommenden Version.' }
+          ]
+        },
+        {
           id: 'faq-klasse-loeschen',
           group: 'Klassen & Schuljahre',
           title: 'Wie lösche ich eine Klasse, die ich versehentlich angelegt habe?',

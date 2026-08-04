@@ -427,6 +427,123 @@
   }
   function resetWaitHours() { return RESET_WAIT_MS / 3600000; }
 
+  /* ---------- Teamteaching: geteilte Kurse ---------- *
+     Formatlogik in js/share.js; hier nur die Anbindung an den Zustand.
+     Dateien sind immer mit einem gemeinsam vereinbarten Kurs-Passwort
+     verschlüsselt (CryptoBox.encrypt, dasselbe Verfahren wie beim Backup). */
+
+  /* Export bei Lehrkraft 1. Vergibt beim ersten Mal eine shareId, die die
+     Kurs-Beziehung über beide Geräte hinweg identifiziert. */
+  function courseShareExport(courseId, password) {
+    if (!password) return Promise.reject(new Error('Für den Kurs-Export ist ein gemeinsames Kurs-Passwort erforderlich.'));
+    var course = courseById(courseId);
+    if (!course) return Promise.reject(new Error('Der Kurs wurde nicht gefunden.'));
+    var cls = classById(course.classId);
+    var year = yearById(course.yearId);
+    var payload;
+    try {
+      if (!course.shareId) { course.shareId = uid(); save(); }
+      payload = Share.buildCourseExport(course, cls, year, {
+        criteriaNames: state.settings.criteriaNames || null
+      });
+      payload.shareId = course.shareId;
+    } catch (e) { return Promise.reject(e); }
+    return CryptoBox.encrypt(JSON.stringify(payload), password).then(function (env) {
+      env.kind = Share.FORMAT; /* erlaubt eine klare Fehlermeldung vor der Passwortabfrage */
+      return { envelope: env, fileName: Share.courseFileName(payload) };
+    });
+  }
+
+  /* Entschlüsselt eine Kurs-Datei und liefert Nutzdaten + Abgleichplan.
+     Schreibt noch nichts – die Oberfläche zeigt den Plan als Vorschau. */
+  function courseShareInspect(envelope, password) {
+    return CryptoBox.decrypt(envelope, password).then(function (plain) {
+      if (plain.length > IMPORT_MAX_BYTES) throw new Error('Die Datei ist unerwartet groß und wurde abgelehnt.');
+      var data = JSON.parse(plain);
+      scanForbiddenKeys(data);
+      Share.validateCourseImport(data);
+      var existing = findPartnerCourse(data.shareId);
+      var plan = Share.planCourseImport(data, existing, state.settings.criteriaNames || null);
+      return { data: data, plan: plan, existing: existing };
+    });
+  }
+
+  function findPartnerCourse(shareId) {
+    var course = state.courses.find(function (c) { return c.shareId === shareId && c.sharedRole === 'partner'; });
+    if (!course) return null;
+    return { course: course, cls: classById(course.classId) };
+  }
+
+  /* Wendet einen geprüften Import an. `inspect` ist das Ergebnis von
+     courseShareInspect. Liefert eine Zusammenfassung für die Oberfläche.
+     Grundsätze:
+     - Neuanlage: eigenes Schuljahr wird über den Namen gefunden oder aus den
+       Quartalsgrenzen der Datei neu angelegt; Schüler behalten die IDs aus
+       der Datei (Schlüssel für den späteren Punkte-Export), Klasse und Kurs
+       bekommen neue IDs.
+     - Abgleich: geteilte Einstellungen werden überschrieben, Schülerliste
+       wird ergänzt; verschwundene Schüler/innen bleiben MIT ihren Daten
+       stehen (die Oberfläche nennt sie), Bewertungsdaten bleiben immer
+       unangetastet. */
+  function courseShareApply(inspect) {
+    var data = inspect.data;
+    var summary = { mode: inspect.plan.mode, added: 0, subject: data.course.subject, className: data.course.className };
+    var course, cls;
+
+    if (inspect.existing) {
+      course = inspect.existing.course;
+      cls = inspect.existing.cls;
+    } else {
+      /* Schuljahr über den Namen wiederverwenden, sonst anlegen. */
+      var year = state.schoolYears.find(function (y) { return y.name === data.course.yearName; });
+      if (!year) {
+        year = { id: uid(), name: data.course.yearName, quarters: data.course.quarters.map(function (q) { return { start: q.start, end: q.end }; }) };
+        state.schoolYears.push(year);
+        summary.yearCreated = data.course.yearName;
+      }
+      cls = { id: uid(), yearId: year.id, name: data.course.className, students: [] };
+      state.classes.push(cls);
+      course = {
+        id: uid(), yearId: year.id, classId: cls.id,
+        subject: data.course.subject,
+        numOBT: 0, numKA: 0,
+        weights: { sl: 100, obt: 0, ka: 0 },
+        maxPoints: {},
+        currentQuarter: 1, portfolio: {}, quarterOverrides: null, completed: false,
+        uploadCriterion: data.course.uploadCriterion,
+        sharedRole: 'partner', shareId: data.shareId
+      };
+      state.courses.push(course);
+    }
+
+    /* Geteilte Einstellungen – Quelle ist immer die Datei. */
+    course.subject = data.course.subject;
+    course.maxPoints = JSON.parse(JSON.stringify(data.course.maxPoints));
+    course.quarterOverrides = data.course.quarters.map(function (q) { return { start: q.start, end: q.end }; });
+    if (data.course.teachingDays) course.teachingDays = JSON.parse(JSON.stringify(data.course.teachingDays));
+    else delete course.teachingDays;
+    course.uploadCriterion = data.course.uploadCriterion;
+
+    /* Schülerliste ergänzen; vorhandene bleiben samt Bewertungen stehen. */
+    var have = {};
+    (cls.students || []).forEach(function (s) { have[s.id] = s; });
+    data.students.forEach(function (s) {
+      if (have[s.id]) {
+        /* Namen aktualisieren (Tippfehlerkorrekturen bei Lehrkraft 1). */
+        have[s.id].lastName = s.lastName;
+        have[s.id].firstName = s.firstName;
+        return;
+      }
+      cls.students.push({ id: s.id, lastName: s.lastName, firstName: s.firstName,
+        company: '', phone: '', email: '', trainerName: '', trainerPhone: '', trainerEmail: '' });
+      summary.added++;
+    });
+    summary.missing = inspect.plan.studentsMissing;
+    save();
+    summary.courseId = course.id;
+    return Promise.resolve(summary);
+  }
+
   /* Kompletter Neustart (PIN vergessen): löscht alle Daten unwiderruflich. */
   function factoryReset() {
     security = null; masterRaw = null; masterKey = null;
@@ -1283,6 +1400,7 @@
 
   root.Store = {
     init: init, save: save, onChange: onChange, uid: uid, todayISO: todayISO,
+    downloadTextAs: downloadText,
     getState: getState, freshState: freshState,
     yearById: yearById, classById: classById, courseById: courseById, studentById: studentById,
     entriesFor: entriesFor, addEntry: addEntry, updateEntry: updateEntry, deleteEntry: deleteEntry,
@@ -1293,6 +1411,8 @@
     listSnapshots: listSnapshots, restoreSnapshot: restoreSnapshot, transferYear: transferYear,
     verifySecret: verifySecret, deleteYear: deleteYear,
     deleteClass: deleteClass, classesWithoutCourses: classesWithoutCourses,
+    courseShareExport: courseShareExport, courseShareInspect: courseShareInspect,
+    courseShareApply: courseShareApply, findPartnerCourse: findPartnerCourse,
     classCourseCount: classCourseCount,
     noteFor: noteFor, setNote: setNote, notesFor: notesFor,
     lessonContentFor: lessonContentFor, setLessonContent: setLessonContent,
