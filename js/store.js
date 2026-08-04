@@ -544,6 +544,138 @@
     return Promise.resolve(summary);
   }
 
+  /* ---------- Teamteaching: Punkte am Quartalsende ---------- */
+
+  var PARTNER_SRC = 'partner'; /* Herkunftskennzeichen importierter Vergaben/Notizen */
+
+  /* Export im Partnerkurs (Lehrkraft 2). Merkt sich Beschriftung und –
+     optional – das Kurs-Passwort am Kurs (der Gesamtzustand liegt ohnehin
+     verschlüsselt). */
+  function pointsShareExport(courseId, quarter, label, password, rememberPw) {
+    if (!password) return Promise.reject(new Error('Für den Punkte-Export ist das gemeinsame Kurs-Passwort erforderlich.'));
+    var course = courseById(courseId);
+    if (!course) return Promise.reject(new Error('Der Kurs wurde nicht gefunden.'));
+    var cls = classById(course.classId);
+    var payload;
+    try {
+      var entries = state.soleiEntries.filter(function (e) {
+        return e.courseId === courseId && e.quarter === quarter && !e.absenceId && !e.src;
+      });
+      var quarters = course.quarterOverrides || (yearById(course.yearId) || {}).quarters || [];
+      var qq = quarters[quarter - 1];
+      var notes = state.notes.filter(function (n) {
+        return n.courseId === courseId && !n.src && qq &&
+          n.date >= qq.start && n.date <= qq.end;
+      });
+      payload = Share.buildPointsExport(course, cls, entries, notes,
+        { quarter: quarter, label: label });
+    } catch (e) { return Promise.reject(e); }
+    course.partnerLabel = payload.source.label;
+    if (rememberPw) course.sharePassword = password;
+    else delete course.sharePassword;
+    save();
+    return CryptoBox.encrypt(JSON.stringify(payload), password).then(function (env) {
+      env.kind = Share.FORMAT_POINTS;
+      return { envelope: env, fileName: Share.pointsFileName(payload),
+        counts: { entries: payload.entries.length, notes: payload.notes.length } };
+    });
+  }
+
+  /* Entschlüsseln + Plan; schreibt nichts. */
+  function pointsShareInspect(envelope, password) {
+    return CryptoBox.decrypt(envelope, password).then(function (plain) {
+      if (plain.length > IMPORT_MAX_BYTES) throw new Error('Die Datei ist unerwartet groß und wurde abgelehnt.');
+      var data = JSON.parse(plain);
+      scanForbiddenKeys(data);
+      Share.validatePointsImport(data);
+      /* Der eigene (Notengeber-)Kurs zu dieser Kurs-Beziehung. */
+      var course = state.courses.find(function (c) {
+        return c.shareId === data.shareId && c.sharedRole !== 'partner';
+      });
+      var partnerOnly = !course && !!state.courses.find(function (c) { return c.shareId === data.shareId; });
+      if (!course && partnerOnly) {
+        throw new Error('Punkte importiert die Lehrkraft, welche die Note vergibt – auf diesem Gerät liegt der Kurs nur als Partnerkurs vor.');
+      }
+      var cls = course ? classById(course.classId) : null;
+      var quarters = course ? (course.quarterOverrides || (yearById(course.yearId) || {}).quarters || []) : [];
+      var plan = Share.planPointsImport(data, course, cls, function (dateISO) {
+        return Quarters.quarterForDate(dateISO, quarters);
+      });
+      /* Was würde ersetzt? Vorhandene Partner-Einträge in den betroffenen Quartalen. */
+      plan.replacing = state.soleiEntries.filter(function (e) {
+        return e.courseId === course.id && e.src === PARTNER_SRC &&
+          plan.quartersTouched.indexOf(e.quarter) > -1;
+      }).length;
+      return { data: data, plan: plan, course: course };
+    });
+  }
+
+  /* Ersetzendes Schreiben: Erst verschwinden alle Partner-Einträge der
+     betroffenen Quartale, dann kommen die aus der Datei. Ein doppelter Import
+     derselben Datei ist dadurch folgenlos, und eine korrigierte Datei
+     ersetzt die alte vollständig – es bleiben nie Reste zurück. */
+  function pointsShareApply(inspect) {
+    var data = inspect.data;
+    var course = inspect.course;
+    var cls = classById(course.classId);
+    var known = {};
+    (cls.students || []).forEach(function (s) { known[s.id] = true; });
+    var quarters = course.quarterOverrides || (yearById(course.yearId) || {}).quarters || [];
+    var touched = inspect.plan.quartersTouched;
+
+    var removed = 0;
+    state.soleiEntries = state.soleiEntries.filter(function (e) {
+      var hit = e.courseId === course.id && e.src === PARTNER_SRC && touched.indexOf(e.quarter) > -1;
+      if (hit) removed++;
+      return !hit;
+    });
+
+    var added = 0, skipped = 0;
+    data.entries.forEach(function (e) {
+      if (!known[e.studentId]) { skipped++; return; }
+      var q = Quarters.quarterForDate(e.date, quarters);
+      if (!(q >= 1 && q <= 4)) { skipped++; return; }
+      state.soleiEntries.push({
+        id: uid(), courseId: course.id, studentId: e.studentId, quarter: q,
+        criterion: e.criterion, points: e.points, date: e.date,
+        src: PARTNER_SRC, createdAt: new Date().toISOString()
+      });
+      added++;
+    });
+
+    /* Kursnotizen: eigene Notizen der Notengeberin bleiben unberührt; die
+       Partner-Notizen der betroffenen Quartale werden ersetzt und tragen die
+       Beschriftung der Quelle im Text. */
+    var label = (data.source && data.source.label) || 'Kollegin/Kollege';
+    var notesRemoved = 0;
+    state.notes = state.notes.filter(function (n) {
+      if (n.courseId !== course.id || n.src !== PARTNER_SRC) return true;
+      var q = Quarters.quarterForDate(n.date, quarters);
+      var hit = touched.indexOf(q) > -1;
+      if (hit) notesRemoved++;
+      return !hit;
+    });
+    var notesAdded = 0;
+    data.notes.forEach(function (n) {
+      if (!known[n.studentId]) return;
+      var t = String(n.text || '').trim();
+      if (!t) return;
+      state.notes.push({
+        id: uid(), courseId: course.id, studentId: n.studentId, date: n.date,
+        text: '[' + label + '] ' + t, src: PARTNER_SRC
+      });
+      notesAdded++;
+    });
+
+    course.partnerLabel = label;
+    save();
+    return Promise.resolve({
+      removed: removed, added: added, skipped: skipped,
+      notesRemoved: notesRemoved, notesAdded: notesAdded,
+      quarters: touched, courseId: course.id, label: label
+    });
+  }
+
   /* Kompletter Neustart (PIN vergessen): löscht alle Daten unwiderruflich. */
   function factoryReset() {
     security = null; masterRaw = null; masterKey = null;
@@ -1421,6 +1553,8 @@
     deleteClass: deleteClass, classesWithoutCourses: classesWithoutCourses,
     courseShareExport: courseShareExport, courseShareInspect: courseShareInspect,
     courseShareApply: courseShareApply, findPartnerCourse: findPartnerCourse,
+    pointsShareExport: pointsShareExport, pointsShareInspect: pointsShareInspect,
+    pointsShareApply: pointsShareApply,
     classCourseCount: classCourseCount,
     noteFor: noteFor, setNote: setNote, notesFor: notesFor,
     lessonContentFor: lessonContentFor, setLessonContent: setLessonContent,

@@ -70,7 +70,7 @@
 
   /* ================= App-Start ================= */
 
-  var APP_VERSION = '0.45.0';
+  var APP_VERSION = '0.46.0';
 
   /* ---------- PWA-Installation ----------
      Chrome/Edge/Android liefern `beforeinstallprompt`: Event abfangen und
@@ -362,7 +362,11 @@
         return resp.text().then(function (text) {
           return c.delete('./shared-file').then(function () {
             if (!text) return;
-            courseShareImportDialog(text);
+            /* Weiche nach Dateiart: Kurs-Datei oder Punkte-Datei. */
+            var env = null;
+            try { env = JSON.parse(text); } catch (e) {}
+            if (env && env.kind === Share.FORMAT_POINTS) pointsShareImportDialog(env);
+            else courseShareImportDialog(text);
           });
         });
       });
@@ -2376,6 +2380,13 @@
           : h('button.btn-primary.btn-block.grid-btn', { onclick: function () { gradesState.mode = 'class'; gradesState.studentIdx = 0; go('grades', { id: course.id }); } },
               'Notenübersicht & Zeugnisnoten')
       ),
+      partner ? h('div.section-head', {}, 'Teamteaching') : null,
+      partner
+        ? h('div.card.card-tight.solei-card',
+            h('button.btn-primary.btn-block.grid-btn', { onclick: function () { pointsShareExportDialog(course); } },
+              'SoLei-Punkte exportieren (an die Notengeberin)'),
+            h('p.hint', {}, 'Am Quartalsende: Ihre Punktevergaben und Kursnotizen als verschlüsselte Datei an die Lehrkraft übermitteln, welche die Note vergibt.'))
+        : null,
       h('button.btn-plain.btn-block.course-settings-btn', { onclick: function () { go('editCourse', { id: course.id }); } },
         'Kurs-Einstellungen'),
       /* Punktestand-Liste bewusst nicht mehr auf der Kursseite (über den Button
@@ -2719,6 +2730,18 @@
       go('quarterReview', { id: course.id, quarter: Number(qSel.value) });
     });
 
+    /* Teamteaching: Der Kurs wurde geteilt (shareId) und dies ist das Gerät
+       der Notengeberin – hier kommen die Punkte der Kollegin an. */
+    var ttImport = (course.shareId && course.sharedRole !== 'partner')
+      ? h('div.card.card-tight',
+          h('div.row-between',
+            h('span.hint', {},
+              'Teamteaching: Punkte-Datei der Kollegin / des Kollegen' +
+              (course.partnerLabel ? ' (' + course.partnerLabel + ')' : '') + ' einspielen.'),
+            h('button.btn-small.btn-primary', { onclick: function () { pointsShareImportDialog(); } },
+              'Punkte importieren')))
+      : null;
+
     var inputs = {}; /* studentId -> input */
     var soleiCells = {}; /* studentId -> Zelle für Note SoLei (Live-Aktualisierung) */
 
@@ -2858,6 +2881,7 @@
     return h('div.screen',
       header('SoLei-Quartalsnoten', { name: 'course', params: { id: course.id } }),
       courseBox(course),
+      ttImport,
       h('div.card.card-tight',
         h('div.row-between', qSel,
           q > 1 ? h('span.hint', {}, '▲ / ▼ = Entwicklung zum Vorquartal') : null),
@@ -7162,6 +7186,11 @@
         UI.modal('Import fehlgeschlagen', h('p', {}, 'Die Datei ist keine gültige Kurs-Datei.'));
         return;
       }
+      if (env && env.kind === Share.FORMAT_POINTS) {
+        /* Falsche Tür, richtige Absicht: direkt in den Punkte-Import. */
+        pointsShareImportDialog(env);
+        return;
+      }
       if (env && env.kind && env.kind !== Share.FORMAT) {
         UI.modal('Falsche Datei', h('p', {}, 'Das ist keine Kurs-Datei für Teamteaching. Backups spielen Sie über die Globalen Einstellungen ein.'));
         return;
@@ -7234,6 +7263,150 @@
             : 'Partnerkurs abgeglichen' + (sum.added ? ' – ' + sum.added + ' Schüler/innen ergänzt.' : '.'));
           if (sum.yearCreated) setActiveYear(null);
           go('course', { id: sum.courseId });
+        }).catch(function (e) {
+          UI.modal('Import fehlgeschlagen', h('p', {}, e.message));
+        });
+      });
+    }
+  }
+
+  /* ================= Teamteaching: Punkte am Quartalsende ================= */
+
+  /* Export im Partnerkurs (Lehrkraft 2). */
+  function pointsShareExportDialog(course) {
+    var quarters = courseQuarters(course);
+    var q0 = course.currentQuarter || Quarters.quarterForDate(Store.todayISO(), quarters);
+    var qSel = h('select.input', {}, [1, 2, 3, 4].map(function (n) {
+      return h('option', { value: n, selected: n === q0 }, n + '. Quartal');
+    }));
+    var counts = h('p.hint');
+    function refreshCounts() {
+      var q = Number(qSel.value);
+      var st = S();
+      var nE = st.soleiEntries.filter(function (e) {
+        return e.courseId === course.id && e.quarter === q && !e.absenceId && !e.src;
+      }).length;
+      var qq = quarters[q - 1];
+      var nN = st.notes.filter(function (n) {
+        return n.courseId === course.id && !n.src && qq && n.date >= qq.start && n.date <= qq.end;
+      }).length;
+      counts.textContent = 'Im ' + q + '. Quartal: ' + nE + ' Punktevergaben, ' + nN + ' Kursnotizen.';
+    }
+    qSel.addEventListener('change', refreshCounts);
+    refreshCounts();
+
+    var labelInput = h('input.input', { type: 'text', value: course.partnerLabel || '',
+      placeholder: 'z. B. Ihr Nachname oder Kürzel' });
+    var pw = h('input.input', { type: 'password', autocomplete: 'off',
+      value: course.sharePassword || '', placeholder: 'Kurs-Passwort' });
+    var remember = h('input', { type: 'checkbox' });
+    if (course.sharePassword) remember.checked = true;
+    var err = h('p.hint.error-text');
+
+    UI.modal('SoLei-Punkte exportieren', [
+      h('p', {}, 'Die Datei enthält Ihre Punktevergaben und Kursnotizen des gewählten Quartals. Die Lehrkraft, welche die Note vergibt, spielt sie bei sich ein.'),
+      h('label.field', h('span.field-label', {}, 'Quartal'), qSel),
+      counts,
+      h('label.field', h('span.field-label', {}, 'Ihre Beschriftung (erscheint an den Notizen)'), labelInput),
+      h('label.field', h('span.field-label', {}, 'Kurs-Passwort (gemeinsam vereinbart)'), pw),
+      h('label.check-row', {}, remember, h('span', {}, 'Kurs-Passwort auf diesem Gerät merken')),
+      err
+    ], [
+      { label: 'Abbrechen', value: false },
+      { label: 'Exportieren', value: true, primary: true, validate: function () {
+          if (!pw.value) { err.textContent = 'Bitte geben Sie das Kurs-Passwort ein.'; return false; }
+          return true;
+        } }
+    ]).then(function (ok) {
+      if (!ok) return;
+      Store.pointsShareExport(course.id, Number(qSel.value), labelInput.value, pw.value, remember.checked)
+        .then(function (res) {
+          deliverShareFile(res.fileName, JSON.stringify(res.envelope),
+            'Punkte-Datei erstellt (' + res.counts.entries + ' Vergaben, ' + res.counts.notes + ' Notizen).');
+        }).catch(function (e) {
+          UI.modal('Export fehlgeschlagen', h('p', {}, e.message));
+        });
+    });
+  }
+
+  /* Import bei der Notengeberin (Lehrkraft 1). presetEnv: bereits gelesener
+     Umschlag aus dem Teilen-Eingang. */
+  function pointsShareImportDialog(presetEnv) {
+    if (presetEnv) { askPw(presetEnv); return; }
+    var fileInput = h('input', { type: 'file',
+      accept: '.solpunkte,.txt,.json,application/json,text/plain', style: { display: 'none' } });
+    fileInput.addEventListener('change', function () {
+      var f = fileInput.files[0]; fileInput.value = ''; fileInput.remove();
+      if (!f) return;
+      if (f.size > 10 * 1024 * 1024) {
+        UI.modal('Import abgelehnt', h('p', {}, 'Die Datei ist unerwartet groß und wurde aus Sicherheitsgründen abgelehnt.'));
+        return;
+      }
+      f.text().then(function (text) {
+        var env;
+        try { env = JSON.parse(text); }
+        catch (e) { UI.modal('Import fehlgeschlagen', h('p', {}, 'Die Datei ist keine gültige Punkte-Datei.')); return; }
+        if (env && env.kind === Share.FORMAT) {
+          UI.modal('Falsche Datei', h('p', {}, 'Das ist eine Kurs-Datei. Punkte-Dateien enden auf .solpunkte; den Kurs importieren Sie über „Kurs-Import (Teamteaching)“ auf der Startseite.'));
+          return;
+        }
+        askPw(env);
+      });
+    });
+    document.body.appendChild(fileInput);
+    fileInput.click();
+
+    function askPw(env) {
+      var pw = h('input.input', { type: 'password', autocomplete: 'off', placeholder: 'Kurs-Passwort' });
+      var err = h('p.hint.error-text');
+      UI.modal('Kurs-Passwort eingeben', [
+        h('p', {}, 'Geben Sie das gemeinsam vereinbarte Kurs-Passwort ein.'),
+        h('label.field', {}, pw), err
+      ], [
+        { label: 'Abbrechen', value: false },
+        { label: 'Weiter', value: true, primary: true, validate: function () {
+            if (pw.value) return true;
+            err.textContent = 'Bitte geben Sie das Kurs-Passwort ein.';
+            return false;
+          } }
+      ]).then(function (ok) {
+        if (!ok) return;
+        Store.pointsShareInspect(env, pw.value).then(showPlan).catch(function (e) {
+          UI.modal('Import fehlgeschlagen', h('p', {}, /Entschlüsselung/.test(e.message)
+            ? 'Die Datei ließ sich nicht entschlüsseln. Prüfen Sie das Kurs-Passwort.'
+            : e.message));
+        });
+      });
+    }
+
+    function showPlan(inspect) {
+      var plan = inspect.plan;
+      var cls = Store.classById(inspect.course.classId);
+      var lines = [
+        h('p', {}, 'Punkte von ', h('strong', {}, plan.sourceLabel), ' für ',
+          h('strong', {}, cls.name + ' · ' + inspect.course.subject), ':'),
+        h('p.hint', {}, plan.importable + ' Punktevergaben (' + plan.personCount + ' Personen), ' +
+          plan.notesOk + ' Kursnotizen – ' + plan.quartersTouched.map(function (q) { return q + '. Quartal'; }).join(', ') + '.')
+      ];
+      if (plan.replacing) {
+        lines.push(h('p.hint', {}, plan.replacing + ' bereits früher importierte Vergaben dieser Quelle werden dabei ersetzt – ein doppelter Import derselben Datei ist folgenlos.'));
+      }
+      if (plan.unknownStudents) {
+        lines.push(h('p.warn-text', {}, plan.unknownStudents + ' Personen aus der Datei stehen nicht in Ihrer Schülerliste; ihre Vergaben werden übersprungen. Gleichen Sie ggf. zuerst den Kurs ab (neuer Kurs-Export an die Kollegin / den Kollegen).'));
+      }
+      if (plan.quartersMismatch) {
+        lines.push(h('p.warn-text', {}, 'Die Quartalszeiträume der Kollegin / des Kollegen weichen von Ihren ab. Das Quartal jeder Vergabe wird beim Import aus dem Datum nach IHREN Zeiträumen neu bestimmt. Senden Sie danach einen neuen Kurs-Export, damit beide Geräte wieder übereinstimmen.'));
+      }
+      lines.push(h('p', {}, 'Ihre eigenen Vergaben, Fehlzeiten, Uploads und Notizen bleiben unangetastet.'));
+      UI.modal('Punkte-Import: Vorschau', lines, [
+        { label: 'Abbrechen', value: false },
+        { label: 'Importieren', value: true, primary: true }
+      ]).then(function (ok) {
+        if (!ok) return;
+        Store.pointsShareApply(inspect).then(function (sum) {
+          toast(sum.added + ' Vergaben von ' + sum.label + ' importiert' +
+            (sum.removed ? ' (' + sum.removed + ' ältere ersetzt)' : '') + '.');
+          go('quarterReview', { id: sum.courseId, quarter: sum.quarters[sum.quarters.length - 1] });
         }).catch(function (e) {
           UI.modal('Import fehlgeschlagen', h('p', {}, e.message));
         });

@@ -171,12 +171,146 @@
     return 'SOL-Kurs-' + safe(data.course.className) + '-' + safe(data.course.subject) + '.solkurs';
   }
 
+  /* ---------- Punkte-Export (Quartalsende, Lehrkraft 2 -> Lehrkraft 1) ---------- */
+
+  var FORMAT_POINTS = 'sol-noten-punkte';
+
+  /* entries: SoLei-Vergaben des Kurses im gewählten Quartal (ohne Fehlzeit-
+     Vergaben – im Partnerkurs entstehen ohnehin keine). notes: Kursnotizen.
+     Die Quartalsgrenzen des Absenders reisen als Prüfsumme mit. */
+  function buildPointsExport(course, cls, entries, notes, opts) {
+    if (!course || !course.shareId) throw new Error('Dieser Kurs ist kein Teamteaching-Kurs.');
+    if (course.sharedRole !== 'partner') {
+      throw new Error('Der Punkte-Export erfolgt auf dem Gerät der Lehrkraft, die NICHT die Note vergibt (Partnerkurs).');
+    }
+    var quarter = opts.quarter;
+    if (!(quarter >= 1 && quarter <= 4)) throw new Error('Ungültiges Quartal.');
+    var quarters = (course.quarterOverrides || []).map(function (q) { return { start: q.start, end: q.end }; });
+    return {
+      format: FORMAT_POINTS,
+      version: FORMAT_VERSION,
+      shareId: course.shareId,
+      exportedAt: (opts && opts.now) || new Date().toISOString(),
+      source: { label: String(opts.label || '').trim() || 'Kollegin/Kollege' },
+      quarter: quarter,
+      quarters: quarters,
+      course: { subject: course.subject, className: cls ? cls.name : '' },
+      entries: entries.map(function (e) {
+        return { studentId: e.studentId, criterion: e.criterion, points: e.points, date: e.date };
+      }),
+      notes: (notes || []).map(function (n) {
+        return { studentId: n.studentId, date: n.date, text: n.text };
+      })
+    };
+  }
+
+  function validatePointsImport(data) {
+    if (!data || typeof data !== 'object') throw new Error('Die Datei ist keine gültige Punkte-Datei.');
+    if (data.format !== FORMAT_POINTS) throw new Error('Die Datei ist keine Punkte-Datei für Teamteaching (falsches Format).');
+    if (typeof data.version !== 'number' || data.version > FORMAT_VERSION) {
+      throw new Error('Die Datei stammt aus einer neueren App-Version. Bitte aktualisieren Sie SOL-Noten.');
+    }
+    if (!data.shareId || typeof data.shareId !== 'string') throw new Error('Der Datei fehlt die Kurs-Kennung.');
+    if (!(data.quarter >= 1 && data.quarter <= 4)) throw new Error('Der Datei fehlt das Quartal.');
+    if (!Array.isArray(data.entries)) throw new Error('Der Datei fehlen die Punktevergaben.');
+    data.entries.forEach(function (e) {
+      if (!e || typeof e.studentId !== 'string' || !e.studentId) throw new Error('Eine Vergabe hat keine Schüler-ID.');
+      if (!(e.criterion >= 0 && e.criterion <= 4) || e.criterion !== Math.floor(e.criterion)) {
+        throw new Error('Eine Vergabe hat ein ungültiges Kriterium.');
+      }
+      if (typeof e.points !== 'number' || !isFinite(e.points) || e.points < 0 || e.points > 100) {
+        throw new Error('Eine Vergabe hat eine ungültige Punktzahl.');
+      }
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(String(e.date || ''))) throw new Error('Eine Vergabe hat ein ungültiges Datum.');
+    });
+    if (!Array.isArray(data.notes)) data.notes = [];
+    data.notes.forEach(function (n) {
+      if (!n || typeof n.studentId !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(String(n.date || '')) ||
+          typeof n.text !== 'string') {
+        throw new Error('Eine Kursnotiz in der Datei ist unvollständig.');
+      }
+    });
+    return true;
+  }
+
+  /* Importplan – reine Funktion. course/cls: der eigene (Notengeber-)Kurs.
+     quarterForDate(dateISO) liefert das Quartal nach den Grenzen des
+     EMPFÄNGERS: das Quartal wird beim Import aus dem Datum neu berechnet,
+     nie aus der Datei übernommen (datumsgetriebenes Quartalsprinzip). */
+  function planPointsImport(data, course, cls, quarterForDate) {
+    validatePointsImport(data);
+    if (!course) throw new Error('Zu dieser Punkte-Datei gibt es auf diesem Gerät keinen passenden Kurs. Der Import gehört auf das Gerät der Lehrkraft, die den Kurs exportiert hat.');
+    if (course.sharedRole === 'partner') {
+      throw new Error('Punkte importiert die Lehrkraft, welche die Note vergibt – nicht der Partnerkurs.');
+    }
+    var known = {};
+    (cls.students || []).forEach(function (s) { known[s.id] = s; });
+
+    var myQuarters = (course.quarterOverrides || null);
+    var mismatch = false;
+    if (Array.isArray(data.quarters) && data.quarters.length === 4 && myQuarters) {
+      var a = data.quarters.map(function (q) { return q.start + '/' + q.end; }).join(',');
+      var b = myQuarters.map(function (q) { return q.start + '/' + q.end; }).join(',');
+      mismatch = a !== b;
+    }
+
+    var perQuarter = {};    /* recomputedQuarter -> Anzahl */
+    var persons = {};
+    var unknown = {};
+    var outOfRange = 0;
+    data.entries.forEach(function (e) {
+      if (!known[e.studentId]) { unknown[e.studentId] = true; return; }
+      var q = quarterForDate(e.date);
+      if (!(q >= 1 && q <= 4)) { outOfRange++; return; }
+      perQuarter[q] = (perQuarter[q] || 0) + 1;
+      persons[e.studentId] = true;
+    });
+    var notesOk = 0, notesUnknown = 0;
+    data.notes.forEach(function (n) {
+      if (known[n.studentId]) notesOk++; else notesUnknown++;
+    });
+
+    /* Ersetzt wird immer mindestens das deklarierte Quartal – auch wenn die
+       Datei leer ist, gilt sie als „aktueller Stand: nichts“. */
+    var quartersTouched = Object.keys(perQuarter).map(Number);
+    if (quartersTouched.indexOf(data.quarter) === -1) quartersTouched.push(data.quarter);
+    quartersTouched.sort();
+
+    return {
+      sourceLabel: data.source && data.source.label || 'Kollegin/Kollege',
+      declaredQuarter: data.quarter,
+      quartersTouched: quartersTouched,
+      perQuarter: perQuarter,
+      entryCount: data.entries.length,
+      importable: Object.keys(perQuarter).reduce(function (s, k) { return s + perQuarter[k]; }, 0),
+      personCount: Object.keys(persons).length,
+      unknownStudents: Object.keys(unknown).length,
+      outOfRange: outOfRange,
+      notesOk: notesOk,
+      notesUnknown: notesUnknown,
+      quartersMismatch: mismatch
+    };
+  }
+
+  function pointsFileName(data) {
+    function safe(s) {
+      return String(s || '').replace(/[^\wäöüÄÖÜß-]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 30);
+    }
+    return 'SOL-Punkte-' + safe(data.course.className) + '-' + safe(data.course.subject) +
+      '-Q' + data.quarter + '.solpunkte';
+  }
+
   return {
     FORMAT: FORMAT,
+    FORMAT_POINTS: FORMAT_POINTS,
     FORMAT_VERSION: FORMAT_VERSION,
     buildCourseExport: buildCourseExport,
     validateCourseImport: validateCourseImport,
     planCourseImport: planCourseImport,
-    courseFileName: courseFileName
+    courseFileName: courseFileName,
+    buildPointsExport: buildPointsExport,
+    validatePointsImport: validatePointsImport,
+    planPointsImport: planPointsImport,
+    pointsFileName: pointsFileName
   };
 });

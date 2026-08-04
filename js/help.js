@@ -495,7 +495,13 @@
               'Die zweite Lehrkraft importiert sie: Startseite → „Kurs-Import (Teamteaching)“, Datei z. B. aus den Downloads wählen. Nach Kurs-Passwort und Vorschau entsteht der Partnerkurs. **Auf Android** geht es direkt: Anhang antippen → „Teilen“ → SOL-Noten – die App öffnet sich sofort mit der Import-Vorschau. Das setzt voraus, dass SOL-Noten **mit Chrome installiert** wurde: Nur Chrome erzeugt auf Android ein App-Paket, das sich beim System als Teilen-Ziel anmelden kann. In der mit Edge installierten App und auf iPhone/iPad bietet das System diesen Weg nicht an – dort führt der Weg über „Speichern“ bzw. „In Dateien sichern“ und die Dateiauswahl im Import-Dialog.'
             ] },
             { t: 'p', v: 'Die Schülerliste des Partnerkurses kommt vollständig von der Notengeberin – Hinzufügen und Bearbeiten sind dort deshalb gesperrt, nur Löschen ist möglich. Kommen später Schüler/innen dazu oder ändern sich Maximalpunkte, Quartalszeiträume oder Unterrichtstage, exportiert die Notengeberin einfach erneut; der zweite Import wirkt als **Abgleich** – vorhandene Punkte bleiben unangetastet. Im Partnerkurs sind diese Einstellungen deshalb nicht änderbar: Es gibt genau eine Quelle für die Bewertungsskala, ein stilles Auseinanderlaufen ist ausgeschlossen.' },
-            { t: 'note', v: 'Die Zusammenführung der vergebenen Punkte am Quartalsende (Punkte-Export bei der zweiten Lehrkraft, Punkte-Import bei der Notengeberin) folgt in einer kommenden Version.' }
+            { t: 'p', v: '**Am Quartalsende** führt die Notengeberin die Punkte zusammen: Die zweite Lehrkraft tippt im Partnerkurs auf „SoLei-Punkte exportieren“, wählt das Quartal und übermittelt die Datei (.solpunkte) – mit demselben Kurs-Passwort. Die Notengeberin spielt sie auf „SoLei-Quartalsnoten“ über „Punkte importieren“ ein (auf Android auch direkt per „Teilen“ → SOL-Noten). Eine Vorschau zeigt vorher, wie viele Vergaben und Notizen von wem ankommen.' },
+            { t: 'ul', v: [
+              'Die importierten Vergaben zählen in Punktesumme, Note und Diagrammen **gleichberechtigt** mit – die Gewichtung ergibt sich automatisch daraus, wie viel jede Lehrkraft tatsächlich bewertet hat.',
+              'Importierte Kursnotizen tragen die Beschriftung der Kollegin bzw. des Kollegen, z.\u202fB. „[Meier] hat die Gruppe gut moderiert“.',
+              'Ein **doppelter Import derselben Datei ist folgenlos**, und eine korrigierte Datei ersetzt die frühere vollständig: Beim Import werden zunächst alle früher importierten Vergaben dieser Quelle im betroffenen Quartal entfernt und dann die aus der Datei eingesetzt. Eigene Vergaben, Fehlzeiten, Uploads und Notizen der Notengeberin bleiben dabei immer unangetastet.',
+              'Das Quartal jeder Vergabe wird beim Import aus dem **Datum** nach den Zeiträumen der Notengeberin neu bestimmt – nicht aus der Datei übernommen.'
+            ] }
           ]
         },
         {
