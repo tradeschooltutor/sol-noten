@@ -1,5 +1,5 @@
 /* SOL-Noten – Service Worker: macht die App vollständig offline nutzbar. */
-var CACHE = 'sol-noten-v0.44.1';
+var CACHE = 'sol-noten-v0.44.2';
 var FILES = [
   './',
   'index.html',
@@ -71,6 +71,22 @@ self.addEventListener('fetch', function (e) {
   }
 
   if (e.request.method !== 'GET') return;
+
+  /* Das Manifest netz-zuerst: Chrome liest es bei der Installation, und ein
+     WebAPK wird mit genau dem Stand gebaut, den es dabei bekommt. Aus dem
+     Cache bedient könnte eine Neuinstallation sonst ein altes Manifest ohne
+     Teilen-Ziel erwischen. Offline fällt es auf den Cache zurück. */
+  if (url.pathname.endsWith('manifest.webmanifest')) {
+    e.respondWith(
+      fetch(e.request).then(function (resp) {
+        var copy = resp.clone();
+        caches.open(CACHE).then(function (c) { c.put(e.request, copy); });
+        return resp;
+      }).catch(function () { return caches.match(e.request); })
+    );
+    return;
+  }
+
   e.respondWith(
     caches.match(e.request).then(function (hit) {
       return hit || fetch(e.request).then(function (resp) {
