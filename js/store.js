@@ -1224,10 +1224,18 @@
        die App ohnehin die PIN, bevor Daten erfasst werden. */
     if (!(isEncrypted() && masterKey)) return Promise.resolve();
     return CryptoBox.encryptWithKey(masterKey, JSON.stringify(state)).then(function (box) {
-      return JSON.stringify({
+      var env = {
         app: 'SOL-Noten', encrypted: true, v: 2, mode: 'pin-master',
         wrapped: security.wrapped, iv: box.iv, data: box.data
-      });
+      };
+      /* Zweiter Umschlag mit dem Wiederherstellungsschlüssel, sofern
+         vorhanden. Wichtig für den Fall, dass die PIN nach dem Schreiben
+         geändert wird: Die Datei trägt den PIN-Umschlag von DAMALS und wäre
+         sonst nur noch mit der damaligen PIN zu öffnen. Der
+         Wiederherstellungsschlüssel bleibt dagegen über PIN-Wechsel hinweg
+         gültig und rettet die Datei. */
+      if (security.recovery) env.recovery = security.recovery;
+      return JSON.stringify(env);
     }).then(function (text) {
       return backupDirHandle.getFileHandle('SOL-Noten-Backup-' + todayISO() + '.json', { create: true })
         .then(function (fh) { return fh.createWritable(); })

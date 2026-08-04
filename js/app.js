@@ -70,7 +70,7 @@
 
   /* ================= App-Start ================= */
 
-  var APP_VERSION = '0.44.2';
+  var APP_VERSION = '0.45.0';
 
   /* ---------- PWA-Installation ----------
      Chrome/Edge/Android liefern `beforeinstallprompt`: Event abfangen und
@@ -6598,13 +6598,25 @@
         var parsed = Store.parseBackup(text);
         var getData;
         if (parsed.keyEnvelope) {
-          getData = askPassword(f.name, true).then(function (pin) {
+          getData = askPassword(f.name, true, !!parsed.envelope.recovery).then(function (pin) {
             if (pin == null) return null;
+            /* Ein automatisches Ordner-Backup trägt den PIN-Umschlag von dem
+               Tag, an dem es geschrieben wurde. Wurde die PIN seitdem
+               geändert, öffnet nur noch die DAMALIGE PIN – oder, falls die
+               Datei ihn mitführt, der Wiederherstellungsschlüssel. Deshalb
+               wird beides versucht, bevor der Fehler gemeldet wird. */
             return CryptoBox.unwrapMaster(pin, parsed.envelope.wrapped)
+              .catch(function (e) {
+                if (!parsed.envelope.recovery) throw e;
+                return CryptoBox.unwrapMaster(CryptoBox.normalizeRecoveryKey(pin), parsed.envelope.recovery);
+              })
               .then(function (raw) { return CryptoBox.importAesKey(raw); })
               .then(function (key) { return CryptoBox.decryptWithKey(key, parsed.envelope); })
               .then(function (plain) { return JSON.parse(plain); })
-              .catch(function () { throw new Error('Falsche PIN / falsches Passwort oder beschädigte Datei.'); });
+              .catch(function () {
+                throw new Error('Die Datei ließ sich nicht öffnen. Ein automatisches Ordner-Backup verlangt die PIN bzw. das Passwort, die zum Zeitpunkt der Sicherung galten – nicht unbedingt die heutige. Haben Sie PIN oder Passwort seitdem geändert, versuchen Sie die frühere.' +
+                  (parsed.envelope.recovery ? ' Auch der Wiederherstellungsschlüssel öffnet diese Datei.' : ''));
+              });
           });
         } else if (parsed.encrypted) {
           getData = askPassword(f.name, false).then(function (pw) {
@@ -6628,14 +6640,17 @@
       }).catch(function (e) { UI.modal('Import fehlgeschlagen', h('p', {}, e.message)); });
     });
 
-    function askPassword(fileName, isKeyEnvelope) {
-      var label = isKeyEnvelope ? 'PIN / Passwort' : 'Passwort';
+    function askPassword(fileName, isKeyEnvelope, hasRecovery) {
+      var label = isKeyEnvelope
+        ? (hasRecovery ? 'PIN / Passwort / Wiederherstellungsschlüssel' : 'PIN / Passwort')
+        : 'Passwort';
       var pw = h('input.input', { type: 'password',
         autocomplete: 'current-password', placeholder: label });
       return UI.modal('Verschlüsseltes Backup',
         [h('p.hint', {}, isKeyEnvelope
-          ? 'Die Datei „' + fileName + '“ ist ein automatisches Backup. Bitte geben Sie die PIN bzw. das Passwort ein, die/das beim Erstellen der Datei aktiv war.'
-          : 'Die Datei „' + fileName + '“ ist verschlüsselt. Bitte geben Sie das Passwort ein.'),
+          ? 'Die Datei „' + fileName + '“ ist ein automatisches Backup. Bitte geben Sie die PIN bzw. das Passwort ein, die zum Zeitpunkt der Sicherung galten – nach einem PIN-Wechsel also die frühere.' +
+            (hasRecovery ? ' Der Wiederherstellungsschlüssel funktioniert ebenfalls.' : '')
+          : 'Die Datei „' + fileName + '“ ist verschlüsselt. Bitte geben Sie das Passwort ein, das Sie beim Export vergeben haben.'),
          h('label.field', h('span.field-label', {}, label), pw)],
         [{ label: 'Abbrechen', value: false }, { label: 'Entschlüsseln', value: true, primary: true }]
       ).then(function (ok) { return ok ? pw.value : null; });
