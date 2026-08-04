@@ -491,9 +491,9 @@
             { t: 'steps', v: [
               'Die Notengeberin exportiert den Kurs: Startseite → „Kurs-Export (Teamteaching)“. Dabei vereinbaren beide ein gemeinsames **Kurs-Passwort** (mündlich oder auf einem anderen Weg als die Datei).',
               'Die Datei (.solkurs) wird übermittelt – per Teilen-Menü, E-Mail oder USB-Stick. Sie ist verschlüsselt und enthält nur Namen der Schüler/innen und Kurseinstellungen, keine Bewertungen, Fotos oder Kontaktdaten.',
-              'Die zweite Lehrkraft importiert sie: Startseite → „Kurs-Import (Teamteaching)“. Nach Kurs-Passwort und Vorschau entsteht der Partnerkurs.'
+              'Die zweite Lehrkraft importiert sie: Startseite → „Kurs-Import (Teamteaching)“, Datei z. B. aus den Downloads wählen. Nach Kurs-Passwort und Vorschau entsteht der Partnerkurs. **Auf Android** geht es direkt: Anhang in der Mail antippen → „Teilen“ → SOL-Noten – die App öffnet sich sofort mit der Import-Vorschau (nur in der installierten App; auf iPhone und iPad bietet das System diesen Weg nicht an, dort führt der Weg über „In Dateien sichern“ und die Dateiauswahl).'
             ] },
-            { t: 'p', v: 'Kommen später Schüler/innen dazu oder ändern sich Maximalpunkte, Quartalszeiträume oder Unterrichtstage, exportiert die Notengeberin einfach erneut; der zweite Import wirkt als **Abgleich** – vorhandene Punkte bleiben unangetastet. Im Partnerkurs sind diese Einstellungen deshalb nicht änderbar: Es gibt genau eine Quelle für die Bewertungsskala, ein stilles Auseinanderlaufen ist ausgeschlossen.' },
+            { t: 'p', v: 'Die Schülerliste des Partnerkurses kommt vollständig von der Notengeberin – Hinzufügen und Bearbeiten sind dort deshalb gesperrt, nur Löschen ist möglich. Kommen später Schüler/innen dazu oder ändern sich Maximalpunkte, Quartalszeiträume oder Unterrichtstage, exportiert die Notengeberin einfach erneut; der zweite Import wirkt als **Abgleich** – vorhandene Punkte bleiben unangetastet. Im Partnerkurs sind diese Einstellungen deshalb nicht änderbar: Es gibt genau eine Quelle für die Bewertungsskala, ein stilles Auseinanderlaufen ist ausgeschlossen.' },
             { t: 'note', v: 'Die Zusammenführung der vergebenen Punkte am Quartalsende (Punkte-Export bei der zweiten Lehrkraft, Punkte-Import bei der Notengeberin) folgt in einer kommenden Version.' }
           ]
         },

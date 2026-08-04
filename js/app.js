@@ -70,7 +70,7 @@
 
   /* ================= App-Start ================= */
 
-  var APP_VERSION = '0.43.0';
+  var APP_VERSION = '0.44.0';
 
   /* ---------- PWA-Installation ----------
      Chrome/Edge/Android liefern `beforeinstallprompt`: Event abfangen und
@@ -339,6 +339,36 @@
     }).catch(function () {});
   }
 
+  /* ---- Teilen-Ziel: hereingereichte Datei abholen ---- *
+     Der Service Worker parkt eine über das Android-Teilen-Menü geteilte
+     Datei im Cache 'share-inbox' und öffnet die App mit ?shared=1. Hier wird
+     sie abgeholt, der Parkplatz geleert und die Import-Vorschau gestartet –
+     erst nach dem Entsperren, damit der Dialog nicht unter dem
+     Sperrbildschirm liegt. */
+  var sharedInboxChecked = false;
+  function checkSharedInbox() {
+    if (sharedInboxChecked) return;
+    if (!/[?&]shared=1/.test(location.search)) { sharedInboxChecked = true; return; }
+    sharedInboxChecked = true;
+    /* Die Import-Vorschau hat Vorrang – die Installations-Erinnerung soll
+       sich in dieser Sitzung nicht darüberlegen. */
+    installOverlayChecked = true;
+    /* Parameter entfernen, damit ein Neuladen den Import nicht wiederholt. */
+    try { history.replaceState(history.state, '', location.pathname); } catch (e) {}
+    if (!('caches' in window)) return;
+    caches.open('share-inbox').then(function (c) {
+      return c.match('./shared-file').then(function (resp) {
+        if (!resp) return;
+        return resp.text().then(function (text) {
+          return c.delete('./shared-file').then(function () {
+            if (!text) return;
+            courseShareImportDialog(text);
+          });
+        });
+      });
+    }).catch(function () {});
+  }
+
   /* Wiederkehrende Erinnerung auf dem Startbildschirm, solange die App nicht
      installiert ist. Takt: alle 3 Tage – bewusst kürzer als die etwa sieben
      Tage, nach denen Safari die Daten nicht installierter Websites löscht.
@@ -591,6 +621,7 @@
       /* Erst nach dem Seitenaufbau, damit das Overlay über der fertigen
          Startseite liegt und nicht während des Renderns eingreift. */
       if (route.name === 'home' && !Store.isLocked()) {
+        checkSharedInbox();
         maybeShowInstallOverlay();
         schedulePersistRetry();
       }
@@ -4853,6 +4884,14 @@
        der weißen Box unter der Titelzeile, samt Fragezeichen. Ohne Kurs
        (theoretischer Fall) genügt der Klassenname. */
     var srcCourse = p.courseId ? Store.courseById(p.courseId) : null;
+    /* Im Partnerkurs kommt die Schülerliste per Kurs-Import von der
+       Notengeberin. Hinzufügen und Bearbeiten sind hier gesperrt – die IDs
+       müssen mit dem Gerät der Kollegin übereinstimmen, sonst lassen sich
+       die Punkte am Quartalsende nicht zuordnen; ein von Hand angelegter
+       Eintrag hätte zwangsläufig eine fremde ID. Löschen bleibt möglich,
+       damit ausgeschiedene Schüler/innen entfernt werden können (der
+       Abgleich legt sie nicht wieder an). */
+    var partner = !!(srcCourse && srcCourse.sharedRole === 'partner');
     var back = p.from === 'editCourse' && p.courseId
       ? { name: 'editCourse', params: { id: p.courseId } }
       : (p.courseId ? { name: 'course', params: { id: p.courseId } } : { name: 'home' });
@@ -4865,7 +4904,7 @@
           h('div.student-name', {}, stu.lastName + ', ' + stu.firstName,
             stu.company ? h('span.hint.block', {}, stu.company) : null),
           h('div.row-gap',
-            h('button.btn-small.btn-plain', { onclick: function () { editStudent(stu); } }, 'Bearbeiten'),
+            partner ? null : h('button.btn-small.btn-plain', { onclick: function () { editStudent(stu); } }, 'Bearbeiten'),
             h('button.btn-small.btn-plain.danger-text', { onclick: function () { delStudent(stu); } }, 'Löschen')
           )
         );
@@ -4879,10 +4918,12 @@
             h('strong', {}, cls.name),
             helpBtn(Help.CONTEXT.students)),
       h('div.card.card-list', {}, list.length ? list : h('div.empty', h('p', {}, 'Noch keine Schüler/innen.'))),
-      h('div.actions-col',
-        h('button.btn-primary.btn-block', { onclick: function () { editStudent(null); } }, '+ Schüler/in hinzufügen'),
-        h('button.btn-primary.btn-block', { onclick: importStudents }, 'Aus Excel einfügen (Kopieren & Einfügen)')
-      )
+      partner
+        ? h('p.hint', {}, 'Partnerkurs: Neue Schüler/innen und Namensänderungen erhalten Sie über den Kurs-Abgleich von der Lehrkraft, welche die Note vergibt. Ausgeschiedene können Sie hier löschen.')
+        : h('div.actions-col',
+            h('button.btn-primary.btn-block', { onclick: function () { editStudent(null); } }, '+ Schüler/in hinzufügen'),
+            h('button.btn-primary.btn-block', { onclick: importStudents }, 'Aus Excel einfügen (Kopieren & Einfügen)')
+          )
     );
 
     function editStudent(stu) {
@@ -7020,10 +7061,15 @@
   }
 
   /* Datei ausliefern: Teilen-Menü, wenn das Gerät Dateien teilen kann
-     (Tablets/Smartphones), sonst normaler Download. */
+     (Tablets/Smartphones), sonst normaler Download.
+     Wichtig: Chrome und Edge auf Android teilen nur eine feste Liste von
+     Dateitypen – `application/json` gehört NICHT dazu, `text/plain` schon.
+     Die Datei wird deshalb als text/plain geteilt (der Inhalt ist ohnehin
+     Text); iOS prüft den Typ nicht. Zusätzlich fängt ein catch den Fall ab,
+     dass share() trotz canShare() scheitert – dann Rückfall auf Download. */
   function deliverShareFile(fileName, text, doneMsg) {
     var file = null;
-    try { file = new File([text], fileName, { type: 'application/json' }); } catch (e) {}
+    try { file = new File([text], fileName, { type: 'text/plain' }); } catch (e) {}
     if (file && navigator.canShare && navigator.canShare({ files: [file] }) && navigator.share) {
       UI.modal('Datei übermitteln', [
         h('p', {}, 'Wie möchten Sie die Datei „' + fileName + '“ weitergeben?'),
@@ -7035,7 +7081,14 @@
         if (choice === 'share') {
           navigator.share({ files: [file], title: fileName }).then(function () {
             toast(doneMsg);
-          }).catch(function () { /* Abbruch des Teilen-Menüs ist kein Fehler */ });
+          }).catch(function (err) {
+            /* AbortError = Nutzerin hat das Teilen-Menü geschlossen – kein
+               Fehler. Alles andere (z. B. Typ vom System abgelehnt): Datei
+               stattdessen speichern, damit sie nie verloren geht. */
+            if (err && err.name === 'AbortError') return;
+            Store.downloadTextAs(fileName, text);
+            toast('Teilen war auf diesem Gerät nicht möglich – die Datei wurde stattdessen in Ihren Downloads gespeichert.');
+          });
         } else if (choice === 'save') {
           Store.downloadTextAs(fileName, text);
           toast(doneMsg);
@@ -7050,7 +7103,13 @@
   /* Import bei Lehrkraft 2: Datei wählen, Kurs-Passwort eingeben, Vorschau
      bestätigen. Wiederholter Import derselben Kurs-Beziehung wirkt als
      Abgleich (Nachzügler, geänderte Maximalpunkte usw.). */
-  function courseShareImportDialog() {
+  /* presetText: Inhalt einer über das Teilen-Ziel hereingereichten Datei –
+     dann entfällt die Dateiauswahl und es geht direkt zum Kurs-Passwort. */
+  function courseShareImportDialog(presetText) {
+    if (presetText !== undefined) {
+      handleFileText(presetText);
+      return;
+    }
     var fileInput = h('input', { type: 'file', accept: '.solkurs,.json,application/json', style: { display: 'none' } });
     fileInput.addEventListener('change', function () {
       var f = fileInput.files[0]; fileInput.value = '';
@@ -7060,20 +7119,7 @@
         return;
       }
       var reader = new FileReader();
-      reader.onload = function () {
-        var env;
-        try {
-          env = JSON.parse(String(reader.result));
-        } catch (e) {
-          UI.modal('Import fehlgeschlagen', h('p', {}, 'Die Datei ist keine gültige Kurs-Datei.'));
-          return;
-        }
-        if (env && env.kind && env.kind !== Share.FORMAT) {
-          UI.modal('Falsche Datei', h('p', {}, 'Das ist keine Kurs-Datei für Teamteaching. Backups spielen Sie über die Globalen Einstellungen ein.'));
-          return;
-        }
-        askSharePassword(env);
-      };
+      reader.onload = function () { handleFileText(String(reader.result)); };
       reader.readAsText(f);
     });
     document.body.appendChild(fileInput);
@@ -7087,6 +7133,21 @@
       if (ok) fileInput.click();
       else fileInput.remove();
     });
+
+    function handleFileText(text) {
+      var env;
+      try {
+        env = JSON.parse(text);
+      } catch (e) {
+        UI.modal('Import fehlgeschlagen', h('p', {}, 'Die Datei ist keine gültige Kurs-Datei.'));
+        return;
+      }
+      if (env && env.kind && env.kind !== Share.FORMAT) {
+        UI.modal('Falsche Datei', h('p', {}, 'Das ist keine Kurs-Datei für Teamteaching. Backups spielen Sie über die Globalen Einstellungen ein.'));
+        return;
+      }
+      askSharePassword(env);
+    }
 
     function askSharePassword(env) {
       var pw = h('input.input', { type: 'password', autocomplete: 'off', placeholder: 'Kurs-Passwort' });
@@ -7102,7 +7163,7 @@
             return false;
           } }
       ]).then(function (ok) {
-        fileInput.remove();
+        if (typeof fileInput !== 'undefined' && fileInput.parentNode) fileInput.remove();
         if (!ok) return;
         Store.courseShareInspect(env, pw.value).then(showPlan).catch(function (e) {
           UI.modal('Import fehlgeschlagen', h('p', {}, /Entschlüsselung/.test(e.message)

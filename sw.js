@@ -1,5 +1,5 @@
 /* SOL-Noten – Service Worker: macht die App vollständig offline nutzbar. */
-var CACHE = 'sol-noten-v0.43.0';
+var CACHE = 'sol-noten-v0.44.0';
 var FILES = [
   './',
   'index.html',
@@ -33,7 +33,9 @@ self.addEventListener('activate', function (e) {
   e.waitUntil(
     caches.keys().then(function (keys) {
       return Promise.all(keys.map(function (k) {
-        if (k !== CACHE) return caches.delete(k);
+        /* 'share-inbox' parkt eine gerade hereingeteilte Datei und darf beim
+           Versionswechsel nicht mitgelöscht werden. */
+        if (k !== CACHE && k !== 'share-inbox') return caches.delete(k);
       }));
     }).then(function () { return self.clients.claim(); })
   );
@@ -43,6 +45,32 @@ self.addEventListener('fetch', function (e) {
   var url = new URL(e.request.url);
   /* Nur eigene Dateien cachen; API-Aufrufe (Ferien) gehen direkt ins Netz. */
   if (url.origin !== location.origin) return;
+
+  /* Teilen-Ziel (Web Share Target, Android): Das System schickt die geteilte
+     Datei als POST an ./share-import. Der Inhalt wird kurz im Cache geparkt
+     und die App mit ?shared=1 geöffnet; app.js holt ihn dort ab und startet
+     die Import-Vorschau. Redirect 303 verhindert, dass ein Neuladen den
+     POST wiederholt. */
+  if (e.request.method === 'POST' && url.pathname.endsWith('/share-import')) {
+    e.respondWith((function () {
+      return e.request.formData().then(function (fd) {
+        var file = fd.get('file');
+        if (!file) return Response.redirect('./', 303);
+        return file.text().then(function (text) {
+          return caches.open('share-inbox').then(function (c) {
+            return c.put('./shared-file', new Response(text, {
+              headers: { 'Content-Type': 'text/plain', 'X-File-Name': encodeURIComponent(file.name || '') }
+            }));
+          });
+        }).then(function () {
+          return Response.redirect('./?shared=1', 303);
+        });
+      }).catch(function () { return Response.redirect('./', 303); });
+    })());
+    return;
+  }
+
+  if (e.request.method !== 'GET') return;
   e.respondWith(
     caches.match(e.request).then(function (hit) {
       return hit || fetch(e.request).then(function (resp) {
