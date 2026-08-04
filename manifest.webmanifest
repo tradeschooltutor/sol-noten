@@ -37,9 +37,11 @@
           "accept": [
             ".solkurs",
             ".solpunkte",
+            ".txt",
             ".json",
+            "text/plain",
             "application/json",
-            "text/plain"
+            "application/octet-stream"
           ]
         }
       ]

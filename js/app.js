@@ -70,7 +70,7 @@
 
   /* ================= App-Start ================= */
 
-  var APP_VERSION = '0.44.0';
+  var APP_VERSION = '0.44.1';
 
   /* ---------- PWA-Installation ----------
      Chrome/Edge/Android liefern `beforeinstallprompt`: Event abfangen und
@@ -7063,13 +7063,18 @@
   /* Datei ausliefern: Teilen-Menü, wenn das Gerät Dateien teilen kann
      (Tablets/Smartphones), sonst normaler Download.
      Wichtig: Chrome und Edge auf Android teilen nur eine feste Liste von
-     Dateitypen – `application/json` gehört NICHT dazu, `text/plain` schon.
-     Die Datei wird deshalb als text/plain geteilt (der Inhalt ist ohnehin
-     Text); iOS prüft den Typ nicht. Zusätzlich fängt ein catch den Fall ab,
-     dass share() trotz canShare() scheitert – dann Rückfall auf Download. */
+     Dateitypen und prüfen dabei MIME-Typ UND Dateiendung. `text/plain`
+     allein genügt nicht – auch die Endung muss zugelassen sein (.txt ist es,
+     .solkurs nicht; deshalb scheiterte share() trotz erfolgreichem
+     canShare()). Geteilt wird daher unter dem Namen `…​.solkurs.txt`; der
+     Import akzeptiert .txt ausdrücklich, und der Inhalt wird ohnehin geprüft.
+     Beim Download (PC, „Speichern“) bleibt der Name unverändert .solkurs.
+     iOS prüft weder Typ noch Endung. Ein catch fängt zusätzlich den Fall ab,
+     dass share() dennoch scheitert – dann Rückfall auf Download. */
   function deliverShareFile(fileName, text, doneMsg) {
+    var shareName = /\.txt$/i.test(fileName) ? fileName : fileName + '.txt';
     var file = null;
-    try { file = new File([text], fileName, { type: 'text/plain' }); } catch (e) {}
+    try { file = new File([text], shareName, { type: 'text/plain' }); } catch (e) {}
     if (file && navigator.canShare && navigator.canShare({ files: [file] }) && navigator.share) {
       UI.modal('Datei übermitteln', [
         h('p', {}, 'Wie möchten Sie die Datei „' + fileName + '“ weitergeben?'),
@@ -7079,7 +7084,7 @@
         { label: 'Teilen', value: 'share', primary: true }
       ]).then(function (choice) {
         if (choice === 'share') {
-          navigator.share({ files: [file], title: fileName }).then(function () {
+          navigator.share({ files: [file], title: shareName }).then(function () {
             toast(doneMsg);
           }).catch(function (err) {
             /* AbortError = Nutzerin hat das Teilen-Menü geschlossen – kein
@@ -7110,7 +7115,7 @@
       handleFileText(presetText);
       return;
     }
-    var fileInput = h('input', { type: 'file', accept: '.solkurs,.json,application/json', style: { display: 'none' } });
+    var fileInput = h('input', { type: 'file', accept: '.solkurs,.txt,.json,application/json,text/plain', style: { display: 'none' } });
     fileInput.addEventListener('change', function () {
       var f = fileInput.files[0]; fileInput.value = '';
       if (!f) return;
