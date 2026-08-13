@@ -488,20 +488,30 @@
           group: 'Klassen & Schuljahre',
           title: 'Wie arbeiten zwei Lehrkräfte im selben Kurs zusammen (Teamteaching)?',
           body: [
-            { t: 'p', v: 'Unterrichten zwei Lehrkräfte denselben Kurs, vergeben beide SoLei-Punkte auf ihren eigenen Geräten. Eine Lehrkraft („Notengeberin“) führt den Kurs vollständig – Fehlzeiten, Ergebnis-Uploads, Prüfungen, Quartals- und Zeugnisnoten. Die zweite Lehrkraft arbeitet in einem **Partnerkurs**, der nur die Punktevergabe, den Sitzplan und den Punktestand enthält.' },
+            { t: 'p', v: 'Unterrichten zwei Lehrkräfte denselben Kurs, vergeben beide SoLei-Punkte auf ihren eigenen Geräten. Eine Lehrkraft („Notengeber/in“) führt den Kurs vollständig – Fehlzeiten, Ergebnis-Uploads, Prüfungen, Quartals- und Zeugnisnoten. Die zweite Lehrkraft arbeitet in einem **Partnerkurs**, der nur die Punktevergabe, den Sitzplan und den Punktestand enthält.' },
+            { t: 'p', v: '**A. Schuljahresanfang**' },
+            { t: 'p', v: 'Am Schuljahresanfang gibt die Noten gebende Lehrkraft die Kursdaten an die zweite Lehrkraft:' },
             { t: 'steps', v: [
-              'Die Notengeberin exportiert den Kurs: Startseite → „Kurs-Export (Teamteaching)“. Dabei vereinbaren beide ein gemeinsames **Kurs-Passwort** (mündlich oder auf einem anderen Weg als die Datei).',
-              'Die Datei wird übermittelt – per Teilen-Menü, E-Mail oder USB-Stick. Beim Teilen heißt sie z.\u202fB. „SOL-Kurs-AK26A-KPA.solkurs.txt“ (die Endung .txt ist technisch nötig, damit Android sie teilt), beim Speichern am PC „….solkurs“ – der Import versteht beides. Die Datei ist verschlüsselt und enthält nur Namen der Schüler/innen und Kurseinstellungen, keine Bewertungen, Fotos oder Kontaktdaten.',
-              'Die zweite Lehrkraft importiert sie: Startseite → „Kurs-Import (Teamteaching)“, Datei z. B. aus den Downloads wählen. Nach Kurs-Passwort und Vorschau entsteht der Partnerkurs. **Auf Android** geht es direkt: Anhang antippen → „Teilen“ → SOL-Noten – die App öffnet sich sofort mit der Import-Vorschau. Das setzt voraus, dass SOL-Noten **mit Chrome installiert** wurde: Nur Chrome erzeugt auf Android ein App-Paket, das sich beim System als Teilen-Ziel anmelden kann. In der mit Edge installierten App und auf iPhone/iPad bietet das System diesen Weg nicht an – dort führt der Weg über „Speichern“ bzw. „In Dateien sichern“ und die Dateiauswahl im Import-Dialog.'
+              'Die Noten gebende Lehrkraft exportiert den Kurs: Startseite → „Kurs-Export (Teamteaching)“. Sie teilt das Kurs-Passwort der zweiten Lehrkraft mit. Die Datei ist verschlüsselt und enthält nur Namen der Schüler/innen und Kurseinstellungen, keine Bewertungen, Fotos oder Kontaktdaten.',
+              'Die Noten gebende Lehrkraft übermittelt die Datei an die zweite Lehrkraft – per E-Mail oder USB-Stick.',
+              'Die zweite Lehrkraft importiert die Datei: Startseite → „Kurs-Import (Teamteaching)“. Sie wählt die Datei in dem Ordner aus, in dem sie sie abgespeichert hat, z.\u202fB. „Downloads“. Alternative auf Android: das Teilen-Menü – E-Mail-Anhang antippen → „Teilen“ → SOL-Noten. (Das Teilen ist bei PWA-Apps auf iPhone und iPad leider nicht möglich.)'
             ] },
-            { t: 'p', v: 'Die Schülerliste des Partnerkurses kommt vollständig von der Notengeberin – Hinzufügen und Bearbeiten sind dort deshalb gesperrt, nur Löschen ist möglich. Kommen später Schüler/innen dazu oder ändern sich Maximalpunkte, Quartalszeiträume oder Unterrichtstage, exportiert die Notengeberin einfach erneut; der zweite Import wirkt als **Abgleich** – vorhandene Punkte bleiben unangetastet. Im Partnerkurs sind diese Einstellungen deshalb nicht änderbar: Es gibt genau eine Quelle für die Bewertungsskala, ein stilles Auseinanderlaufen ist ausgeschlossen.' },
-            { t: 'p', v: '**Am Quartalsende** führt die Notengeberin die Punkte zusammen: Die zweite Lehrkraft tippt im Partnerkurs auf „SoLei-Punkte exportieren“, wählt das Quartal und übermittelt die Datei (.solpunkte) – mit demselben Kurs-Passwort. Die Notengeberin spielt sie auf „SoLei-Quartalsnoten“ über „Punkte importieren“ ein (auf Android auch direkt per „Teilen“ → SOL-Noten). Eine Vorschau zeigt vorher, wie viele Vergaben und Notizen von wem ankommen.' },
+            { t: 'p', v: 'Während des Quartals vergeben beide Lehrkräfte SoLei-Punkte und machen bei Bedarf Notizen für jede/n Schüler/in.' },
+            { t: 'p', v: 'Kommen später Schüler/innen dazu oder ändern sich {{SoLei-Maximalpunkte|Maximalpunkte}}, Quartalszeiträume oder Unterrichtstage, exportiert die Noten gebende Lehrkraft den Kurs einfach erneut; durch den zweiten Import bleiben bereits gegebene SoLei-Punkte unangetastet. Wenn ein/e Schüler/in die Klasse verlässt, ist kein Export/Import nötig – beide Lehrkräfte können diese Person in ihrem Kurs eigenständig löschen.' },
+            { t: 'p', v: '**B. SoLei-Punkte-Austausch am Quartalsende**' },
+            { t: 'p', v: 'Am Quartalsende exportiert die zweite Lehrkraft die SoLei-Punkte, die Noten gebende Lehrkraft führt sie für die Notengebung zusammen:' },
+            { t: 'steps', v: [
+              'Die zweite Lehrkraft tippt im Partnerkurs auf „SoLei-Punkte exportieren“, wählt das Quartal und übermittelt die Datei per E-Mail oder USB-Stick – mit dem vereinbarten Kurs-Passwort.',
+              'Die Noten gebende Lehrkraft importiert die SoLei-Punkte. Dazu tippt sie auf „SoLei-Quartalsnoten“ und dort auf „Punkte importieren“ (auf Android auch direkt per „Teilen“ → SOL-Noten).'
+            ] },
+            { t: 'p', v: '**Hinweise zur importierten SoLei-Punkte-Datei:**' },
             { t: 'ul', v: [
-              'Die importierten Vergaben zählen in Punktesumme, Note und Diagrammen **gleichberechtigt** mit – die Gewichtung ergibt sich automatisch daraus, wie viel jede Lehrkraft tatsächlich bewertet hat.',
-              'Importierte Kursnotizen tragen die Beschriftung der Kollegin bzw. des Kollegen, z.\u202fB. „[Meier] hat die Gruppe gut moderiert“.',
-              'Ein **doppelter Import derselben Datei ist folgenlos**, und eine korrigierte Datei ersetzt die frühere vollständig: Beim Import werden zunächst alle früher importierten Vergaben dieser Quelle im betroffenen Quartal entfernt und dann die aus der Datei eingesetzt. Eigene Vergaben, Fehlzeiten, Uploads und Notizen der Notengeberin bleiben dabei immer unangetastet.',
-              'Das Quartal jeder Vergabe wird beim Import aus dem **Datum** nach den Zeiträumen der Notengeberin neu bestimmt – nicht aus der Datei übernommen.',
-              'Bewerten **beide Lehrkräfte am selben Tag dasselbe Kriterium**, bleiben beide Vergaben erhalten und zählen beide in den Durchschnitt. Auf „SoLei-Punkte vergeben“ bearbeiten Sie immer nur Ihre eigene; die importierte steht als Kennzeichen daneben (z.\u202fB. „Meier: 2“) und ist nur auf deren Gerät änderbar.'
+              'Die importierten SoLei-Punkte gehen in die Durchschnittspunkte jedes SoLei-Kriteriums ein. Sie werden auch in den SoLei-Punkte-Diagrammen angezeigt.',
+              'Die SoLei-Punkte werden automatisch auf Basis des Datums der Punktevergabe dem richtigen {{Quartal}} zugeordnet.',
+              'Bewerten beide Lehrkräfte am selben Tag dasselbe Kriterium, bleiben beide Vergaben erhalten und zählen bei der Berechnung der Durchschnittspunkte.',
+              'Beim Button „SoLei-Punkte vergeben“ kann die Noten gebende Lehrkraft immer nur ihre eigenen SoLei-Punkte bearbeiten; die SoLei-Punkte der zweiten Lehrkraft sind nur auf deren Gerät änderbar.',
+              'Importierte Kursnotizen tragen die Beschriftung der Kollegin bzw. des Kollegen, d.\u202fh. man kann nachvollziehen, wer die Notiz geschrieben hat.',
+              'Ein doppelter Import derselben Datei ist folgenlos, und eine korrigierte Datei ersetzt die frühere vollständig.'
             ] }
           ]
         },

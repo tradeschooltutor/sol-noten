@@ -70,7 +70,15 @@
 
   /* ================= App-Start ================= */
 
-  var APP_VERSION = '0.48.0';
+  var APP_VERSION = '0.49.0';
+
+  /* Einheitliche Mindestlänge für ALLE selbst vergebenen Passwörter: Backup,
+     Foto-Sicherung, Kurs- und Punkte-Export sowie das App-Passwort. Nur die
+     PIN hat ihre eigene Regel (4–8 Ziffern). Eine Konstante statt verstreuter
+     Zahlen – sonst laufen die Stellen wieder auseinander. */
+  var PW_MIN = 6;
+  var PW_MIN_TEXT = 'Mindestens ' + PW_MIN + ' Zeichen';
+  function pwTooShort(v) { return String(v || '').length < PW_MIN; }
 
   /* ---------- PWA-Installation ----------
      Chrome/Edge/Android liefern `beforeinstallprompt`: Event abfangen und
@@ -658,7 +666,7 @@
       if (Store.isDemo() && screen && screen.classList && screen.classList.contains('screen')) {
         screen.insertBefore(h('div.demo-banner.demo-banner-row', {},
           h('span.demo-banner-text', {},
-            h('strong', {}, 'DEMO-MODUS'), ' – Beispieldaten, keine echten Schülerdaten'),
+            h('strong', {}, 'DEMO-MODUS'), ' – keine echten Schülerdaten'),
           h('button.demo-banner-btn', { onclick: endDemoDialog }, 'Beenden')
         ), screen.firstChild);
       }
@@ -1251,7 +1259,7 @@
     ], [
       { label: 'Abbrechen', value: false },
       { label: 'Sicherung speichern', value: true, primary: true, validate: function () {
-          if (pw1.value.length < 6) { err.textContent = 'Bitte ein Passwort mit mindestens 6 Zeichen vergeben.'; return false; }
+          if (pwTooShort(pw1.value)) { err.textContent = 'Bitte ein Passwort mit mindestens ' + PW_MIN + ' Zeichen vergeben.'; return false; }
           if (pw1.value !== pw2.value) { err.textContent = 'Die Passwörter stimmen nicht überein.'; return false; }
           return true;
         } }
@@ -1939,7 +1947,7 @@
       { label: 'Abbrechen', value: false },
       { label: 'Backup speichern', value: true, primary: true,
         validate: function () {
-          if (pw1.value.length < 6) { err.textContent = 'Bitte ein Passwort mit mindestens 6 Zeichen vergeben.'; return false; }
+          if (pwTooShort(pw1.value)) { err.textContent = 'Bitte ein Passwort mit mindestens ' + PW_MIN + ' Zeichen vergeben.'; return false; }
           if (pw1.value !== pw2.value) { err.textContent = 'Die Passwörter stimmen nicht überein.'; return false; }
           return true;
         } }
@@ -7147,7 +7155,7 @@
       var cls = Store.classById(c.classId);
       return h('option', { value: c.id }, (cls ? cls.name : '?') + ' · ' + c.subject);
     }));
-    var pw1 = h('input.input', { type: 'password', autocomplete: 'new-password', placeholder: 'Mindestens 8 Zeichen' });
+    var pw1 = h('input.input', { type: 'password', autocomplete: 'new-password', placeholder: PW_MIN_TEXT });
     var pw2 = h('input.input', { type: 'password', autocomplete: 'new-password', placeholder: 'Wiederholen' });
     var err = h('p.hint.error-text');
     UI.modal('Kurs für Teamteaching exportieren', [
@@ -7160,7 +7168,7 @@
     ], [
       { label: 'Abbrechen', value: false },
       { label: 'Exportieren', value: true, primary: true, validate: function () {
-          if (pw1.value.length < 8) { err.textContent = 'Das Kurs-Passwort braucht mindestens 8 Zeichen.'; return false; }
+          if (pwTooShort(pw1.value)) { err.textContent = 'Das Kurs-Passwort braucht mindestens ' + PW_MIN + ' Zeichen.'; return false; }
           if (pw1.value !== pw2.value) { err.textContent = 'Die Passwörter stimmen nicht überein.'; return false; }
           return true;
         } }
@@ -7374,12 +7382,22 @@
     qSel.addEventListener('change', refreshCounts);
     refreshCounts();
 
+    var preset = course.sharePassword || '';
     var labelInput = h('input.input', { type: 'text', value: course.partnerLabel || '',
       placeholder: 'z. B. Ihr Nachname oder Kürzel' });
     var pw = h('input.input', { type: 'password', autocomplete: 'off',
-      value: course.sharePassword || '', placeholder: 'Kurs-Passwort' });
+      value: course.sharePassword || '', placeholder: PW_MIN_TEXT });
+    /* Zweite Eingabe gegen Tippfehler: Ein falsch getipptes Passwort fiele
+       erst der Kollegin beim Import auf – dann ist die Datei unbrauchbar.
+       Ist das Passwort gemerkt, entfällt die Wiederholung. */
+    var pw2 = h('input.input', { type: 'password', autocomplete: 'off', placeholder: 'Wiederholen' });
+    var pw2Field = h('label.field', h('span.field-label', {}, 'Kurs-Passwort wiederholen'), pw2);
     var remember = h('input', { type: 'checkbox' });
-    if (course.sharePassword) remember.checked = true;
+    if (preset) { remember.checked = true; pw2Field.style.display = 'none'; }
+    /* Sobald das gemerkte Passwort geändert wird, ist die Wiederholung wieder nötig. */
+    pw.addEventListener('input', function () {
+      pw2Field.style.display = (preset && pw.value === preset) ? 'none' : '';
+    });
     var err = h('p.hint.error-text');
 
     UI.modal('SoLei-Punkte exportieren', [
@@ -7388,12 +7406,22 @@
       counts,
       h('label.field', h('span.field-label', {}, 'Ihre Beschriftung (erscheint an den Notizen)'), labelInput),
       h('label.field', h('span.field-label', {}, 'Kurs-Passwort (gemeinsam vereinbart)'), pw),
+      pw2Field,
       h('label.check-row', {}, remember, h('span', {}, 'Kurs-Passwort auf diesem Gerät merken')),
       err
     ], [
       { label: 'Abbrechen', value: false },
       { label: 'Exportieren', value: true, primary: true, validate: function () {
-          if (!pw.value) { err.textContent = 'Bitte geben Sie das Kurs-Passwort ein.'; return false; }
+          if (pwTooShort(pw.value)) {
+            err.textContent = 'Das Kurs-Passwort braucht mindestens ' + PW_MIN + ' Zeichen.';
+            return false;
+          }
+          /* Ein bereits gemerktes, unverändertes Passwort muss nicht erneut
+             bestätigt werden – es war beim Speichern schon geprüft. */
+          if (!(preset && pw.value === preset) && pw.value !== pw2.value) {
+            err.textContent = 'Die Eingaben stimmen nicht überein.';
+            return false;
+          }
           return true;
         } }
     ]).then(function (ok) {
@@ -7711,14 +7739,14 @@
     });
   }
 
-  /* Eingabepaar für den Zugangsschutz: PIN (4–8 Ziffern) oder Passwort (mind. 10 Zeichen).
+  /* Eingabepaar für den Zugangsschutz: PIN (4–8 Ziffern) oder Passwort (mind. PW_MIN Zeichen).
      Liefert value(), kind() und validate() für den umgebenden Dialog. */
   var HINT_PIN = 'Die PIN schützt vor neugierigen Blicken im Alltag. Wer das Gerät häufig mitnimmt, wählt besser das Passwort – es schützt auch bei Verlust oder Diebstahl.';
   var HINT_PW = 'Länge zählt mehr als Sonderzeichen: Eine merkbare Wortfolge wie „roterTraktorImSchnee“ ist stark und lässt sich gut behalten.';
   function secretInputPair(labels) {
     var sel = h('select.input');
     sel.appendChild(h('option', { value: 'pin' }, 'PIN (4–8 Ziffern) – schneller Zugriff'));
-    sel.appendChild(h('option', { value: 'password' }, 'Passwort (mind. 10 Zeichen) – höherer Schutz'));
+    sel.appendChild(h('option', { value: 'password' }, 'Passwort (mind. ' + PW_MIN + ' Zeichen) – höherer Schutz'));
     var p1 = h('input.input', { type: 'password', inputmode: 'numeric', autocomplete: 'new-password', placeholder: '4–8 Ziffern' });
     var p2 = h('input.input', { type: 'password', inputmode: 'numeric', autocomplete: 'new-password', placeholder: 'Wiederholung' });
     var err = h('p.hint.error-text');
@@ -7728,7 +7756,7 @@
       p1.value = ''; p2.value = ''; err.textContent = '';
       if (pw) {
         p1.removeAttribute('inputmode'); p2.removeAttribute('inputmode');
-        p1.placeholder = 'Mindestens 10 Zeichen';
+        p1.placeholder = PW_MIN_TEXT;
         hint.textContent = HINT_PW;
       } else {
         p1.setAttribute('inputmode', 'numeric'); p2.setAttribute('inputmode', 'numeric');
@@ -7739,7 +7767,7 @@
     sel.addEventListener('change', applyMode);
     function validate() {
       if (sel.value === 'password') {
-        if (p1.value.length < 10) { err.textContent = 'Das Passwort muss mindestens 10 Zeichen lang sein.'; return false; }
+        if (pwTooShort(p1.value)) { err.textContent = 'Das Passwort muss mindestens ' + PW_MIN + ' Zeichen lang sein.'; return false; }
       } else {
         if (!/^\d{4,8}$/.test(p1.value)) { err.textContent = 'Die PIN muss aus 4 bis 8 Ziffern bestehen.'; return false; }
       }
