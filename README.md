@@ -1,4 +1,4 @@
-# SOL-Noten (Version 0.49.0 – Beta)
+# SOL-Noten (Version 0.49.1 – Beta)
 
 Notenverwaltung zum selbstorganisierten Lernen (SOL) als Progressive Web App (PWA).
 Basierend auf der Excel-Notenverwaltung V8.0 von Andreas Vandelaar.
@@ -96,7 +96,7 @@ Kapitel sind aufklappbar und im Glossar alphabetisch sortiert. Das FAQ hat ein S
 
 **Ordner-Backups und PIN-Wechsel (wichtig):** Ein automatisches Ordner-Backup (`mode: 'pin-master'`) trägt den **PIN-Umschlag des Schreibzeitpunkts**. Der Hauptschlüssel ändert sich bei `changePin`/`setSecretFromMaster` nicht, wohl aber `security.wrapped` – ältere Dateien öffnen deshalb weiterhin nur mit der **damaligen** PIN, die aktuelle wird abgewiesen (Symptom: „Falsche PIN … oder beschädigte Datei" trotz korrekter heutiger Eingabe). Das ist Kryptografie, kein Fehler, und per Round-Trip-Test abgesichert. Ab v0.45 legt `writeFolderBackup` deshalb zusätzlich `security.recovery` in die Datei: Der Wiederherstellungsschlüssel überdauert PIN-Wechsel und öffnet die Datei unabhängig davon. Der Import versucht erst den PIN-Umschlag, dann – falls vorhanden – den Wiederherstellungs-Umschlag, und die Fehlermeldung nennt die Ursache beim Namen. Ältere Dateien ohne `recovery` bleiben an ihre damalige PIN gebunden.
 
-**Passwort-Mindestlänge:** Für alle selbst vergebenen Passwörter gilt einheitlich `PW_MIN = 6` (Backup, Foto-Sicherung, Kurs-Export, Punkte-Export, App-Passwort) – zentrale Konstante plus `pwTooShort()`/`PW_MIN_TEXT` statt verstreuter Zahlen, vorher 6/8/10 gemischt. Die PIN behält ihre eigene Regel (4–8 Ziffern). Beim Punkte-Export wird das Kurs-Passwort zweimal eingegeben (ein Tippfehler fiele sonst erst der Kollegin beim Import auf); ist es gemerkt und unverändert, entfällt die Wiederholung.
+**Passwort-Mindestlängen (zwei Stufen):** `PW_MIN = 6` für **Datei**-Passwörter (Backup, Foto-Sicherung, Kurs-Export, Punkte-Export) – jedes schützt genau eine Datei. `APP_PW_MIN = 10` für den **Zugang zur App**, hinter dem sämtliche Schülerdaten liegen; dort wiegt ein Treffer ungleich schwerer. Zentrale Konstanten plus `pwTooShort()` / `appPwTooShort()` statt verstreuter Zahlen (vor 0.49 waren 6, 8 und 10 gemischt im Einsatz); alle angezeigten Zahlen werden aus den Konstanten erzeugt. Die PIN behält ihre eigene Regel (4–8 Ziffern). Beim Punkte-Export wird das Kurs-Passwort zweimal eingegeben (ein Tippfehler fiele sonst erst der Kollegin beim Import auf); ist es gemerkt und unverändert, entfällt die Wiederholung.
 
 **Klasse löschen:** Globale Einstellungen → Datensicherung → Gefahrenbereich. Zur Auswahl stehen **nur Klassen ohne zugehörigen Kurs** – `Store.deleteClass` lehnt eine belegte Klasse auch dann ab, wenn die Oberfläche sie anböte, weil ein Kurs ohne Schülerliste unbenutzbar wäre. Bestätigung mit PIN/Passwort wie beim Löschen eines Schuljahres; Fotos werden nur entfernt, wenn die Schüler-ID in keiner anderen Klasse mehr vorkommt (Schuljahreswechsel).
 
