@@ -70,7 +70,7 @@
 
   /* ================= App-Start ================= */
 
-  var APP_VERSION = '0.49.3';
+  var APP_VERSION = '0.50.0';
 
   /* Mindestlänge für Datei-Passwörter: Backup, Foto-Sicherung, Kurs- und
      Punkte-Export. Jedes schützt genau eine Datei; ein Treffer kostet diese
@@ -1256,8 +1256,8 @@
   }
 
   function photoExportDialog() {
-    var pw1 = h('input.input', { type: 'password', autocomplete: 'new-password', placeholder: 'Passwort' });
-    var pw2 = h('input.input', { type: 'password', autocomplete: 'new-password', placeholder: 'Wiederholung' });
+    var pw1 = h('input.input', { type: 'password', autocomplete: 'new-password', placeholder: PW_MIN_TEXT });
+    var pw2 = h('input.input', { type: 'password', autocomplete: 'new-password', placeholder: 'Passwort wiederholen' });
     var err = h('p.hint.error-text');
     UI.modal('Fotos sichern', [
       h('p.hint', {}, 'Alle Fotos werden in eine einzelne, mit Passwort verschlüsselte Sicherungsdatei geschrieben. Da Schülerfotos besonders schützenswert sind, ist ein Passwort verpflichtend.'),
@@ -1721,12 +1721,19 @@
         : h('div.course-grid', {}, courses.map(courseTile)),
       h('button.btn-primary.btn-block', { onclick: function () { go('editCourse', {}); } }, '+ Kurs anlegen'),
       h('div.section-head.share-head', {}, 'Teamteaching'),
-      h('div.row-gap.share-row',
+      /* Zwei Spalten nach Rolle: links, wer die Note vergibt, rechts die
+         zweite Lehrkraft. Bewusst KEINE .card als Hülle – .card erzwingt
+         flex-direction: column und würde das Raster zerlegen. */
+      h('div.tt-grid',
+        h('div.tt-head', {}, 'Notengeber/in'),
+        h('div.tt-head', {}, 'Zweite Lehrkraft'),
         /* Beide Handler bewusst gekapselt: Direkt als onclick übergeben,
            bekämen sie das MouseEvent als ersten Parameter – und der ist bei
            courseShareImportDialog der Dateiinhalt. */
         h('button.btn-plain.share-btn', { onclick: function () { courseShareExportDialog(); } }, 'Kurs-Export'),
-        h('button.btn-plain.share-btn', { onclick: function () { courseShareImportDialog(); } }, 'Kurs-Import')),
+        h('button.btn-plain.share-btn', { onclick: function () { courseShareImportDialog(); } }, 'Kurs-Import'),
+        h('button.btn-plain.share-btn', { onclick: function () { go('soleiImport', {}); } }, 'SoLei-Import'),
+        h('button.btn-plain.share-btn', { onclick: function () { go('soleiExport', {}); } }, 'SoLei-Export')),
       h('button.btn-plain.btn-block', { onclick: function () { go('settings', { back: { name: 'home' } }); } }, 'Globale Einstellungen')
     );
     return screen;
@@ -1943,7 +1950,7 @@
 
   /* Backup speichern – immer mit Passwort verschlüsselt (kein Klartext-Export). */
   function exportDialog(onDone) {
-    var pw1 = h('input.input', { type: 'password', autocomplete: 'new-password', placeholder: 'Passwort' });
+    var pw1 = h('input.input', { type: 'password', autocomplete: 'new-password', placeholder: PW_MIN_TEXT });
     var pw2 = h('input.input', { type: 'password', autocomplete: 'new-password', placeholder: 'Passwort wiederholen' });
     var err = h('p.hint.error-text');
     UI.modal('Backup speichern', [
@@ -2427,7 +2434,10 @@
       partner
         ? h('div.card.card-tight.partner-hint',
             h('p.hint', {}, h('strong', {}, 'Partnerkurs (Teamteaching): '),
-              'Die ausgegrauten Buttons werden von der Lehrkraft gepflegt, welche die Note vergibt.'))
+              'Die ausgegrauten Buttons werden von der Lehrkraft gepflegt, welche die Note vergibt. ',
+              'Am Quartalsende tippen Sie unten auf den Button ',
+              h('strong', {}, 'SoLei-Punkte exportieren'),
+              ', um Ihre SoLei-Punkte zu exportieren und an die Noten gebende Lehrkraft zu schicken.'))
         : null,
       h('div.section-head', {}, 'Sonstige Leistungen'),
       h('div.card.card-tight.solei-card',
@@ -2552,6 +2562,77 @@
       cls.students.length === 0
         ? h('div.empty', h('p', {}, 'Diese Klasse hat noch keine Schüler/innen.'))
         : h('div.card.card-list', {}, pointstandRows(course, cls, shownQ))
+    );
+  };
+
+  /* ================= Teamteaching: SoLei-Punkte (eigene Seiten) =================
+     Beide Seiten bündeln die Punkte-Wege an einem Ort. Die bisherigen Wege
+     (Button im Partnerkurs bzw. auf „SoLei-Quartalsnoten“) bleiben bestehen. */
+
+  /* Import: bewusst OHNE Kursauswahl. Kurs und Quartal stehen in der Datei –
+     der Kurs über die shareId, das Quartal wird je Vergabe aus dem Datum nach
+     den EIGENEN Quartalszeiträumen bestimmt. Ein Dropdown würde eine Wahl
+     vortäuschen, die der Import gar nicht auswerten kann. */
+  views.soleiImport = function (p) {
+    var st = S();
+    var year = Store.yearById(activeYearId());
+    var own = st.courses.filter(function (c) {
+      return c.yearId === year.id && c.shareId && c.sharedRole !== 'partner';
+    });
+
+    return h('div.screen',
+      header('SoLei-Import', p && p.back ? p.back : { name: 'home' }),
+      h('div.card',
+        h('p', {}, 'Hier spielen Sie die SoLei-Punkte der zweiten Lehrkraft ein.'),
+        h('p.hint', {}, 'Kurs und Quartal stehen in der Datei: Der Kurs wird an seiner Kennung erkannt, das Quartal jeder Vergabe aus dem Datum nach Ihren Quartalszeiträumen bestimmt. Eine Datei kann daher auch Vergaben aus mehreren Quartalen enthalten.'),
+        h('p.hint', {}, 'Vor dem Speichern sehen Sie eine Vorschau mit Quelle, Klasse, Fach und Anzahl der Vergaben. Ihre eigenen Vergaben bleiben unangetastet.'),
+        h('button.btn-primary.btn-block', { onclick: function () { pointsShareImportDialog(); } },
+          'Punkte-Datei wählen')),
+      own.length === 0
+        ? h('div.card.card-tight',
+            h('p.hint', {}, 'In diesem Schuljahr ist noch kein Kurs für Teamteaching freigegeben. Exportieren Sie den Kurs zuerst über „Kurs-Export“, damit die zweite Lehrkraft Punkte zurückschicken kann.'))
+        : h('div.card.card-tight',
+            h('p.hint', {}, 'Für Teamteaching freigegebene Kurse:'),
+            h('ul.tt-list', {}, own.map(function (c) {
+              var cls = Store.classById(c.classId);
+              return h('li', {}, (cls ? cls.name : '?') + ' · ' + c.subject +
+                (c.partnerLabel ? ' (' + c.partnerLabel + ')' : ''));
+            })))
+    );
+  };
+
+  /* Export: hier ist die Kursauswahl echt – der Dialog braucht den Kurs.
+     Das Quartal wählen Sie eine Stufe später im Dialog selbst. */
+  views.soleiExport = function (p) {
+    var st = S();
+    var year = Store.yearById(activeYearId());
+    var partners = st.courses.filter(function (c) {
+      return c.yearId === year.id && c.sharedRole === 'partner';
+    });
+
+    if (!partners.length) {
+      return h('div.screen',
+        header('SoLei-Export', p && p.back ? p.back : { name: 'home' }),
+        h('div.card',
+          h('p', {}, 'Sie haben in diesem Schuljahr keinen Partnerkurs.'),
+          h('p.hint', {}, 'Ein Partnerkurs entsteht, wenn Sie über „Kurs-Import“ die Kurs-Datei der Noten gebenden Lehrkraft einspielen. Erst danach können Sie Ihre SoLei-Punkte zurückschicken.')));
+    }
+
+    var sel = h('select.input', {}, partners.map(function (c) {
+      var cls = Store.classById(c.classId);
+      return h('option', { value: c.id }, (cls ? cls.name : '?') + ' · ' + c.subject);
+    }));
+
+    return h('div.screen',
+      header('SoLei-Export', p && p.back ? p.back : { name: 'home' }),
+      h('div.card',
+        h('p', {}, 'Hier schicken Sie Ihre SoLei-Punkte an die Lehrkraft, welche die Note vergibt.'),
+        h('label.field', h('span.field-label', {}, 'Partnerkurs'), sel),
+        h('p.hint', {}, 'Quartal, Beschriftung und Kurs-Passwort wählen Sie im nächsten Schritt.'),
+        h('button.btn-primary.btn-block', { onclick: function () {
+            var course = Store.courseById(sel.value);
+            if (course) pointsShareExportDialog(course);
+          } }, 'Weiter zum Export'))
     );
   };
 
@@ -2812,7 +2893,7 @@
               'Teamteaching: Punkte-Datei der Kollegin / des Kollegen' +
               (course.partnerLabel ? ' (' + course.partnerLabel + ')' : '') + ' einspielen.'),
             h('button.btn-small.btn-primary', { onclick: function () { pointsShareImportDialog(); } },
-              'Punkte importieren')))
+              'SoLei-Import')))
       : null;
 
     var inputs = {}; /* studentId -> input */
@@ -7165,7 +7246,7 @@
       return h('option', { value: c.id }, (cls ? cls.name : '?') + ' · ' + c.subject);
     }));
     var pw1 = h('input.input', { type: 'password', autocomplete: 'new-password', placeholder: PW_MIN_TEXT });
-    var pw2 = h('input.input', { type: 'password', autocomplete: 'new-password', placeholder: 'Wiederholen' });
+    var pw2 = h('input.input', { type: 'password', autocomplete: 'new-password', placeholder: 'Passwort wiederholen' });
     var err = h('p.hint.error-text');
     UI.modal('Kurs für Teamteaching exportieren', [
       h('p', {}, 'Die Datei enthält Schülerliste (nur Namen), Maximalpunkte, Quartalszeiträume und Unterrichtstage des Kurses – keine Bewertungen, Fotos oder Kontaktdaten. Ihre Kollegin bzw. Ihr Kollege importiert sie als Partnerkurs.'),
@@ -7399,7 +7480,7 @@
     /* Zweite Eingabe gegen Tippfehler: Ein falsch getipptes Passwort fiele
        erst der Kollegin beim Import auf – dann ist die Datei unbrauchbar.
        Ist das Passwort gemerkt, entfällt die Wiederholung. */
-    var pw2 = h('input.input', { type: 'password', autocomplete: 'off', placeholder: 'Wiederholen' });
+    var pw2 = h('input.input', { type: 'password', autocomplete: 'off', placeholder: 'Passwort wiederholen' });
     var pw2Field = h('label.field', h('span.field-label', {}, 'Kurs-Passwort wiederholen'), pw2);
     var remember = h('input', { type: 'checkbox' });
     if (preset) { remember.checked = true; pw2Field.style.display = 'none'; }
@@ -7757,7 +7838,7 @@
     sel.appendChild(h('option', { value: 'pin' }, 'PIN (4–8 Ziffern) – schneller Zugriff'));
     sel.appendChild(h('option', { value: 'password' }, 'Passwort (mind. ' + APP_PW_MIN + ' Zeichen) – höherer Schutz'));
     var p1 = h('input.input', { type: 'password', inputmode: 'numeric', autocomplete: 'new-password', placeholder: '4–8 Ziffern' });
-    var p2 = h('input.input', { type: 'password', inputmode: 'numeric', autocomplete: 'new-password', placeholder: 'Wiederholung' });
+    var p2 = h('input.input', { type: 'password', inputmode: 'numeric', autocomplete: 'new-password', placeholder: 'PIN wiederholen' });
     var err = h('p.hint.error-text');
     var hint = h('p.hint', {}, HINT_PIN);
     function applyMode() {
@@ -7766,10 +7847,12 @@
       if (pw) {
         p1.removeAttribute('inputmode'); p2.removeAttribute('inputmode');
         p1.placeholder = 'Mindestens ' + APP_PW_MIN + ' Zeichen';
+        p2.placeholder = 'Passwort wiederholen';
         hint.textContent = HINT_PW;
       } else {
         p1.setAttribute('inputmode', 'numeric'); p2.setAttribute('inputmode', 'numeric');
         p1.placeholder = '4–8 Ziffern';
+        p2.placeholder = 'PIN wiederholen';
         hint.textContent = HINT_PIN;
       }
     }

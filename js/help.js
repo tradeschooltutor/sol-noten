@@ -72,6 +72,7 @@
               'App installieren – am besten zuerst, siehe nächstes Kapitel.',
               'Bundesland und erstes Schuljahr anlegen (geschieht automatisch beim ersten Start).',
               'PIN oder Passwort festlegen. Bitte sicher notieren.',
+              '{{Wiederherstellungsschlüssel}} sichern: Die App zeigt ihn direkt danach **nur einmal** an. Drucken oder notieren Sie ihn und bewahren Sie ihn getrennt vom Gerät auf – ohne ihn ist bei vergessener PIN nichts mehr zu retten.',
               'Auf der Startseite „+ Kurs“ antippen: Klasse anlegen und Fach eingeben.',
               'Schülerliste erfassen – am schnellsten über „Aus Excel einfügen“.',
               '{{SoLei-Maximalpunkte}} der fünf {{SoLei-Kriterien}} prüfen (Vorgabe: je 3 Punkte, Summe 15).',
@@ -494,7 +495,7 @@
             { t: 'steps', v: [
               'Die Noten gebende Lehrkraft exportiert den Kurs: Startseite → „Kurs-Export (Teamteaching)“. Sie teilt das Kurs-Passwort der zweiten Lehrkraft mit. Die Datei ist verschlüsselt und enthält nur Namen der Schüler/innen und Kurseinstellungen, keine Bewertungen, Fotos oder Kontaktdaten.',
               'Die Noten gebende Lehrkraft übermittelt die Datei an die zweite Lehrkraft – per E-Mail oder USB-Stick.',
-              'Die zweite Lehrkraft importiert die Datei: Startseite → „Kurs-Import (Teamteaching)“. Sie wählt die Datei in dem Ordner aus, in dem sie sie abgespeichert hat, z.\u202fB. „Downloads“. Alternative auf Android: das Teilen-Menü – E-Mail-Anhang antippen → „Teilen“ → SOL-Noten. (Das Teilen ist bei PWA-Apps auf iPhone und iPad leider nicht möglich.)'
+              'Die zweite Lehrkraft importiert die Datei: Startseite → „Kurs-Import (Teamteaching)“. Sie wählt die Datei in dem Ordner aus, in dem sie sie abgespeichert hat, z.\u202fB. „Downloads“. Alternative auf Android: das Teilen-Menü – E-Mail-Anhang antippen → „Teilen“ → SOL-Noten. (Das Teilen ist bei {{PWA|PWA-Apps}} auf iPhone und iPad leider nicht möglich.)'
             ] },
             { t: 'p', v: 'Während des Quartals vergeben beide Lehrkräfte SoLei-Punkte und machen bei Bedarf Notizen für jede/n Schüler/in.' },
             { t: 'p', v: 'Kommen später Schüler/innen dazu oder ändern sich {{SoLei-Maximalpunkte|Maximalpunkte}}, Quartalszeiträume oder Unterrichtstage, exportiert die Noten gebende Lehrkraft den Kurs einfach erneut; durch den zweiten Import bleiben bereits gegebene SoLei-Punkte unangetastet. Wenn ein/e Schüler/in die Klasse verlässt, ist kein Export/Import nötig – beide Lehrkräfte können diese Person in ihrem Kurs eigenständig löschen.' },
