@@ -70,7 +70,7 @@
 
   /* ================= App-Start ================= */
 
-  var APP_VERSION = '0.50.1';
+  var APP_VERSION = '0.50.2';
 
   /* Mindestlänge für Datei-Passwörter: Backup, Foto-Sicherung, Kurs- und
      Punkte-Export. Jedes schützt genau eine Datei; ein Treffer kostet diese
@@ -4208,9 +4208,50 @@
         if (zSaveTimer) { clearTimeout(zSaveTimer); zSaveTimer = null; }
         persistZ();
       });
+      /* Zeugnisnoten werden spaltenweise eingetragen, nicht zeilenweise: Die
+         Tabulator-Taste (auf Android das „→|“ der Zifferntastatur) und Enter
+         springen deshalb zur nächsten Person DERSELBEN Spalte statt in die
+         Nachbarspalte. Am Ende der HJ-Spalte geht es an den Anfang der
+         Jahresspalte; am Ende der Jahresspalte bleibt es beim Normalverhalten,
+         damit die Tabelle verlassen werden kann.
+         Hinweis: Manche Android-Tastaturen melden Tasten als keyCode 229 ohne
+         auswertbaren `key` – dort greift die Umleitung nicht, und es bleibt
+         beim voreingestellten Sprung nach rechts. */
+      inp.addEventListener('keydown', function (ev) {
+        if (ev.key !== 'Tab' && ev.key !== 'Enter') return;
+        if (ev.altKey || ev.ctrlKey || ev.metaKey) return;
+        var target = nextZInput(stu.id, key, ev.shiftKey ? -1 : 1);
+        if (!target) return; /* kein Ziel: normales Verhalten der Taste */
+        ev.preventDefault();
+        target.focus();
+        if (target.select) target.select();
+      });
       return inp;
     }
     var zSaveTimer = null;
+
+    /* Nächstes Eingabefeld in derselben Spalte. Die Reihenfolge stammt aus
+       `students` – also aus der angezeigten Sortierung der Tabelle. */
+    function nextZInput(studentId, key, dir) {
+      var i = students.findIndex(function (x) { return x.id === studentId; });
+      if (i < 0) return null;
+      var j = i + dir;
+      if (j >= 0 && j < students.length) {
+        var row = zInputs[students[j].id];
+        return (row && row[key]) || null;
+      }
+      /* Spaltenende: vorwärts von „HJ-Zeugnis“ an den Anfang von
+         „Jahreszeugnis“, rückwärts von dort ans Ende der HJ-Spalte. */
+      if (dir > 0 && key === 'hj' && students.length) {
+        var first = zInputs[students[0].id];
+        return (first && first.jahr) || null;
+      }
+      if (dir < 0 && key === 'jahr' && students.length) {
+        var last = zInputs[students[students.length - 1].id];
+        return (last && last.hj) || null;
+      }
+      return null;
+    }
 
     var body = rowsData.map(function (r) {
       var cells = [h('td.sticky-col.name-cell', {
@@ -7519,11 +7560,22 @@
     var pw2 = h('input.input', { type: 'password', autocomplete: 'off', placeholder: 'Passwort wiederholen' });
     var pw2Field = h('label.field', h('span.field-label', {}, 'Kurs-Passwort wiederholen'), pw2);
     var remember = h('input', { type: 'checkbox' });
-    if (preset) { remember.checked = true; pw2Field.style.display = 'none'; }
-    /* Sobald das gemerkte Passwort geändert wird, ist die Wiederholung wieder nötig. */
-    pw.addEventListener('input', function () {
-      pw2Field.style.display = (preset && pw.value === preset) ? 'none' : '';
-    });
+    if (preset) remember.checked = true;
+    /* Die Wiederholung entfällt NUR, solange das gemerkte Passwort unverändert
+       bleibt UND gemerkt bleiben soll. Sobald eines davon nicht mehr zutrifft,
+       wird ein Passwort neu vergeben und muss bestätigt werden. `pw2Needed`
+       steuert Anzeige und Prüfung gemeinsam – so kann das Feld nie verlangt
+       werden, während es unsichtbar ist (oder umgekehrt). */
+    var pw2Needed = false;
+    function syncPw2() {
+      pw2Needed = !(preset && pw.value === preset && remember.checked);
+      pw2Field.style.display = pw2Needed ? '' : 'none';
+      if (!pw2Needed) pw2.value = '';
+    }
+    pw.addEventListener('input', syncPw2);
+    pw.addEventListener('change', syncPw2);
+    remember.addEventListener('change', syncPw2);
+    syncPw2();
     var err = h('p.hint.error-text');
 
     UI.modal('SoLei-Punkte exportieren', [
@@ -7542,9 +7594,8 @@
             err.textContent = 'Das Kurs-Passwort braucht mindestens ' + PW_MIN + ' Zeichen.';
             return false;
           }
-          /* Ein bereits gemerktes, unverändertes Passwort muss nicht erneut
-             bestätigt werden – es war beim Speichern schon geprüft. */
-          if (!(preset && pw.value === preset) && pw.value !== pw2.value) {
+          /* Genau dann prüfen, wenn das Feld auch sichtbar ist. */
+          if (pw2Needed && pw.value !== pw2.value) {
             err.textContent = 'Die Eingaben stimmen nicht überein.';
             return false;
           }
