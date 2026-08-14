@@ -1,4 +1,4 @@
-# SOL-Noten (Version 0.49.1 – Beta)
+# SOL-Noten (Version 0.49.2 – Beta)
 
 Notenverwaltung zum selbstorganisierten Lernen (SOL) als Progressive Web App (PWA).
 Basierend auf der Excel-Notenverwaltung V8.0 von Andreas Vandelaar.
@@ -56,7 +56,6 @@ Bei jeder neuen Version die Versionsnummer in `sw.js` (Zeile `var CACHE = 'sol-n
 Es gibt keinen Server und kein Konto. Sämtliche Noten und Schülerdaten bleiben ausschließlich auf dem Gerät. Die einzige Internetverbindung ist der einmalige Abruf der Schulferientermine (openholidaysapi.org) beim Anlegen eines Schuljahres – dabei werden keine personenbezogenen Daten übertragen.
 
 ---
-© 2026 Andreas Vandelaar
 
 **Zurück-Geste/-Taste (Android):** Wischen vom Rand bzw. die Zurück-Taste navigiert innerhalb der App seitenweise zurück; ein offenes Dialogfenster wird zuerst geschlossen. Erst von der Startansicht aus beendet die Geste die App. Geplante Funktionen: siehe ROADMAP.md.
 
@@ -144,3 +143,134 @@ In den Globalen Einstellungen (Abschnitt „Klausurbewertung") wählbar: **Einfa
 ## Hinweis zu Exporten
 
 Backups sind mit einem Passwort verschlüsselt (AES-256-GCM). **Exporte und Ausdrucke sind es nicht**: Excel-Dateien und PDFs enthalten personenbezogene Daten im Klartext. Alle Export- und Druckdialoge weisen darauf hin. Exportierte Dateien gehören daher auf ein geschütztes Gerät und nicht in ungeschützte Cloud-Ordner oder E-Mail-Anhänge.
+
+---
+
+## Lizenz
+
+**© 2026 Andreas Vandelaar. Alle Rechte vorbehalten.**
+
+SOL-Noten steht unter der [PolyForm Noncommercial License 1.0.0](LICENSE.md)
+(SPDX: `PolyForm-Noncommercial-1.0.0`). Eine unverbindliche deutsche
+Lesefassung liegt als [LIZENZ-DE.md](LIZENZ-DE.md) bei; maßgeblich ist der
+englische Originaltext.
+
+Der Quellcode ist damit **einsehbar, aber nicht Open Source im Sinne der OSI** –
+die Kategorie heißt „source available". In Kurzform:
+
+| Nutzung | Erlaubt? |
+|---|---|
+| Code ansehen, prüfen, Sicherheitslücken suchen und melden | ja, ausdrücklich erwünscht |
+| Kopieren, verändern, forken, weitergeben (nicht-kommerziell) | ja |
+| Einzelne Lehrkraft nutzt die App für den eigenen Unterricht | ja |
+| Schulen, Schulträger, Behörden, Hochschulen, gemeinnützige Träger | ja, unentgeltlich |
+| Verkauf, kostenpflichtiger Dienst, bezahlte Beratung damit | nur mit gesonderter Lizenz |
+| Einbau in ein kommerzielles Produkt | nur mit gesonderter Lizenz |
+| Fork unter dem Namen „SOL-Noten" verbreiten | nein – bitte eigenen Namen wählen |
+| Fork ohne Urhebernennung im Kasten „Über diese App" verbreiten | nein – § 13 UrhG, unabhängig von der Lizenz |
+
+Bei jeder Weitergabe müssen die Lizenz (oder ihre URL) und die Zeile
+`Required Notice: …` aus der Lizenzdatei mitgeliefert werden.
+
+Der Name „SOL-Noten" ist von der Lizenz nicht erfasst. Forks sind willkommen,
+sollten aber einen eigenen Namen tragen – die App verarbeitet Schülerdaten, und
+eine veränderte Fassung mit geschwächter Verschlüsselung darf nicht unter dem
+Namen des Originals in Umlauf geraten.
+
+Unabhängig von der Lizenz gilt die **Urheberbezeichnung nach § 13 Satz 2 UrhG**:
+Vervielfältigungsstücke und Bearbeitungen tragen den Hinweis
+„© 2026 Andreas Vandelaar" in der Lizenzdatei und im Kasten „Über diese App",
+der am Fuß jeder Seite der App steht; Bearbeitungen ergänzen dort
+„Veränderte Fassung, basierend auf SOL-Noten von Andreas Vandelaar".
+Der maßgebliche Wortlaut steht in den Ergänzenden Hinweisen der
+[LICENSE.md](LICENSE.md).
+
+**Anfragen zur kommerziellen Lizenzierung:** vandelaar@live.de
+
+### Warum der Code offenliegt
+
+SOL-Noten verarbeitet personenbezogene Daten von Schülerinnen und Schülern. Die
+Sicherheitsversprechen der App – Verschlüsselung mit AES-256-GCM,
+Schlüsselableitung mit PBKDF2 (310.000 Runden), ausschließlich lokale
+Speicherung ohne Server und ohne Konto – sind nur dann etwas wert, wenn sie
+überprüfbar sind. Sicherheitsforschung ist von der Lizenz gedeckt und wird nicht
+behindert; Schwachstellenmeldungen bitte an vandelaar@live.de, Näheres in
+[CONTRIBUTING.md](CONTRIBUTING.md).
+
+Dass Schulen und Behörden die App unentgeltlich einsetzen dürfen, ist Absicht:
+Das Ziel ist Verbreitung im Bildungsbereich. Die Lizenz richtet sich nicht gegen
+Schulen, sondern gegen die Verwertung fremder Arbeit als Produkt.
+
+### KI-gestützte Entwicklung
+
+Bei der Umsetzung wurde der KI-Assistent Claude (Anthropic) als
+Entwicklungswerkzeug eingesetzt – vergleichbar mit einer Entwicklungsumgebung
+oder einer Codebibliothek, nur weitreichender.
+
+Die schöpferische Leistung liegt beim Autor. Von ihm stammen insbesondere:
+
+- das **fachliche Konzept**: das SOL-Bewertungsmodell mit fünf Kriterien, die
+  Herleitung der SoLei-Note aus Kriteriumsdurchschnitten, das datumsgetriebene
+  Quartalsmodell, die Gewichtung der Zeugnisnote, das Teamteaching-Konzept;
+- das **Datenmodell** und die Architektur: lokale Verschlüsselung ohne Backend,
+  Aufteilung der Module, Rollenmodell geteilter Kurse;
+- sämtliche **Entwurfs- und Abwägungsentscheidungen**, einschließlich der
+  bewusst verworfenen Alternativen;
+- die **Bedienlogik**, die Abläufe und die Texte der Oberfläche;
+- **Auswahl, Kombination, Prüfung und Überarbeitung** aller erzeugten
+  Bestandteile sowie die Erprobung auf realen Geräten.
+
+Der Entwicklungsverlauf ist vollständig dokumentiert und belegt diese Leistung.
+
+Zur rechtlichen Einordnung: Nach § 2 Abs. 2 UrhG setzt Urheberrechtsschutz eine
+persönliche geistige Schöpfung voraus. Der Autor beansprucht Schutz für seine
+eigene schöpferische Leistung im vorstehenden Sinne – insbesondere für
+Konzeption, Struktur sowie Auswahl und Anordnung der Bestandteile (auch nach
+§ 4 UrhG) – und nicht für Bestandteile, denen nach geltendem Recht kein Schutz
+zukommt. Die Lizenzbedingungen gelten davon unabhängig als vertragliche
+Vereinbarung.
+
+### Entstehungskontext
+
+SOL-Noten ist ein privates Projekt des Autors. Die Entwicklung erfolgte
+außerhalb der Dienstzeit, ohne dienstlichen Auftrag, ohne Nutzung dienstlicher
+Ausstattung und ohne Verwendung realer Schülerdaten. Die App steht in keiner
+Verbindung zu einem Schulträger, einer Bezirksregierung oder dem Land
+Nordrhein-Westfalen.
+
+---
+
+## License (English summary)
+
+**© 2026 Andreas Vandelaar. All rights reserved.**
+
+SOL-Noten is licensed under the
+[PolyForm Noncommercial License 1.0.0](LICENSE.md)
+(SPDX: `PolyForm-Noncommercial-1.0.0`). The source is available but **not Open
+Source in the OSI sense**.
+
+Viewing, auditing, modifying, forking and redistributing for any noncommercial
+purpose is permitted and welcome. Use by schools, school authorities, government
+bodies, universities and charitable organisations is expressly permitted free of
+charge. **Commercial use requires a separate license:** vandelaar@live.de
+
+The name "SOL-Noten" is not covered by the license; please give forks their own
+name. Independently of the license, German copyright law (§ 13 sentence 2 UrhG)
+entitles the author to determine the author's designation and where it appears:
+copies and derivative works carry "© 2026 Andreas Vandelaar" in the license file
+and in the application's "Über diese App" panel, which appears at the bottom of
+every screen; derivative works add "Veränderte Fassung, basierend auf SOL-Noten
+von Andreas Vandelaar". The authoritative wording is in the supplementary notes
+of [LICENSE.md](LICENSE.md).
+
+The source is public because the app processes student data. Its security claims
+— AES-256-GCM encryption, PBKDF2 key derivation, purely local storage with no
+server and no account — are only worth something if they can be verified.
+Security research is covered by the license and will not be obstructed; see
+[CONTRIBUTING.md](CONTRIBUTING.md).
+
+**AI-assisted development:** Claude (Anthropic) was used as a development tool.
+The creative contribution — concept, architecture, data model, design decisions,
+interaction logic, and the selection, combination, review and revision of all
+generated components — is the author's, and is documented throughout the
+development history.
