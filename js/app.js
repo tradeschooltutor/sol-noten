@@ -70,7 +70,7 @@
 
   /* ================= App-Start ================= */
 
-  var APP_VERSION = '0.49.2';
+  var APP_VERSION = '0.49.3';
 
   /* Mindestlänge für Datei-Passwörter: Backup, Foto-Sicherung, Kurs- und
      Punkte-Export. Jedes schützt genau eine Datei; ein Treffer kostet diese
@@ -737,11 +737,8 @@
         h('p.hint', {}, 'Betaversion zu Testzwecken, Nutzung auf eigenes Risiko. Fehlermeldungen und Featurewünsche bitte an ',
           h('a', { href: 'mailto:vandelaar@live.de' }, 'vandelaar@live.de'), '.'),
         h('p.hint', {}, 'Version ' + APP_VERSION + ' · © 2026 Andreas Vandelaar'),
-        /* Urheberbezeichnung (§ 13 Satz 2 UrhG) und Lizenzhinweis. Der Link ist
-           ein reiner Anker und lädt nichts nach; die Adresse stimmt mit der
-           „Required Notice“-Zeile der Lizenzdatei überein. */
-        h('p.hint', {}, 'PolyForm Noncommercial License 1.0.0 · Nutzung durch Schulen, Schulträger, Behörden und gemeinnützige Träger ist unentgeltlich gestattet. ',
-          h('a', { href: 'https://github.com/tradeschooltutor/sol-noten', target: '_blank', rel: 'noopener' }, 'Quellcode und Lizenz')),
+        /* Urheberbezeichnung (§ 13 Satz 2 UrhG) und Lizenzhinweis. */
+        h('p.hint', {}, 'PolyForm Noncommercial License 1.0.0 · Nutzung durch Schulen, Schulträger, Behörden und gemeinnützige Träger ist unentgeltlich gestattet.'),
         h('p.hint', {}, 'Alle Daten sind verschlüsselt und bleiben ausschließlich auf diesem Gerät. Sie können die Daten durch verschlüsselte Backups auf andere Geräte übertragen.'),
         det
       )
