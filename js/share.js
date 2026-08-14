@@ -296,7 +296,7 @@
     function safe(s) {
       return String(s || '').replace(/[^\wäöüÄÖÜß-]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 30);
     }
-    return 'SOL-Punkte-' + safe(data.course.className) + '-' + safe(data.course.subject) +
+    return 'SoLei-Punkte-' + safe(data.course.className) + '-' + safe(data.course.subject) +
       '-Q' + data.quarter + '.solpunkte';
   }
 

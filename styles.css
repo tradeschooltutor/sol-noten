@@ -406,9 +406,10 @@ textarea.input.recovery-input {
 /* Teamteaching-Raster: zwei Spalten nach Rolle, drei Zeilen (Überschrift,
    Kurs-Aktion, SoLei-Aktion). Kein Flex-Container als Hülle nötig – Grid
    ordnet die sechs Kinder selbst zeilenweise an. */
+.tt-card { padding: 10px; }
 .tt-grid {
   display: grid; grid-template-columns: 1fr 1fr;
-  gap: 8px; align-items: stretch;
+  gap: 8px; align-items: stretch; width: 100%;
 }
 .tt-head {
   font-weight: 600; font-size: 0.85rem; color: var(--ink-soft);

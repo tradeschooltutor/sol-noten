@@ -70,7 +70,7 @@
 
   /* ================= App-Start ================= */
 
-  var APP_VERSION = '0.50.0';
+  var APP_VERSION = '0.50.1';
 
   /* Mindestlänge für Datei-Passwörter: Backup, Foto-Sicherung, Kurs- und
      Punkte-Export. Jedes schützt genau eine Datei; ein Treffer kostet diese
@@ -1722,9 +1722,10 @@
       h('button.btn-primary.btn-block', { onclick: function () { go('editCourse', {}); } }, '+ Kurs anlegen'),
       h('div.section-head.share-head', {}, 'Teamteaching'),
       /* Zwei Spalten nach Rolle: links, wer die Note vergibt, rechts die
-         zweite Lehrkraft. Bewusst KEINE .card als Hülle – .card erzwingt
-         flex-direction: column und würde das Raster zerlegen. */
-      h('div.tt-grid',
+         zweite Lehrkraft. Die .card ist nur die Hülle und enthält genau EIN
+         Kind – so greift ihr flex-direction: column nicht in das Raster ein
+         (derselbe Fallstrick wie bei .card.help-nav). */
+      h('div.card.card-tight.tt-card', h('div.tt-grid',
         h('div.tt-head', {}, 'Notengeber/in'),
         h('div.tt-head', {}, 'Zweite Lehrkraft'),
         /* Beide Handler bewusst gekapselt: Direkt als onclick übergeben,
@@ -1733,7 +1734,7 @@
         h('button.btn-plain.share-btn', { onclick: function () { courseShareExportDialog(); } }, 'Kurs-Export'),
         h('button.btn-plain.share-btn', { onclick: function () { courseShareImportDialog(); } }, 'Kurs-Import'),
         h('button.btn-plain.share-btn', { onclick: function () { go('soleiImport', {}); } }, 'SoLei-Import'),
-        h('button.btn-plain.share-btn', { onclick: function () { go('soleiExport', {}); } }, 'SoLei-Export')),
+        h('button.btn-plain.share-btn', { onclick: function () { go('soleiExport', {}); } }, 'SoLei-Export'))),
       h('button.btn-plain.btn-block', { onclick: function () { go('settings', { back: { name: 'home' } }); } }, 'Globale Einstellungen')
     );
     return screen;
@@ -6410,16 +6411,24 @@
         var entry = Help.glossaryFor(term);
         if (!entry || forPrint) { out.push(shown); return; }
         var btn = h('button.gloss-term', { type: 'button' }, shown);
+        var openBox = null;
         btn.addEventListener('click', function () {
-          var open = defHost.querySelector('[data-term="' + entry.term + '"]');
-          if (open) { open.remove(); return; }
+          if (openBox && openBox.parentNode) {
+            openBox.parentNode.removeChild(openBox);
+            openBox = null;
+            return;
+          }
           var box = h('div.gloss-def', { 'data-term': entry.term },
             h('div.row-between',
               h('strong', {}, entry.term),
               h('button.icon-btn.gloss-close', { 'aria-label': 'Schließen' }, '×')),
             h('p.hint', {}, entry.def));
-          box.querySelector('.gloss-close').addEventListener('click', function () { box.remove(); });
-          defHost.appendChild(box);
+          box.querySelector('.gloss-close').addEventListener('click', function () {
+            if (box.parentNode) box.parentNode.removeChild(box);
+            openBox = null;
+          });
+          openBox = box;
+          placeGlossBox(btn, box, defHost);
         });
         out.push(btn);
       } else if (part.indexOf('**') === 0) {
@@ -6438,6 +6447,33 @@
       }
     });
     return out;
+  }
+
+  /* Die Definition erscheint unmittelbar unter dem Absatz mit dem Begriff.
+     Früher sammelte ein Host am Seitenende alle Definitionen; bei langen
+     Kapiteln lag die Box weit außerhalb des Sichtfelds, und der Link wirkte
+     wie ohne Funktion. Gesucht wird der nächste Vorfahre auf Blockebene:
+     Steht der Begriff in einem Aufzählungspunkt, gehört die Box in diesen
+     Punkt hinein, sonst hinter den Absatz. Der Host am Seitenende bleibt als
+     Rückfall, falls kein passender Vorfahre gefunden wird. */
+  function placeGlossBox(btn, box, fallbackHost) {
+    var el = btn.parentNode;
+    while (el && el !== document.body) {
+      /* In Aufzählungspunkten und Tabellenzellen gehört die Box HINEIN –
+         ein div dahinter wäre an dieser Stelle ungültiges HTML. */
+      if (el.tagName === 'LI' || el.tagName === 'TD' || el.tagName === 'TH') {
+        el.appendChild(box);
+        return;
+      }
+      var disp = '';
+      try { disp = window.getComputedStyle(el).display; } catch (e) { disp = ''; }
+      if (disp && disp !== 'inline' && disp !== 'inline-block' && el.parentNode) {
+        el.parentNode.insertBefore(box, el.nextSibling);
+        return;
+      }
+      el = el.parentNode;
+    }
+    if (fallbackHost) fallbackHost.appendChild(box);
   }
 
   /* Überschriften: nur **fett** und _kursiv_, keine Verweise oder Glossarbegriffe
