@@ -420,6 +420,18 @@ textarea.input.recovery-input {
   padding-left: 8px; padding-right: 8px; white-space: nowrap;
 }
 .tt-list { margin: 4px 0 0; padding-left: 1.1rem; font-size: 0.85rem; color: var(--ink-soft); }
+
+/* Schülerliste (nur lesen): je Person eine Karte, Angaben untereinander.
+   Telefonnummern sind Verweise und müssen als solche erkennbar sein und
+   groß genug zum Treffen mit dem Finger. */
+.stu-list { display: flex; flex-direction: column; gap: 8px; }
+.stu-name { margin: 0 0 4px; font-weight: 650; }
+.stu-line { margin: 2px 0; }
+.stu-label { color: var(--ink-soft); }
+.tel-link {
+  color: var(--teal); text-decoration: underline; text-underline-offset: 2px;
+  display: inline-block; padding: 3px 0; min-height: 22px;
+}
 .tt-list li { margin: 2px 0; }
 
 /* Demo-Modus: dauerhaft sichtbares Band auf jeder Seite */

@@ -70,7 +70,7 @@
 
   /* ================= App-Start ================= */
 
-  var APP_VERSION = '0.50.3';
+  var APP_VERSION = '0.51.0';
 
   /* Mindestlänge für Datei-Passwörter: Backup, Foto-Sicherung, Kurs- und
      Punkte-Export. Jedes schützt genau eine Datei; ein Treffer kostet diese
@@ -2473,6 +2473,8 @@
               'SoLei-Punkte exportieren (an die Notengeberin)'),
             h('p.hint', {}, 'Am Quartalsende: Ihre Punktevergaben und Kursnotizen als verschlüsselte Datei an die Lehrkraft übermitteln, welche die Note vergibt.'))
         : null,
+      h('button.btn-plain.btn-block.course-settings-btn', { onclick: function () { go('studentList', { id: course.id }); } },
+        'Schülerliste'),
       h('button.btn-plain.btn-block.course-settings-btn', { onclick: function () { go('editCourse', { id: course.id }); } },
         'Kurs-Einstellungen'),
       /* Punktestand-Liste bewusst nicht mehr auf der Kursseite (über den Button
@@ -5099,6 +5101,62 @@
   };
 
   /* ================= Schülerliste ================= */
+
+  /* ================= Schülerliste (nur lesen) =================
+     Die Kontaktdaten waren bisher nur über die Kurs-Einstellungen und den
+     Bearbeiten-Dialog je Person erreichbar – umständlich, wenn man im
+     Unterricht schnell eine Nummer braucht. Diese Seite zeigt sie am Stück.
+     Telefonnummern sind `tel:`-Verweise: Ein Tippen übergibt die Nummer an
+     die Telefon-App. Bearbeitet wird bewusst NICHT hier, sondern weiterhin
+     über „Schülerliste bearbeiten“ – zwei Bearbeitungswege für dieselben
+     Daten wären eine Fehlerquelle. */
+  function telLink(number) {
+    /* Für den Verweis werden alle Zeichen außer Ziffern und führendem Plus
+       entfernt; Leerzeichen und Schrägstriche in „0221 / 12 34 56“ würden die
+       Telefon-App sonst irritieren. Angezeigt bleibt die Eingabe im Original. */
+    var raw = String(number || '').trim();
+    if (!raw) return null;
+    var dial = raw.replace(/[^\d+]/g, '').replace(/(?!^)\+/g, '');
+    if (!dial || dial === '+') return document.createTextNode(raw);
+    return h('a.tel-link', { href: 'tel:' + dial }, raw);
+  }
+
+  views.studentList = function (p) {
+    var course = Store.courseById(p.id);
+    if (!course) return h('div.screen', header('Schülerliste', { name: 'home' }));
+    var cls = Store.classById(course.classId);
+    var students = (cls && cls.students ? cls.students.slice() : []).sort(function (a, b) {
+      return (a.lastName + a.firstName).localeCompare(b.lastName + b.firstName, 'de');
+    });
+
+    function line(label, value, asPhone) {
+      if (!value) return null;
+      var val = asPhone ? telLink(value) : document.createTextNode(value);
+      if (!val) return null;
+      return h('p.hint.stu-line', h('span.stu-label', {}, label + ': '), val);
+    }
+
+    return h('div.screen',
+      header('Schülerliste', { name: 'course', params: { id: course.id } }),
+      courseBox(course),
+      students.length === 0
+        ? h('div.empty', h('p', {}, 'Diese Klasse hat noch keine Schüler/innen.'))
+        : h('div.stu-list', students.map(function (stu) {
+            var rows = [
+              line('Telefon', stu.phone, true),
+              line('E-Mail', stu.email, false),
+              line('Betrieb', stu.company, false),
+              line('Ausbilder/in bzw. Eltern', stu.trainerName, false),
+              line('Telefon', stu.trainerPhone, true),
+              line('E-Mail', stu.trainerEmail, false)
+            ].filter(Boolean);
+            return h('div.card.card-tight',
+              h('p.stu-name', {}, stu.lastName + ', ' + stu.firstName),
+              rows.length ? rows : h('p.hint', {}, 'Keine Kontaktdaten hinterlegt.'));
+          })),
+      h('p.hint', {}, 'Zum Ändern der Daten: Kurs-Einstellungen, dann „Schülerliste bearbeiten“.')
+    );
+  };
 
   views.students = function (p) {
     var cls = Store.classById(p.classId);
