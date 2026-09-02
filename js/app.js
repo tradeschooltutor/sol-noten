@@ -70,7 +70,7 @@
 
   /* ================= App-Start ================= */
 
-  var APP_VERSION = '0.51.0';
+  var APP_VERSION = '0.51.1';
 
   /* Mindestlänge für Datei-Passwörter: Backup, Foto-Sicherung, Kurs- und
      Punkte-Export. Jedes schützt genau eine Datei; ein Treffer kostet diese
@@ -842,16 +842,23 @@
   /* Kursname (Klasse - Fach) als weiße Box unterhalb der Kopfzeile – auf allen Kursseiten. */
   /* Kursnamen-Box. `helpId` verweist auf ein Hilfekapitel; das Fragezeichen
      steht rechtsbündig und führt dorthin zurück, wo es angetippt wurde. */
-  function courseBox(course, helpId) {
+  /* `extra` ist ein optionaler Knopf, der links neben dem Fragezeichen sitzt.
+     Beide stehen zusammen in einer .row-gap-Gruppe, damit sie als Einheit
+     rechts bleiben und bei schmalen Bildschirmen gemeinsam umbrechen statt
+     einzeln auseinanderzufallen. */
+  function courseBox(course, helpId, extra) {
     var cls = Store.classById(course.classId);
     var hid = helpId || Help.CONTEXT[route.name];
-    if (!hid) {
+    if (!hid && !extra) {
       return h('div.card.card-tight.course-box',
         h('strong', {}, cls.name + ' - ' + course.subject));
     }
+    var right = h('div.row-gap');
+    if (extra) right.appendChild(extra);
+    if (hid) right.appendChild(helpBtn(hid));
     return h('div.card.card-tight.course-box.course-box-row',
       h('strong', {}, cls.name + ' - ' + course.subject),
-      helpBtn(hid));
+      right);
   }
 
   /* Kleines Fragezeichen für die kontextbezogene Hilfe. */
@@ -5129,26 +5136,39 @@
       return (a.lastName + a.firstName).localeCompare(b.lastName + b.firstName, 'de');
     });
 
-    function line(label, value, asPhone) {
+    /* kind: 'tel' | 'mail' | null. Bei 'mail' genügt eine grobe Prüfung auf
+       ein @ mit Text davor und dahinter – steht dort Freitext statt einer
+       Adresse, bleibt es bei reinem Text statt eines toten Verweises. */
+    function line(label, value, kind) {
       if (!value) return null;
-      var val = asPhone ? telLink(value) : document.createTextNode(value);
+      var val;
+      if (kind === 'tel') val = telLink(value);
+      else if (kind === 'mail') {
+        var t = String(value).trim();
+        val = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(t)
+          ? h('a.tel-link', { href: 'mailto:' + t }, t)
+          : document.createTextNode(value);
+      } else val = document.createTextNode(value);
       if (!val) return null;
       return h('p.hint.stu-line', h('span.stu-label', {}, label + ': '), val);
     }
 
     return h('div.screen',
       header('Schülerliste', { name: 'course', params: { id: course.id } }),
-      courseBox(course),
+      courseBox(course, null,
+        h('button.btn-plain.course-box-btn', { onclick: function () {
+          go('students', { classId: course.classId, courseId: course.id, from: 'studentList' });
+        } }, 'Bearbeiten')),
       students.length === 0
         ? h('div.empty', h('p', {}, 'Diese Klasse hat noch keine Schüler/innen.'))
         : h('div.stu-list', students.map(function (stu) {
             var rows = [
-              line('Telefon', stu.phone, true),
-              line('E-Mail', stu.email, false),
-              line('Betrieb', stu.company, false),
-              line('Ausbilder/in bzw. Eltern', stu.trainerName, false),
-              line('Telefon', stu.trainerPhone, true),
-              line('E-Mail', stu.trainerEmail, false)
+              line('Telefon', stu.phone, 'tel'),
+              line('E-Mail', stu.email, 'mail'),
+              line('Betrieb', stu.company, null),
+              line('Ausbilder/in bzw. Eltern', stu.trainerName, null),
+              line('Telefon', stu.trainerPhone, 'tel'),
+              line('E-Mail', stu.trainerEmail, 'mail')
             ].filter(Boolean);
             return h('div.card.card-tight',
               h('p.stu-name', {}, stu.lastName + ', ' + stu.firstName),
@@ -5174,7 +5194,9 @@
     var partner = !!(srcCourse && srcCourse.sharedRole === 'partner');
     var back = p.from === 'editCourse' && p.courseId
       ? { name: 'editCourse', params: { id: p.courseId } }
-      : (p.courseId ? { name: 'course', params: { id: p.courseId } } : { name: 'home' });
+      : (p.from === 'studentList' && p.courseId
+          ? { name: 'studentList', params: { id: p.courseId } }
+          : (p.courseId ? { name: 'course', params: { id: p.courseId } } : { name: 'home' }));
 
     var list = cls.students
       .slice()

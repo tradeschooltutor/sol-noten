@@ -100,7 +100,7 @@ body {
   flex: 0 1 auto; min-width: 0; max-width: 100%;
   flex-wrap: wrap; justify-content: flex-end; margin-left: auto;
 }
-.course-box-btn { min-height: 30px; padding: 4px 12px; font-size: 0.8rem; border-radius: 8px; }
+.course-box-btn { min-height: 30px; padding: 4px 12px; font-size: 0.8rem; border-radius: 8px; white-space: nowrap; }
 
 /* PWA-Installation: Banner auf dem Startbildschirm und Anleitungsschritte */
 .install-banner { border-left: 3px solid var(--teal); border-radius: 0 var(--radius) var(--radius) 0; }
@@ -1185,6 +1185,11 @@ button:focus-visible, .input:focus-visible, select:focus-visible {
 .solei-card { background: color-mix(in srgb, var(--teal) 14%, var(--card)); }
 .card .course-actions-grid { margin: 0; }
 .course-settings-btn { margin-top: 14px; }
+/* Der Vorabstand gilt nur für den ERSTEN dieser Knöpfe. Folgen zwei
+   aufeinander, addiert sich margin-top sonst zum Zeilenabstand des Screens
+   (14 px) und der Zwischenraum wäre doppelt so groß wie der zum Hilfe-Knopf
+   darunter. */
+.course-settings-btn + .course-settings-btn { margin-top: 0; }
 .grid-btn {
   min-height: 64px; border-radius: 12px; padding: 12px 14px;
   display: flex; align-items: center; justify-content: center; text-align: center;
