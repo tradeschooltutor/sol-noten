@@ -70,7 +70,7 @@
 
   /* ================= App-Start ================= */
 
-  var APP_VERSION = '0.51.2';
+  var APP_VERSION = '0.51.3';
 
   /* Mindestlänge für Datei-Passwörter: Backup, Foto-Sicherung, Kurs- und
      Punkte-Export. Jedes schützt genau eine Datei; ein Treffer kostet diese
@@ -830,6 +830,32 @@
       h('span.photo-fallback', {}, initials(stu)), img);
     loadPhotoInto(stu.id, img);
     return tile;
+  }
+
+  /* Foto für die Schülerliste: schwebt oben rechts und wird vom Text
+     umflossen. Anders als photoTile gibt es KEINE Initialen-Ersatzdarstellung –
+     ist kein Foto hinterlegt, verschwindet der Platzhalter wieder, damit der
+     Text die volle Breite bekommt. Weil das Foto erst asynchron aus der
+     Datenbank kommt, wird der Rahmen zunächst eingehängt und bei Fehlanzeige
+     entfernt. */
+  function floatPhoto(stu) {
+    var wrap = h('div.stu-photo');
+    function show(url) {
+      if (!url) {
+        if (wrap.parentNode) wrap.parentNode.removeChild(wrap);
+        return;
+      }
+      wrap.appendChild(h('img.stu-photo-img', { src: url, alt: '' }));
+    }
+    if (photoCache[stu.id] !== undefined) {
+      show(photoCache[stu.id]);
+    } else {
+      Store.getPhoto(stu.id).then(function (url) {
+        photoCache[stu.id] = url || null;
+        show(url);
+      });
+    }
+    return wrap;
   }
 
   /* Kleines Schülerbild links neben dem Namen (für Listen wie OBT / Quartalsabschluss). */
@@ -5170,7 +5196,8 @@
               line('Telefon', stu.trainerPhone, 'tel'),
               line('E-Mail', stu.trainerEmail, 'mail')
             ].filter(Boolean);
-            return h('div.card.card-tight',
+            return h('div.card.card-tight.stu-card',
+              floatPhoto(stu),
               h('p.stu-name', {}, stu.lastName + ', ' + stu.firstName),
               rows.length ? rows : h('p.hint', {}, 'Keine Kontaktdaten hinterlegt.'));
           })),

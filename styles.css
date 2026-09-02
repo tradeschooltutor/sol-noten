@@ -425,6 +425,18 @@ textarea.input.recovery-input {
    Telefonnummern sind Verweise und müssen als solche erkennbar sein und
    groß genug zum Treffen mit dem Finger. */
 .stu-list { display: flex; flex-direction: column; gap: 8px; }
+/* Wichtig: .card.stu-card (zwei Klassen), denn .card setzt display: flex –
+   und in einem Flex-Container wird ein Float von den Geschwistern ignoriert,
+   der Text würde also NICHT umfließen. Erst mit display: block wirkt float.
+   Das ::after räumt den Float ab, damit die Karte bei wenig Text nicht
+   kürzer wird als das Bild. */
+.card.stu-card { display: block; }
+.card.stu-card::after { content: ''; display: block; clear: both; }
+.stu-photo {
+  float: right; width: 76px; height: 76px; margin: 0 0 6px 10px;
+  border-radius: 10px; overflow: hidden; background: var(--line);
+}
+.stu-photo-img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .stu-name { margin: 0 0 4px; font-weight: 650; }
 .stu-line { margin: 2px 0; }
 .stu-label { color: var(--ink-soft); }

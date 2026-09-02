@@ -389,7 +389,7 @@
             { t: 'p', v: 'Auf der Kursseite über den Button **Schülerliste**. Dort stehen alle hinterlegten Angaben untereinander: Telefon und E-Mail der Schüler/innen, der Ausbildungsbetrieb sowie Name, Telefon und E-Mail der Ausbilder/innen bzw. Eltern.' },
             { t: 'p', v: 'Die **Telefonnummern sind antippbar**: Ein Tippen übergibt die Nummer an die Telefon-App Ihres Geräts, sodass Sie direkt anrufen können – etwa um bei einer Fehlzeit im Betrieb nachzufragen. Ob dann sofort gewählt oder die Nummer nur eingesetzt wird, entscheidet Ihr Gerät.' },
             { t: 'p', v: 'Die Seite dient nur zum Ansehen. Geändert werden die Daten weiterhin über die Kurs-Einstellungen unter „Schülerliste bearbeiten“.' },
-            { t: 'note', v: 'Die Angaben stehen nur auf diesem Gerät. Ein Blick auf diese Seite in der Klasse zeigt Kontaktdaten offen an – halten Sie den Bildschirm dabei so, dass Unbeteiligte nicht mitlesen.' }
+            { t: 'note', v: 'Ist ein Foto hinterlegt, erscheint es oben rechts auf der Karte. Die Angaben stehen nur auf diesem Gerät. Ein Blick auf diese Seite in der Klasse zeigt Fotos und Kontaktdaten offen an – halten Sie den Bildschirm dabei so, dass Unbeteiligte nicht mitlesen.' }
           ]
         },
         {
