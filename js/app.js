@@ -70,7 +70,7 @@
 
   /* ================= App-Start ================= */
 
-  var APP_VERSION = '0.51.1';
+  var APP_VERSION = '0.51.2';
 
   /* Mindestlänge für Datei-Passwörter: Backup, Foto-Sicherung, Kurs- und
      Punkte-Export. Jedes schützt genau eine Datei; ein Treffer kostet diese
@@ -7115,9 +7115,6 @@
         snapHost
       ),
 
-      h('div.section-head', {}, 'Speicher auf diesem Gerät'),
-      h('div.card', {}, storageStatusCard()),
-
       h('div.section-head', {}, 'Foto-Sicherung (alle Klassen)'),
       h('div.card', {}, photoBackupCard()),
 
@@ -7232,6 +7229,12 @@
         })()
       ),
 
+      /* Bewusst als letzter Abschnitt: Der Speicherstatus wird selten
+         gebraucht, ist aber im Ernstfall wichtig – deshalb dauerhaft
+         sichtbar, aber ohne die täglich genutzten Abschnitte nach unten
+         zu drängen. */
+      h('div.section-head', {}, 'Speicher auf diesem Gerät'),
+      h('div.card', {}, storageStatusCard())
     );
   };
 
