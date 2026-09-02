@@ -957,11 +957,38 @@
     if (!password) {
       return Promise.reject(new Error('Für das Backup ist ein Passwort erforderlich.'));
     }
+    var name = 'SOL-Noten-Backup-' + todayISO() + '.json';
     return CryptoBox.encrypt(JSON.stringify(state), password).then(function (env) {
-      downloadText('SOL-Noten-Backup-' + todayISO() + '.json', JSON.stringify(env));
-      state.settings.lastExport = new Date().toISOString();
-      save();
+      var text = JSON.stringify(env);
+      /* Ist ein Backup-Ordner verbunden, wird direkt dorthin geschrieben.
+         Unter Android landet ein gewöhnlicher Download zwingend im
+         Downloads-Ordner; über den gespeicherten Ordner-Griff lässt sich das
+         umgehen. Fehlt der Ordner oder die Freigabe, bleibt es beim Download –
+         ein Backup darf nie an der Ablage scheitern. */
+      return writeToBackupFolder(name, text).then(function (written) {
+        if (!written) downloadText(name, text);
+        state.settings.lastExport = new Date().toISOString();
+        save();
+        return { toFolder: written, fileName: name };
+      });
     });
+  }
+
+  /* Schreibt eine Datei in den verbundenen Backup-Ordner. Promise -> bool
+     (true = geschrieben). Die Freigabe wird nur STILL geprüft; ein Dialog
+     mitten im Ablauf würde den Nutzer überraschen. */
+  function writeToBackupFolder(name, text) {
+    if (!backupDirHandle) return Promise.resolve(false);
+    return backupDirHandle.queryPermission({ mode: 'readwrite' })
+      .then(function (p) {
+        if (p !== 'granted') { backupPermissionNeeded = true; return false; }
+        backupPermissionNeeded = false;
+        return backupDirHandle.getFileHandle(name, { create: true })
+          .then(function (fh) { return fh.createWritable(); })
+          .then(function (w) { return w.write(text).then(function () { return w.close(); }); })
+          .then(function () { return true; });
+      })
+      .catch(function (e) { console.warn('Backup in Ordner nicht möglich:', e); return false; });
   }
 
   /* ---------- Import-Schutz (F7): Größenlimits und Struktur-Prüfung ---------- */

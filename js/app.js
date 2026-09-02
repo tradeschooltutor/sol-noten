@@ -70,7 +70,7 @@
 
   /* ================= App-Start ================= */
 
-  var APP_VERSION = '0.50.2';
+  var APP_VERSION = '0.50.3';
 
   /* Mindestlänge für Datei-Passwörter: Backup, Foto-Sicherung, Kurs- und
      Punkte-Export. Jedes schützt genau eine Datei; ein Treffer kostet diese
@@ -1970,8 +1970,10 @@
         } }
     ]).then(function (ok) {
       if (!ok) return;
-      Store.exportJSON(pw1.value).then(function () {
-        toast('Verschlüsseltes Backup wird gespeichert.');
+      Store.exportJSON(pw1.value).then(function (res) {
+        toast(res && res.toFolder
+          ? 'Verschlüsseltes Backup im verbundenen Ordner gespeichert.'
+          : 'Verschlüsseltes Backup wird gespeichert.');
         render();
         if (typeof onDone === 'function') onDone();
       }).catch(function (e) {
@@ -7033,6 +7035,9 @@
         snapHost
       ),
 
+      h('div.section-head', {}, 'Speicher auf diesem Gerät'),
+      h('div.card', {}, storageStatusCard()),
+
       h('div.section-head', {}, 'Foto-Sicherung (alle Klassen)'),
       h('div.card', {}, photoBackupCard()),
 
@@ -7176,6 +7181,70 @@
       Store.save();
       if (onAccept) onAccept();
     });
+  }
+
+  /* ================= Speicherstatus ================= *
+     Ohne dauerhaften Speicher darf der Browser die Daten bei Platzmangel
+     verdrängen – und zwar die gesamte Website auf einmal, nicht einzelne
+     Teile. Die App fordert den dauerhaften Speicher automatisch an, aber
+     gestaffelt über Wochen; ob er gewährt wurde, war bisher nirgends
+     ablesbar. Genau das zeigt diese Karte, samt Möglichkeit, die Anfrage
+     sofort auszulösen. Ein Klick ist dafür ideal: `persist()` verlangt in
+     mehreren Browsern eine vorausgegangene Nutzeraktion. */
+  function fmtBytes(n) {
+    if (n == null || isNaN(n)) return '–';
+    if (n < 1024) return n + ' Byte';
+    if (n < 1024 * 1024) return (n / 1024).toFixed(0) + ' KB';
+    if (n < 1024 * 1024 * 1024) return (n / 1024 / 1024).toFixed(1) + ' MB';
+    return (n / 1024 / 1024 / 1024).toFixed(1) + ' GB';
+  }
+
+  function storageStatusCard() {
+    var stateLine = h('p', {}, 'Dauerhafter Speicher: ', h('strong', {}, 'wird geprüft …'));
+    var usageLine = h('p.hint', {}, 'Belegter Speicherplatz: wird ermittelt …');
+    var explain = h('p.hint');
+    var btnHost = h('div.actions-col');
+
+    if (!persistSupported()) {
+      clear(stateLine);
+      stateLine.appendChild(document.createTextNode('Dauerhafter Speicher: '));
+      stateLine.appendChild(h('strong', {}, 'von diesem Browser nicht angeboten'));
+      explain.textContent = 'Dieser Browser kennt die Anfrage nicht. Die Daten bleiben normalerweise erhalten, können bei Platzmangel aber gelöscht werden. Legen Sie deshalb regelmäßig ein Backup an.';
+      return [stateLine, explain];
+    }
+
+    function paint(granted) {
+      clear(stateLine);
+      stateLine.appendChild(document.createTextNode('Dauerhafter Speicher: '));
+      stateLine.appendChild(h('strong', {}, granted ? 'gewährt' : 'nicht gewährt'));
+      clear(btnHost);
+      if (granted) {
+        explain.textContent = 'Die Daten dieser App sind vor dem automatischen Löschen durch den Browser geschützt. Entfernen kann sie nur noch, wer die Website-Daten von Hand löscht – etwa über „Browserdaten löschen“ oder eine Aufräum-App.';
+      } else {
+        explain.textContent = 'Der Browser darf die Daten dieser App bei Platzmangel löschen – dann sind alle Kurse und Noten auf einen Schlag weg. Fordern Sie den Schutz jetzt an; die Anfrage wird meist ohne Rückfrage gewährt.';
+        btnHost.appendChild(h('button.btn-primary.btn-block', { onclick: function () {
+          requestPersistentStorage().then(notePersistResult).then(function (ok) {
+            paint(ok);
+            toast(ok ? 'Dauerhafter Speicher ist aktiv.'
+                     : 'Der Browser hat die Anfrage abgelehnt. Nutzen Sie die App einige Tage regelmäßig und versuchen Sie es erneut.');
+          });
+        } }, 'Dauerhaften Speicher anfordern'));
+      }
+    }
+
+    navigator.storage.persisted().then(paint).catch(function () { paint(false); });
+
+    if (navigator.storage.estimate) {
+      navigator.storage.estimate().then(function (est) {
+        usageLine.textContent = 'Belegter Speicherplatz: ' + fmtBytes(est.usage) +
+          (est.quota ? ' von rund ' + fmtBytes(est.quota) + ' verfügbar' : '');
+      }).catch(function () { usageLine.textContent = 'Belegter Speicherplatz: nicht ermittelbar.'; });
+    } else {
+      usageLine.textContent = 'Belegter Speicherplatz: nicht ermittelbar.';
+    }
+
+    return [stateLine, explain, usageLine, btnHost,
+      h('p.hint', {}, 'Auch mit dauerhaftem Speicher bleibt ein Backup nötig: Gegen ein verlorenes, defektes oder neu aufgesetztes Gerät hilft nur eine Datei außerhalb dieses Browsers.')];
   }
 
   /* ================= App zurücksetzen ================= *
