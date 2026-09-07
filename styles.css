@@ -805,6 +805,13 @@ a.help-link strong::after { content: ' ↗'; font-weight: 400; color: var(--mute
 
 /* ---------- Tabellen ---------- */
 .grading-table, .preview-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+/* Status in der Import-Vorschau: „neu“ zurückhaltend, „schon vorhanden“ und
+   „mehrdeutig“ hervorgehoben – Farbe allein trägt die Aussage nicht, der
+   Text steht immer dabei. */
+.import-status { white-space: nowrap; font-size: 0.8rem; }
+.import-status.status-neu { color: var(--ink-soft); }
+.import-status.status-vorhanden { color: var(--teal); font-weight: 600; }
+.import-status.status-mehrdeutig { color: var(--amber); font-weight: 600; }
 .grading-table th, .grading-table td, .preview-table th, .preview-table td {
   text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line);
 }

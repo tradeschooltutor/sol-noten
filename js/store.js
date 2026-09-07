@@ -540,7 +540,8 @@
         return;
       }
       cls.students.push({ id: s.id, lastName: s.lastName, firstName: s.firstName,
-        company: '', phone: '', email: '', trainerName: '', trainerPhone: '', trainerEmail: '' });
+        company: '', phone: '', email: '', trainerName: '', trainerPhone: '', trainerEmail: '',
+        trainerName2: '', trainerPhone2: '', trainerEmail2: '' });
       summary.added++;
     });
     summary.missing = inspect.plan.studentsMissing;

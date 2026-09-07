@@ -123,7 +123,8 @@
         cls.students.push({
           id: nid('stu'), lastName: n[0], firstName: n[1],
           company: FIRMEN[i % FIRMEN.length],
-          phone: '', email: '', trainerName: '', trainerPhone: '', trainerEmail: ''
+          phone: '', email: '', trainerName: '', trainerPhone: '', trainerEmail: '',
+          trainerName2: '', trainerPhone2: '', trainerEmail2: ''
         });
       });
       st.classes.push(cls);

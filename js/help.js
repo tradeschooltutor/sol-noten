@@ -378,6 +378,25 @@
           body: [
             { t: 'p', v: 'Über die Kurs-Einstellungen, Punkt „Schülerliste bearbeiten“. Namen können Sie einzeln eintragen oder über „Aus Excel einfügen“ als Block übernehmen – letzteres ist bei ganzen Klassen deutlich schneller.' },
             { t: 'p', v: 'Die Liste gehört zur **Klasse**, nicht zum Kurs: Unterrichten Sie dieselbe Klasse in zwei Fächern, pflegen Sie die Liste nur einmal. Neben den Namen können Sie Kontaktdaten und den Ausbildungsbetrieb hinterlegen.' },
+            { t: 'p', v: '**Aus Excel übernehmen (Kopieren & Einfügen)**' },
+            { t: 'p', v: 'Markieren Sie in Excel die Zeilen der Klasse, kopieren Sie sie mit **Strg+C**, tippen Sie in der App auf „Aus Excel einfügen“ und setzen Sie den Inhalt mit **Strg+V** in das große Feld ein. Sie sehen anschließend eine Vorschau und übernehmen die Liste erst danach.' },
+            { t: 'p', v: 'Entscheidend ist allein die **Reihenfolge der Spalten** – wie Sie die Überschriften in Excel benennen, spielt keine Rolle. Eine Kopfzeile wird nur dann übersprungen, wenn in den ersten beiden Spalten das Wort „Nachname“ vorkommt. Erwartet wird diese Reihenfolge:' },
+            { t: 'steps', v: [
+              'Nachname',
+              'Vorname',
+              'Telefon (Schüler/in)',
+              'E-Mail (Schüler/in)',
+              'Ausbildungsbetrieb',
+              'Ausbilder/in bzw. Elternteil',
+              'Telefon (Ausbilder/in bzw. Elternteil)',
+              'E-Mail (Ausbilder/in bzw. Elternteil)',
+              'Ausbilder/in bzw. Elternteil 2',
+              'Telefon (Ausbilder/in bzw. Elternteil 2)',
+              'E-Mail (Ausbilder/in bzw. Elternteil 2)'
+            ] },
+            { t: 'p', v: 'Nur die ersten beiden Spalten sind Pflicht. Jede weitere darf fehlen – Sie können also auch nur Nachname, Vorname und Telefon einfügen. Bleibt eine Spalte in der Mitte leer, lassen Sie sie in Excel trotzdem stehen, damit die nachfolgenden Angaben nicht verrutschen.' },
+            { t: 'p', v: 'Die Vorschau zeigt zu jeder Zeile, ob die Person **neu** ist oder **schon vorhanden**. Sie haben dann zwei Möglichkeiten: „Neue anlegen, vorhandene ergänzen“ legt nur wirklich neue Personen an und füllt bei den übrigen ausschließlich **leere** Felder – bestehende Angaben, Noten, Punkte und Fehlzeiten bleiben unberührt. So können Sie eine aktualisierte Excel-Liste einfügen, um etwa nachgetragene Telefonnummern zu übernehmen. „Alle als neu anlegen“ brauchen Sie nur, wenn tatsächlich zwei Personen desselben Namens in der Klasse sitzen.' },
+            { t: 'note', v: 'Verglichen wird der Name, ohne Rücksicht auf Groß- und Kleinschreibung. Umlaute werden bewusst **nicht** umgeschrieben: „Müller“ und „Mueller“ gelten als zwei Personen. Steht ein Name in der Klasse bereits doppelt, wird die Zeile als **mehrdeutig** übersprungen – tragen Sie sie dann von Hand nach.' },
             { t: 'p', v: 'Wird jemand entfernt, verschwindet die Person aus allen Sitzplänen; erfasste Bewertungen dieser Person werden mit gelöscht.' }
           ]
         },
@@ -386,7 +405,7 @@
           group: 'Klassen & Schuljahre',
           title: 'Wo sehe ich Telefonnummern und Kontaktdaten?',
           body: [
-            { t: 'p', v: 'Auf der Kursseite über den Button **Schülerliste**. Dort stehen alle hinterlegten Angaben untereinander: Telefon und E-Mail der Schüler/innen, der Ausbildungsbetrieb sowie Name, Telefon und E-Mail der Ausbilder/innen bzw. Eltern.' },
+            { t: 'p', v: 'Auf der Kursseite über den Button **Schülerliste**. Dort stehen alle hinterlegten Angaben untereinander: Telefon und E-Mail der Schüler/innen, der Ausbildungsbetrieb sowie Name, Telefon und E-Mail von bis zu zwei Ausbilder/innen bzw. Elternteilen.' },
             { t: 'p', v: 'Die **Telefonnummern sind antippbar**: Ein Tippen übergibt die Nummer an die Telefon-App Ihres Geräts, sodass Sie direkt anrufen können – etwa um bei einer Fehlzeit im Betrieb nachzufragen. Ob dann sofort gewählt oder die Nummer nur eingesetzt wird, entscheidet Ihr Gerät.' },
             { t: 'p', v: 'Die Seite dient nur zum Ansehen. Geändert werden die Daten weiterhin über die Kurs-Einstellungen unter „Schülerliste bearbeiten“.' },
             { t: 'note', v: 'Ist ein Foto hinterlegt, erscheint es oben rechts auf der Karte. Die Angaben stehen nur auf diesem Gerät. Ein Blick auf diese Seite in der Klasse zeigt Fotos und Kontaktdaten offen an – halten Sie den Bildschirm dabei so, dass Unbeteiligte nicht mitlesen.' }

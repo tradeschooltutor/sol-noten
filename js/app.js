@@ -70,7 +70,7 @@
 
   /* ================= App-Start ================= */
 
-  var APP_VERSION = '0.51.6';
+  var APP_VERSION = '0.53.0';
 
   /* Mindestlänge für Datei-Passwörter: Backup, Foto-Sicherung, Kurs- und
      Punkte-Export. Jedes schützt genau eine Datei; ein Treffer kostet diese
@@ -5196,7 +5196,10 @@
               line('Betrieb', stu.company, null),
               line('Ausbilder/in bzw. Eltern', stu.trainerName, null),
               line('Telefon', stu.trainerPhone, 'tel'),
-              line('E-Mail', stu.trainerEmail, 'mail')
+              line('E-Mail', stu.trainerEmail, 'mail'),
+              line('Ausbilder/in bzw. Elternteil 2', stu.trainerName2, null),
+              line('Telefon', stu.trainerPhone2, 'tel'),
+              line('E-Mail', stu.trainerEmail2, 'mail')
             ].filter(Boolean);
             return h('div.card.card-tight.stu-card',
               floatPhoto(stu),
@@ -5262,7 +5265,9 @@
         ['lastName', 'Nachname *'], ['firstName', 'Vorname *'],
         ['phone', 'Telefon Schüler/in'], ['email', 'E-Mail Schüler/in'],
         ['company', 'Ausbildungsbetrieb'], ['trainerName', 'Ausbilder/in bzw. Eltern'],
-        ['trainerPhone', 'Telefon Ausbilder/Eltern'], ['trainerEmail', 'E-Mail Ausbilder/Eltern']
+        ['trainerPhone', 'Telefon Ausbilder/Eltern'], ['trainerEmail', 'E-Mail Ausbilder/Eltern'],
+        ['trainerName2', 'Ausbilder/in bzw. Elternteil 2'],
+        ['trainerPhone2', 'Telefon (2)'], ['trainerEmail2', 'E-Mail (2)']
       ];
       var inputs = {};
       var body = fields.map(function (f) {
@@ -5312,7 +5317,7 @@
         rows: 8
       });
       UI.modal('Schülerliste aus Excel einfügen', [
-        h('p.hint', {}, 'Erwartete Spaltenreihenfolge: Nachname · Vorname · Telefon · E-Mail · Ausbildungsbetrieb · Ausbilder/Eltern · Telefon (Ausbilder/Eltern) · E-Mail (Ausbilder/Eltern). Nachname und Vorname genügen; weitere Spalten dürfen fehlen.'),
+        h('p.hint', {}, 'Erwartete Spaltenreihenfolge: Nachname · Vorname · Telefon · E-Mail · Ausbildungsbetrieb · Ausbilder/Eltern · Telefon (Ausbilder/Eltern) · E-Mail (Ausbilder/Eltern) · Ausbilder/Eltern 2 · Telefon (Ausbilder/Eltern 2) · E-Mail (Ausbilder/Eltern 2). Nachname und Vorname genügen; weitere Spalten dürfen fehlen. Maßgeblich ist die Reihenfolge, nicht die Beschriftung – eine Kopfzeile wird übersprungen, wenn sie „Nachname“ enthält.'),
         ta
       ], [
         { label: 'Abbrechen', value: false },
@@ -5336,29 +5341,103 @@
       });
     }
 
+    /* Vergleichsform für den Namensabgleich: Groß-/Kleinschreibung und
+       überflüssige Leerzeichen werden ignoriert. Umlautvarianten bewusst
+       NICHT zusammengeführt – „Müller“ und „Mueller“ bleiben zwei Personen.
+       Ein Duplikat zu viel sieht man in der Vorschau und kann es beheben;
+       zwei versehentlich verschmolzene Personen ließen sich nicht mehr
+       trennen, weil Noten, Punkte und Fehlzeiten an der Kennung hängen. */
+    function nameKey(last, first) {
+      return (String(last || '').trim() + '|' + String(first || '').trim())
+        .replace(/\s+/g, ' ').toLowerCase();
+    }
+
+    var IMPORT_FIELDS = ['lastName', 'firstName', 'phone', 'email', 'company',
+      'trainerName', 'trainerPhone', 'trainerEmail',
+      'trainerName2', 'trainerPhone2', 'trainerEmail2'];
+
+    function rowToStudent(r) {
+      var o = { id: Store.uid() };
+      IMPORT_FIELDS.forEach(function (f, i) { o[f] = r[i] || ''; });
+      return o;
+    }
+
+    /* Ordnet jede eingefügte Zeile einer vorhandenen Person zu.
+       status: 'neu' | 'vorhanden' | 'mehrdeutig' */
+    function matchRows(rows) {
+      var byKey = {};
+      cls.students.forEach(function (stu) {
+        var k = nameKey(stu.lastName, stu.firstName);
+        (byKey[k] = byKey[k] || []).push(stu);
+      });
+      return rows.map(function (r) {
+        var hits = byKey[nameKey(r[0], r[1])] || [];
+        return {
+          row: r,
+          status: hits.length === 0 ? 'neu' : (hits.length === 1 ? 'vorhanden' : 'mehrdeutig'),
+          target: hits.length === 1 ? hits[0] : null
+        };
+      });
+    }
+
+    /* Ergänzt ausschließlich LEERE Felder. Vorhandene Angaben bleiben
+       unangetastet, und die Kennung bleibt erhalten – damit hängen Noten,
+       Punkte, Fehlzeiten und Sitzplätze weiterhin an derselben Person. */
+    function fillEmptyFields(stu, r) {
+      var filled = 0;
+      IMPORT_FIELDS.forEach(function (f, i) {
+        if (f === 'lastName' || f === 'firstName') return;
+        var val = (r[i] || '').trim();
+        if (val && !(stu[f] || '').trim()) { stu[f] = val; filled++; }
+      });
+      return filled;
+    }
+
     function previewImport(rows) {
+      var matched = matchRows(rows);
+      var counts = { neu: 0, vorhanden: 0, mehrdeutig: 0 };
+      matched.forEach(function (m) { counts[m.status]++; });
+
+      var LABEL = { neu: 'neu', vorhanden: 'schon vorhanden', mehrdeutig: 'mehrdeutig' };
       var table = h('table.preview-table',
-        h('tr', {}, ['Nachname', 'Vorname', 'Betrieb'].map(function (t) { return h('th', {}, t); })),
-        rows.slice(0, 30).map(function (r) {
-          return h('tr', {}, h('td', {}, r[0]), h('td', {}, r[1]), h('td', {}, r[4] || ''));
+        h('tr', {}, ['Nachname', 'Vorname', 'Betrieb', 'Status'].map(function (t) { return h('th', {}, t); })),
+        matched.slice(0, 30).map(function (m) {
+          return h('tr', {},
+            h('td', {}, m.row[0]), h('td', {}, m.row[1]), h('td', {}, m.row[4] || ''),
+            h('td.import-status.status-' + m.status, {}, LABEL[m.status]));
         })
       );
-      UI.modal(rows.length + ' Schüler/innen erkannt',
-        [table, rows.length > 30 ? h('p.hint', {}, '… und ' + (rows.length - 30) + ' weitere.') : null],
+
+      var summary = h('p.hint', {}, counts.neu + ' neu · ' + counts.vorhanden + ' schon vorhanden' +
+        (counts.mehrdeutig ? ' · ' + counts.mehrdeutig + ' mehrdeutig' : ''));
+      var explain = h('p.hint', {}, counts.vorhanden
+        ? 'Bei bereits vorhandenen Personen werden nur leere Felder ergänzt – bestehende Angaben, Noten und Punkte bleiben unverändert.'
+        : 'Alle Zeilen sind neu.');
+      var ambiguous = counts.mehrdeutig
+        ? h('p.help-warn', {}, 'Bei mehrdeutigen Zeilen steht der Name in dieser Klasse bereits mehrfach. Diese Zeilen werden übersprungen, weil nicht erkennbar ist, welche Person gemeint ist – bitte tragen Sie sie von Hand nach.')
+        : null;
+
+      UI.modal(rows.length + ' Zeilen erkannt',
+        [summary, explain, ambiguous, table,
+         rows.length > 30 ? h('p.hint', {}, '… und ' + (rows.length - 30) + ' weitere.') : null],
         [
-          { label: 'Abbrechen', value: false },
-          { label: 'Alle übernehmen', value: true, primary: true }
-        ]).then(function (ok) {
-          if (!ok) return;
-          rows.forEach(function (r) {
-            cls.students.push({
-              id: Store.uid(), lastName: r[0], firstName: r[1],
-              phone: r[2] || '', email: r[3] || '', company: r[4] || '',
-              trainerName: r[5] || '', trainerPhone: r[6] || '', trainerEmail: r[7] || ''
-            });
+          { label: 'Abbrechen', value: 0 },
+          { label: 'Alle als neu anlegen', value: 2 },
+          { label: 'Neue anlegen, vorhandene ergänzen', value: 1, primary: true }
+        ]).then(function (mode) {
+          if (!mode) return;
+          var added = 0, updated = 0, skipped = 0, fields = 0;
+          matched.forEach(function (m) {
+            if (mode === 2) { cls.students.push(rowToStudent(m.row)); added++; return; }
+            if (m.status === 'neu') { cls.students.push(rowToStudent(m.row)); added++; return; }
+            if (m.status === 'mehrdeutig') { skipped++; return; }
+            var n = fillEmptyFields(m.target, m.row);
+            fields += n;
+            if (n) updated++;
           });
           Store.save();
-          toast(rows.length + ' Schüler/innen übernommen.');
+          toast(added + ' angelegt, ' + updated + ' ergänzt' +
+            (skipped ? ', ' + skipped + ' übersprungen' : '') + '.');
           render();
         });
     }
