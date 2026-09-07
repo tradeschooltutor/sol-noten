@@ -52,6 +52,11 @@
   function uid() {
     return Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8);
   }
+  function hhmmNow() {
+    var d = new Date();
+    return ('0' + d.getHours()).slice(-2) + ('0' + d.getMinutes()).slice(-2);
+  }
+
   function todayISO() {
     var d = new Date();
     return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' +
@@ -862,14 +867,21 @@
       return chain.then(function () {
         var payload = { app: 'SOL-Noten', kind: 'photos', v: 1, photos: out,
           count: Object.keys(out).length, exportedAt: new Date().toISOString() };
-        var finish = function (text) {
-          downloadText('SOL-Noten-Fotos-' + todayISO() + '.json', text);
-          state.settings.lastPhotoExport = new Date().toISOString();
-          save();
-        };
+        /* Wie beim Daten-Backup: Ist ein Ordner verbunden und freigegeben,
+           wird direkt dorthin geschrieben, sonst bleibt es beim Download.
+           Der Name trägt Datum UND Uhrzeit, damit zwei Sicherungen desselben
+           Tages einander nicht ersetzen. Mit dem automatischen Ordner-Backup
+           kann es keine Namenskollision geben – das schreibt „…-Backup-…“. */
+        var name = 'SOL-Noten-Fotos-' + todayISO() + '-' + hhmmNow() + '.json';
         return CryptoBox.encrypt(JSON.stringify(payload), password).then(function (env) {
           env.kind = 'photos';
-          finish(JSON.stringify(env));
+          var text = JSON.stringify(env);
+          return writeToBackupFolder(name, text).then(function (written) {
+            if (!written) downloadText(name, text);
+            state.settings.lastPhotoExport = new Date().toISOString();
+            save();
+            return { toFolder: written, fileName: name };
+          });
         });
       });
     });
@@ -957,7 +969,14 @@
     if (!password) {
       return Promise.reject(new Error('Für das Backup ist ein Passwort erforderlich.'));
     }
-    var name = 'SOL-Noten-Backup-' + todayISO() + '.json';
+    /* Eigener Dateiname mit Uhrzeit. Zwei Gründe: Das automatische
+       Ordner-Backup schreibt „SOL-Noten-Backup-<Datum>.json“ und ist mit dem
+       HAUPTSCHLÜSSEL (PIN) verschlüsselt – gleicher Name hieße, dass die
+       beiden Dateien einander am selben Tag überschreiben und beim Einspielen
+       plötzlich die PIN statt des Passworts verlangt wird. Und zwei
+       Passwort-Backups am selben Tag dürfen sich ebenfalls nicht gegenseitig
+       ersetzen. */
+    var name = 'SOL-Noten-Backup-' + todayISO() + '-' + hhmmNow() + '-Manuelles-Backup.json';
     return CryptoBox.encrypt(JSON.stringify(state), password).then(function (env) {
       var text = JSON.stringify(env);
       /* Ist ein Backup-Ordner verbunden, wird direkt dorthin geschrieben.
@@ -1396,7 +1415,12 @@
       if (security.recovery) env.recovery = security.recovery;
       return JSON.stringify(env);
     }).then(function (text) {
-      return backupDirHandle.getFileHandle('SOL-Noten-Backup-' + todayISO() + '.json', { create: true })
+      /* Bewusst OHNE Uhrzeit: Diese Funktion läuft nach jeder Änderung
+         (gedrosselt auf höchstens alle 30 s). Mit Uhrzeit im Namen entstünde
+         pro Unterrichtstag eine dreistellige Zahl von Dateien. Der
+         Tagesname sorgt dafür, dass alle Schreibvorgänge eines Tages
+         dieselbe Datei aktualisieren. */
+      return backupDirHandle.getFileHandle('SOL-Noten-Backup-' + todayISO() + '-Auto-Backup.json', { create: true })
         .then(function (fh) { return fh.createWritable(); })
         .then(function (w) {
           return w.write(text).then(function () { return w.close(); });

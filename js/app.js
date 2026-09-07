@@ -70,7 +70,7 @@
 
   /* ================= App-Start ================= */
 
-  var APP_VERSION = '0.51.3';
+  var APP_VERSION = '0.51.6';
 
   /* Mindestlänge für Datei-Passwörter: Backup, Foto-Sicherung, Kurs- und
      Punkte-Export. Jedes schützt genau eine Datei; ein Treffer kostet diese
@@ -1307,8 +1307,10 @@
         } }
     ]).then(function (ok) {
       if (!ok) return;
-      Store.exportPhotos(pw1.value).then(function () {
-        toast('Verschlüsselte Foto-Sicherung wird gespeichert.');
+      Store.exportPhotos(pw1.value).then(function (res) {
+        toast(res && res.toFolder
+          ? 'Foto-Sicherung im verbundenen Ordner gespeichert: ' + res.fileName
+          : 'Verschlüsselte Foto-Sicherung wird gespeichert.');
         render();
       });
     });
@@ -2005,7 +2007,7 @@
       if (!ok) return;
       Store.exportJSON(pw1.value).then(function (res) {
         toast(res && res.toFolder
-          ? 'Verschlüsseltes Backup im verbundenen Ordner gespeichert.'
+          ? 'Backup im verbundenen Ordner gespeichert: ' + res.fileName
           : 'Verschlüsseltes Backup wird gespeichert.');
         render();
         if (typeof onDone === 'function') onDone();
@@ -7026,15 +7028,18 @@
 
     function askPassword(fileName, isKeyEnvelope, hasRecovery) {
       var label = isKeyEnvelope
-        ? (hasRecovery ? 'PIN / Passwort / Wiederherstellungsschlüssel' : 'PIN / Passwort')
-        : 'Passwort';
+        ? (hasRecovery ? 'App-PIN / App-Passwort / Wiederherstellungsschlüssel' : 'App-PIN / App-Passwort')
+        : 'Beim Export vergebenes Passwort';
       var pw = h('input.input', { type: 'password',
         autocomplete: 'current-password', placeholder: label });
-      return UI.modal('Verschlüsseltes Backup',
+      /* Der Titel benennt die Herkunft der Datei, damit schon die Überschrift
+         sagt, welches Geheimnis gefragt ist – der Erklärtext darunter muss
+         dann nicht mehr allein die Unterscheidung tragen. */
+      return UI.modal(isKeyEnvelope ? 'Automatisches Backup einspielen' : 'Manuelles Backup einspielen',
         [h('p.hint', {}, isKeyEnvelope
           ? 'Die Datei „' + fileName + '“ ist ein automatisches Backup. Bitte geben Sie die PIN bzw. das Passwort ein, die zum Zeitpunkt der Sicherung galten – nach einem PIN-Wechsel also die frühere.' +
             (hasRecovery ? ' Der Wiederherstellungsschlüssel funktioniert ebenfalls.' : '')
-          : 'Die Datei „' + fileName + '“ ist verschlüsselt. Bitte geben Sie das Passwort ein, das Sie beim Export vergeben haben.'),
+          : 'Die Datei „' + fileName + '“ ist ein manuelles Backup. Bitte geben Sie das Passwort ein, das Sie beim Export selbst vergeben haben – nicht die PIN und nicht das App-Passwort dieses Geräts.'),
          h('label.field', h('span.field-label', {}, label), pw)],
         [{ label: 'Abbrechen', value: false }, { label: 'Entschlüsseln', value: true, primary: true }]
       ).then(function (ok) { return ok ? pw.value : null; });
