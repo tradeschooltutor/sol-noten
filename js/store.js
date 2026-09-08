@@ -12,7 +12,10 @@
   var saveTimer = null;
   var listeners = [];
   var backupDirHandle = null;
-  var security = null;      /* {enabled, wrapped, secretKind:'pin'|'password', fail:{count,lockUntil}, autolockMinutes} */
+  var security = null;      /* {enabled, wrapped, secretKind:'pin'|'password', secretLength, fail:{count,lockUntil}, autolockMinutes}
+                               secretLength: Zeichenzahl von PIN/Passwort (kein Geheimnis – ein Angreifer
+                               probiert ohnehin alle Längen). Dient dem Hinweis auf zu kurze Alt-PINs,
+                               der auch nach biometrischem Entsperren erscheinen muss (v0.54). */
   var masterRaw = null;     /* Uint8Array – nur im Arbeitsspeicher der entsperrten App */
   var masterKey = null;     /* CryptoKey */
 
@@ -196,6 +199,7 @@
     }).then(function (key) {
       masterKey = key;
       security.fail = { count: 0, lockUntil: 0 };
+      security.secretLength = String(pin).length; /* Länge einer Alt-PIN nebenbei lernen */
       return saveSecurity();
     }).then(function () {
       return loadDecryptedState();
@@ -277,6 +281,7 @@
       security = {
         enabled: true, wrapped: wrapped,
         secretKind: kind === 'password' ? 'password' : 'pin',
+        secretLength: String(secret).length,
         fail: { count: 0, lockUntil: 0 }, autolockMinutes: 5,
         createdAt: new Date().toISOString()
       };
@@ -295,6 +300,7 @@
     }).then(function (wrapped) {
       security.wrapped = wrapped;
       if (newKind) security.secretKind = newKind === 'password' ? 'password' : 'pin';
+      security.secretLength = String(newSecret).length;
       return saveSecurity();
     });
   }
@@ -302,6 +308,16 @@
   /* 'pin' (Standard, auch für Bestandsnutzer ohne Flag) oder 'password'. */
   function secretKind() {
     return (security && security.secretKind) === 'password' ? 'password' : 'pin';
+  }
+
+  /* PIN-Mindestlänge seit v0.54: 6 Ziffern. Ältere Installationen können
+     eine kürzere PIN tragen; ist die Länge unbekannt (Datensatz von vor v0.54
+     und seither nur biometrisch entsperrt), gilt sie als verdächtig. */
+  var PIN_MIN = 6;
+  function shortPinSuspected() {
+    if (!isEncrypted() || secretKind() !== 'pin') return false;
+    var n = security.secretLength;
+    return typeof n !== 'number' || n < PIN_MIN;
   }
 
   function setAutolock(minutesOrNull) {
@@ -400,6 +416,7 @@
     return CryptoBox.wrapMaster(newSecret, masterRaw).then(function (wrapped) {
       security.wrapped = wrapped;
       security.secretKind = newKind === 'password' ? 'password' : 'pin';
+      security.secretLength = String(newSecret).length;
       security.fail = { count: 0, lockUntil: 0 };
       return saveSecurity();
     });
@@ -971,10 +988,10 @@
       return Promise.reject(new Error('Für das Backup ist ein Passwort erforderlich.'));
     }
     /* Eigener Dateiname mit Uhrzeit. Zwei Gründe: Das automatische
-       Ordner-Backup schreibt „SOL-Noten-Backup-<Datum>.json“ und ist mit dem
-       HAUPTSCHLÜSSEL (PIN) verschlüsselt – gleicher Name hieße, dass die
-       beiden Dateien einander am selben Tag überschreiben und beim Einspielen
-       plötzlich die PIN statt des Passworts verlangt wird. Und zwei
+       Ordner-Backup schreibt „SOL-Noten-Backup-<Datum>-Auto-Backup.json“ und
+       ist mit dem HAUPTSCHLÜSSEL verschlüsselt – gleicher Name hieße, dass
+       die beiden Dateien einander am selben Tag überschreiben und beim
+       Einspielen plötzlich ein anderes Geheimnis verlangt wird. Und zwei
        Passwort-Backups am selben Tag dürfen sich ebenfalls nicht gegenseitig
        ersetzen. */
     var name = 'SOL-Noten-Backup-' + todayISO() + '-' + hhmmNow() + '-Manuelles-Backup.json';
@@ -1380,8 +1397,23 @@
 
   var lastFolderBackup = 0;
   var backupPermissionNeeded = false;
+
+  /* Womit wird die Auto-Backup-Datei geschützt? (Audit-Befund 1, v0.54)
+     'recovery'  – Wiederherstellungsschlüssel (120 Bit), Regelfall
+     'password'  – App-Passwort (mind. 10 Zeichen), wenn kein Schlüssel hinterlegt ist
+     'blocked'   – PIN ohne Wiederherstellungsschlüssel: KEIN Auto-Backup,
+                   weil die Datei sonst genau so leicht zu knacken wäre wie die PIN
+     'off'       – Verschlüsselung nicht aktiv (tritt praktisch nicht auf) */
+  function autoBackupMode() {
+    if (!isEncrypted()) return 'off';
+    if (security.recovery) return 'recovery';
+    if (secretKind() === 'password') return 'password';
+    return 'blocked';
+  }
+
   function autoBackupToFolder() {
     if (!backupDirHandle) return Promise.resolve();
+    if (autoBackupMode() === 'blocked') return Promise.resolve();
     var now = Date.now();
     if (now - lastFolderBackup < 30000) return Promise.resolve(); /* höchstens alle 30 s */
     lastFolderBackup = now;
@@ -1402,18 +1434,29 @@
        kein Auto-Backup (kein Klartext auf der Platte). In der Praxis erzwingt
        die App ohnehin die PIN, bevor Daten erfasst werden. */
     if (!(isEncrypted() && masterKey)) return Promise.resolve();
+    var mode = autoBackupMode();
+    if (mode === 'blocked' || mode === 'off') return Promise.resolve();
     return CryptoBox.encryptWithKey(masterKey, JSON.stringify(state)).then(function (box) {
-      var env = {
-        app: 'SOL-Noten', encrypted: true, v: 2, mode: 'pin-master',
-        wrapped: security.wrapped, iv: box.iv, data: box.data
-      };
-      /* Zweiter Umschlag mit dem Wiederherstellungsschlüssel, sofern
-         vorhanden. Wichtig für den Fall, dass die PIN nach dem Schreiben
-         geändert wird: Die Datei trägt den PIN-Umschlag von DAMALS und wäre
-         sonst nur noch mit der damaligen PIN zu öffnen. Der
-         Wiederherstellungsschlüssel bleibt dagegen über PIN-Wechsel hinweg
-         gültig und rettet die Datei. */
-      if (security.recovery) env.recovery = security.recovery;
+      var env;
+      if (mode === 'recovery') {
+        /* Nur der Wiederherstellungsschlüssel-Umschlag. Der PIN-/Passwort-
+           Umschlag reist bewusst NICHT mit: Eine kopierte Datei (Cloud-
+           Ordner, verlorener Stick) ließe sich sonst durch Raten der PIN
+           offline öffnen – 10 000 Versuche bei vier Ziffern, Minuten auf
+           einem Laptop. Der Schlüssel hat 120 Bit und bleibt über PIN-Wechsel
+           hinweg gültig. */
+        env = {
+          app: 'SOL-Noten', encrypted: true, v: 3, mode: 'recovery-master',
+          recovery: security.recovery, iv: box.iv, data: box.data
+        };
+      } else {
+        /* Passwort-Modus ohne Wiederherstellungsschlüssel: Umschlag mit dem
+           App-Passwort (mind. 10 Zeichen). Altes Format, bleibt lesbar. */
+        env = {
+          app: 'SOL-Noten', encrypted: true, v: 2, mode: 'pin-master',
+          wrapped: security.wrapped, iv: box.iv, data: box.data
+        };
+      }
       return JSON.stringify(env);
     }).then(function (text) {
       /* Bewusst OHNE Uhrzeit: Diese Funktion läuft nach jeder Änderung
@@ -1631,7 +1674,8 @@
     daysSincePhotoExport: daysSincePhotoExport,
     isEncrypted: isEncrypted, isLocked: isLocked, unlock: unlock, lock: lock,
     enableEncryption: enableEncryption,
-    changePin: changePin, secretKind: secretKind, setAutolock: setAutolock, getAutolock: getAutolock,
+    changePin: changePin, secretKind: secretKind, shortPinSuspected: shortPinSuspected,
+    setAutolock: setAutolock, getAutolock: getAutolock,
     biometricsEnabled: biometricsEnabled, enableBiometrics: enableBiometrics,
     disableBiometrics: disableBiometrics, unlockBiometric: unlockBiometric,
     getLockWait: getLockWait, failedAttempts: failedAttempts, factoryReset: factoryReset,
@@ -1642,6 +1686,7 @@
     resetDue: resetDue, resetWaitHours: resetWaitHours,
     folderBackupSupported: folderBackupSupported, chooseBackupFolder: chooseBackupFolder,
     backupFolderNeedsPermission: backupFolderNeedsPermission, regrantBackupPermission: regrantBackupPermission,
+    autoBackupMode: autoBackupMode,
     removeBackupFolder: removeBackupFolder, daysSinceExport: daysSinceExport,
     hasBackupFolder: function () { return !!backupDirHandle; }
   };

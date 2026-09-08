@@ -70,7 +70,7 @@
 
   /* ================= App-Start ================= */
 
-  var APP_VERSION = '0.53.0';
+  var APP_VERSION = '0.54.0';
 
   /* Mindestlänge für Datei-Passwörter: Backup, Foto-Sicherung, Kurs- und
      Punkte-Export. Jedes schützt genau eine Datei; ein Treffer kostet diese
@@ -83,9 +83,17 @@
 
   /* Das App-Passwort ist bewusst strenger: Es schützt sämtliche Schülerdaten
      auf dem Gerät, während die Datei-Passwörter jeweils nur eine einzelne
-     Datei schützen. Die PIN behält ihre eigene Regel (4–8 Ziffern). */
+     Datei schützen. Die PIN behält ihre eigene Regel (PIN_MIN bis PIN_MAX Ziffern). */
   var APP_PW_MIN = 10;
   function appPwTooShort(v) { return String(v || '').length < APP_PW_MIN; }
+
+  /* PIN: 6–8 Ziffern (bis v0.53: 4–8). Vier Ziffern sind gegen Ausprobieren
+     am Sperrbildschirm ausreichend, aber gegen einen Offline-Angriff auf den
+     PIN-Umschlag wertlos (10 000 Versuche). Bestands-PINs mit 4 oder 5 Ziffern
+     entsperren weiterhin; die App weist nach dem Entsperren auf die Änderung
+     hin (Store.shortPinSuspected). */
+  var PIN_MIN = 6, PIN_MAX = 8;
+  var PIN_RANGE_TEXT = PIN_MIN + '–' + PIN_MAX + ' Ziffern';
 
   /* ---------- PWA-Installation ----------
      Chrome/Edge/Android liefern `beforeinstallprompt`: Event abfangen und
@@ -564,6 +572,28 @@
   function afterUnlock() {
     if (!S().settings.bundesland || S().schoolYears.length === 0) go('setup');
     else go('home');
+    maybeShortPinHint();
+  }
+
+  /* Hinweis auf eine zu kurze Alt-PIN (v0.54: Mindestlänge 6). Erscheint
+     einmal je Sitzung nach JEDEM Entsperren – auch biometrisch, denn dabei
+     sieht die App die PIN nicht; deshalb entscheidet die gespeicherte Länge
+     (Store.shortPinSuspected). Bewusst nicht verpflichtend: Wer vor der
+     Klasse steht, darf „Später“ wählen; beim nächsten Start kommt er wieder. */
+  var shortPinHintShown = false;
+  function maybeShortPinHint() {
+    if (shortPinHintShown || Store.isDemo() || !Store.shortPinSuspected()) return;
+    shortPinHintShown = true;
+    UI.modal('PIN verlängern', [
+      h('p', {}, 'Die Mindestlänge der PIN wurde auf ' + PIN_MIN + ' Stellen erhöht. Hat Ihre PIN weniger als ' +
+        PIN_MIN + ' Stellen, ändern Sie sie bitte jetzt.'),
+      h('p.hint', {}, 'Hintergrund: Eine vierstellige PIN lässt sich an einer kopierten Datei in Minuten erraten. ' +
+        'Am Gerät schützt die Wartesperre, eine Datei schützt nur die PIN selbst. ' +
+        'Hat Ihre PIN bereits ' + PIN_MIN + ' oder mehr Stellen, entsperren Sie einmal mit der PIN statt per Fingerabdruck – dann verschwindet dieser Hinweis.')
+    ], [
+      { label: 'Später', value: false },
+      { label: 'PIN jetzt ändern', value: true, primary: true }
+    ]).then(function (ok) { if (ok) changePinFlow(); });
   }
 
   function doLock() {
@@ -7063,24 +7093,33 @@
         var parsed = Store.parseBackup(text);
         var getData;
         if (parsed.keyEnvelope) {
-          getData = askPassword(f.name, true, !!parsed.envelope.recovery).then(function (pin) {
+          var envl = parsed.envelope;
+          var hasWrapped = !!envl.wrapped, hasRecovery = !!envl.recovery;
+          getData = askPassword(f.name, true, hasRecovery, hasWrapped).then(function (pin) {
             if (pin == null) return null;
-            /* Ein automatisches Ordner-Backup trägt den PIN-Umschlag von dem
-               Tag, an dem es geschrieben wurde. Wurde die PIN seitdem
-               geändert, öffnet nur noch die DAMALIGE PIN – oder, falls die
-               Datei ihn mitführt, der Wiederherstellungsschlüssel. Deshalb
-               wird beides versucht, bevor der Fehler gemeldet wird. */
-            return CryptoBox.unwrapMaster(pin, parsed.envelope.wrapped)
+            /* Ein automatisches Ordner-Backup trägt seit v0.54 in der Regel
+               nur den Wiederherstellungsschlüssel-Umschlag. Ältere Dateien
+               (und Passwort-Modus ohne Schlüssel) tragen den PIN-/Passwort-
+               Umschlag vom Tag der Sicherung – nach einem Wechsel öffnet nur
+               das DAMALIGE Geheimnis. Es werden alle vorhandenen Umschläge
+               versucht, bevor der Fehler gemeldet wird. */
+            var attempt = hasWrapped
+              ? CryptoBox.unwrapMaster(pin, envl.wrapped)
+              : Promise.reject(new Error('kein PIN-Umschlag'));
+            return attempt
               .catch(function (e) {
-                if (!parsed.envelope.recovery) throw e;
-                return CryptoBox.unwrapMaster(CryptoBox.normalizeRecoveryKey(pin), parsed.envelope.recovery);
+                if (!hasRecovery) throw e;
+                return CryptoBox.unwrapMaster(CryptoBox.normalizeRecoveryKey(pin), envl.recovery);
               })
               .then(function (raw) { return CryptoBox.importAesKey(raw); })
-              .then(function (key) { return CryptoBox.decryptWithKey(key, parsed.envelope); })
+              .then(function (key) { return CryptoBox.decryptWithKey(key, envl); })
               .then(function (plain) { return JSON.parse(plain); })
-              .catch(function () {
-                throw new Error('Die Datei ließ sich nicht öffnen. Ein automatisches Ordner-Backup verlangt die PIN bzw. das Passwort, die zum Zeitpunkt der Sicherung galten – nicht unbedingt die heutige. Haben Sie PIN oder Passwort seitdem geändert, versuchen Sie die frühere.' +
-                  (parsed.envelope.recovery ? ' Auch der Wiederherstellungsschlüssel öffnet diese Datei.' : ''));
+              .catch(function (e) {
+                if (/unzulässige Verschlüsselungsparameter/.test(e && e.message || '')) throw e;
+                throw new Error(hasWrapped
+                  ? 'Die Datei ließ sich nicht öffnen. Ein automatisches Ordner-Backup verlangt die PIN bzw. das Passwort, die zum Zeitpunkt der Sicherung galten – nicht unbedingt die heutige. Haben Sie PIN oder Passwort seitdem geändert, versuchen Sie die frühere.' +
+                    (hasRecovery ? ' Auch der Wiederherstellungsschlüssel öffnet diese Datei.' : '')
+                  : 'Die Datei ließ sich nicht öffnen. Dieses automatische Backup ist ausschließlich mit dem Wiederherstellungsschlüssel geschützt – PIN und App-Passwort öffnen es nicht. Bitte geben Sie den 24-stelligen Schlüssel ein (Bindestriche und Groß-/Kleinschreibung sind egal).');
               });
           });
         } else if (parsed.encrypted) {
@@ -7105,9 +7144,11 @@
       }).catch(function (e) { UI.modal('Import fehlgeschlagen', h('p', {}, e.message)); });
     });
 
-    function askPassword(fileName, isKeyEnvelope, hasRecovery) {
+    function askPassword(fileName, isKeyEnvelope, hasRecovery, hasWrapped) {
+      if (isKeyEnvelope && hasWrapped === undefined) hasWrapped = true;
       var label = isKeyEnvelope
-        ? (hasRecovery ? 'App-PIN / App-Passwort / Wiederherstellungsschlüssel' : 'App-PIN / App-Passwort')
+        ? (!hasWrapped ? 'Wiederherstellungsschlüssel'
+          : hasRecovery ? 'App-PIN / App-Passwort / Wiederherstellungsschlüssel' : 'App-PIN / App-Passwort')
         : 'Beim Export vergebenes Passwort';
       var pw = h('input.input', { type: 'password',
         autocomplete: 'current-password', placeholder: label });
@@ -7116,8 +7157,10 @@
          dann nicht mehr allein die Unterscheidung tragen. */
       return UI.modal(isKeyEnvelope ? 'Automatisches Backup einspielen' : 'Manuelles Backup einspielen',
         [h('p.hint', {}, isKeyEnvelope
-          ? 'Die Datei „' + fileName + '“ ist ein automatisches Backup. Bitte geben Sie die PIN bzw. das Passwort ein, die zum Zeitpunkt der Sicherung galten – nach einem PIN-Wechsel also die frühere.' +
-            (hasRecovery ? ' Der Wiederherstellungsschlüssel funktioniert ebenfalls.' : '')
+          ? (!hasWrapped
+            ? 'Die Datei „' + fileName + '“ ist ein automatisches Backup und ausschließlich mit dem Wiederherstellungsschlüssel geschützt. Bitte geben Sie den 24-stelligen Schlüssel ein; PIN und App-Passwort öffnen diese Datei nicht.'
+            : 'Die Datei „' + fileName + '“ ist ein automatisches Backup. Bitte geben Sie die PIN bzw. das Passwort ein, die zum Zeitpunkt der Sicherung galten – nach einem PIN-Wechsel also die frühere.' +
+              (hasRecovery ? ' Der Wiederherstellungsschlüssel funktioniert ebenfalls.' : ''))
           : 'Die Datei „' + fileName + '“ ist ein manuelles Backup. Bitte geben Sie das Passwort ein, das Sie beim Export selbst vergeben haben – nicht die PIN und nicht das App-Passwort dieses Geräts.'),
          h('label.field', h('span.field-label', {}, label), pw)],
         [{ label: 'Abbrechen', value: false }, { label: 'Entschlüsseln', value: true, primary: true }]
@@ -7219,6 +7262,7 @@
                   } }, 'Automatisches Backup: Ordner wählen'))
             : h('p.hint', {}, 'Automatisches Backup in einen Ordner wird von diesem Browser nicht unterstützt (z. B. auf iPad/iPhone). Die App erinnert Sie stattdessen alle 7 Tage an ein Backup.')
         ),
+        Store.folderBackupSupported() && Store.hasBackupFolder() ? autoBackupStatusNode() : null,
         Store.folderBackupSupported()
           ? h('p.hint', {}, 'Tipp: Wählen Sie als Backup-Ziel einen Ordner, der von der OneDrive- oder Google-Drive-App synchronisiert wird – dann liegt Ihr (verschlüsseltes) Backup automatisch zusätzlich in der Cloud.')
           : null,
@@ -8179,15 +8223,15 @@
     });
   }
 
-  /* Eingabepaar für den Zugangsschutz: PIN (4–8 Ziffern) oder Passwort (mind. APP_PW_MIN Zeichen).
+  /* Eingabepaar für den Zugangsschutz: PIN (PIN_MIN–PIN_MAX Ziffern) oder Passwort (mind. APP_PW_MIN Zeichen).
      Liefert value(), kind() und validate() für den umgebenden Dialog. */
-  var HINT_PIN = 'Die PIN schützt vor neugierigen Blicken im Alltag. Wer das Gerät häufig mitnimmt, wählt besser das Passwort – es schützt auch bei Verlust oder Diebstahl.';
+  var HINT_PIN = 'Die PIN schützt vor neugierigen Blicken im Alltag – am Gerät, nicht gegen eine kopierte Backup-Datei. Wer das Gerät häufig mitnimmt, wählt besser das Passwort: Es schützt auch bei Verlust oder Diebstahl.';
   var HINT_PW = 'Länge zählt mehr als Sonderzeichen: Eine merkbare Wortfolge wie „roterTraktorImSchnee“ ist stark und lässt sich gut behalten.';
   function secretInputPair(labels) {
     var sel = h('select.input');
-    sel.appendChild(h('option', { value: 'pin' }, 'PIN (4–8 Ziffern) – schneller Zugriff'));
+    sel.appendChild(h('option', { value: 'pin' }, 'PIN (' + PIN_RANGE_TEXT + ') – schneller Zugriff'));
     sel.appendChild(h('option', { value: 'password' }, 'Passwort (mind. ' + APP_PW_MIN + ' Zeichen) – höherer Schutz'));
-    var p1 = h('input.input', { type: 'password', inputmode: 'numeric', autocomplete: 'new-password', placeholder: '4–8 Ziffern' });
+    var p1 = h('input.input', { type: 'password', inputmode: 'numeric', autocomplete: 'new-password', placeholder: PIN_RANGE_TEXT });
     var p2 = h('input.input', { type: 'password', inputmode: 'numeric', autocomplete: 'new-password', placeholder: 'PIN wiederholen' });
     var err = h('p.hint.error-text');
     var hint = h('p.hint', {}, HINT_PIN);
@@ -8201,7 +8245,7 @@
         hint.textContent = HINT_PW;
       } else {
         p1.setAttribute('inputmode', 'numeric'); p2.setAttribute('inputmode', 'numeric');
-        p1.placeholder = '4–8 Ziffern';
+        p1.placeholder = PIN_RANGE_TEXT;
         p2.placeholder = 'PIN wiederholen';
         hint.textContent = HINT_PIN;
       }
@@ -8211,7 +8255,9 @@
       if (sel.value === 'password') {
         if (appPwTooShort(p1.value)) { err.textContent = 'Das Passwort muss mindestens ' + APP_PW_MIN + ' Zeichen lang sein.'; return false; }
       } else {
-        if (!/^\d{4,8}$/.test(p1.value)) { err.textContent = 'Die PIN muss aus 4 bis 8 Ziffern bestehen.'; return false; }
+        if (!new RegExp('^\\d{' + PIN_MIN + ',' + PIN_MAX + '}$').test(p1.value)) {
+          err.textContent = 'Die PIN muss aus ' + PIN_MIN + ' bis ' + PIN_MAX + ' Ziffern bestehen.'; return false;
+        }
       }
       if (p1.value !== p2.value) { err.textContent = 'Die Eingaben stimmen nicht überein.'; return false; }
       return true;
@@ -8258,6 +8304,38 @@
           });
         });
     }
+  }
+
+  /* Statuszeile unter dem Backup-Ordner: Womit ist die Auto-Backup-Datei
+     geschützt? Im Fall 'blocked' (PIN ohne Wiederherstellungsschlüssel) wird
+     kein Auto-Backup geschrieben – das muss sichtbar sein, sonst wiegt sich
+     die Nutzerin in falscher Sicherheit. (Audit-Befund 1, v0.54) */
+  function autoBackupStatusNode() {
+    var mode = Store.autoBackupMode();
+    if (mode === 'recovery') {
+      return h('p.hint', {}, 'Automatisches Backup aktiv – die Datei ist mit dem Wiederherstellungsschlüssel geschützt (nicht mit der PIN). Zum Einspielen auf einem anderen Gerät brauchen Sie diesen Schlüssel.');
+    }
+    if (mode === 'password') {
+      return h('p.hint', {}, 'Automatisches Backup aktiv – die Datei ist mit Ihrem App-Passwort geschützt. Mit einem Wiederherstellungsschlüssel wäre sie zusätzlich unabhängig von späteren Passwortwechseln.');
+    }
+    if (mode === 'blocked') {
+      return h('div.help-warn', {},
+        h('p', {}, h('strong', {}, 'Kein automatisches Backup: '),
+          'Sie nutzen eine PIN und haben keinen Wiederherstellungsschlüssel. Eine mit der PIN geschützte Datei wäre genau so leicht zu knacken wie die PIN selbst – ' +
+          'darum schreibt die App in diesem Zustand bewusst nichts in den Ordner.'),
+        h('p', {}, 'Legen Sie einen Wiederherstellungsschlüssel an (empfohlen) oder wechseln Sie zum App-Passwort; das automatische Backup startet dann sofort.'),
+        h('div.actions-col',
+          h('button.btn-primary.btn-block', { onclick: function () { newRecoveryKeyFlow(function (done) {
+            if (!done) return;
+            /* Erste Datei sofort schreiben; ohne noch gültige Nutzergeste
+               liefert requestPermission 'prompt' – dann setzt save() über
+               autoBackupToFolder das Freigabe-Banner auf der Startseite. */
+            Store.regrantBackupPermission().then(function () { Store.save(); render(); });
+          }); } },
+            'Wiederherstellungsschlüssel anlegen'),
+          h('button.btn-plain.btn-block', { onclick: changePinFlow }, 'Zum App-Passwort wechseln')));
+    }
+    return null;
   }
 
   /* 'PIN' oder 'Passwort' – je nach aktivem Modus, für Beschriftungen. */

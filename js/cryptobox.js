@@ -25,6 +25,26 @@
     return u;
   }
 
+  /* Grenzen für KDF-Parameter, die aus einer DATEI stammen (Audit-Befund 3):
+     Eine präparierte Datei könnte die Rundenzahl auf Milliarden setzen (die
+     App hinge stundenlang in der Schlüsselableitung) oder auf 1 (ein schwacher
+     Umschlag würde unbemerkt akzeptiert). Eigene Dateien schreiben stets
+     ITERATIONS; alles außerhalb des Korridors ist keine SOL-Noten-Datei. */
+  var KDF_MIN_ITERATIONS = 100000;
+  var KDF_MAX_ITERATIONS = 5000000;
+  var KDF_SALT_BYTES = 16;
+
+  function checkKdf(kdf) {
+    var it = kdf && kdf.iterations;
+    var saltLen = 0;
+    try { saltLen = kdf && kdf.salt ? unb64(kdf.salt).length : 0; } catch (e) { saltLen = 0; }
+    if (typeof it !== 'number' || !isFinite(it) || it !== Math.floor(it) ||
+        it < KDF_MIN_ITERATIONS || it > KDF_MAX_ITERATIONS || saltLen !== KDF_SALT_BYTES) {
+      throw new Error('Die Datei hat unzulässige Verschlüsselungsparameter und wurde abgelehnt.');
+    }
+    return it;
+  }
+
   function deriveKey(password, salt, iterations) {
     return subtle.importKey('raw', new TextEncoder().encode(password), 'PBKDF2', false, ['deriveKey'])
       .then(function (base) {
@@ -56,10 +76,12 @@
   /* Entschlüsselt einen Umschlag. Promise -> Klartext.
      Wirft bei falschem Passwort oder beschädigter Datei. */
   function decrypt(envelope, password) {
+    var iter;
+    try { iter = checkKdf(envelope && envelope.kdf); }
+    catch (e) { return Promise.reject(e); }
     var salt = unb64(envelope.kdf.salt);
     var iv = unb64(envelope.iv);
     var data = unb64(envelope.data);
-    var iter = envelope.kdf.iterations || ITERATIONS;
     return deriveKey(password, salt, iter).then(function (key) {
       return subtle.decrypt({ name: 'AES-GCM', iv: iv }, key, data);
     }).then(function (plain) {
@@ -113,7 +135,10 @@
 
   /* Hauptschlüssel mit der PIN entpacken -> Uint8Array (wirft bei falscher PIN) */
   function unwrapMaster(pin, wrapped) {
-    return deriveKey(pin, unb64(wrapped.kdf.salt), wrapped.kdf.iterations || ITERATIONS)
+    var iter;
+    try { iter = checkKdf(wrapped && wrapped.kdf); }
+    catch (e) { return Promise.reject(e); }
+    return deriveKey(pin, unb64(wrapped.kdf.salt), iter)
       .then(function (pinKey) {
         return subtle.decrypt({ name: 'AES-GCM', iv: unb64(wrapped.iv) }, pinKey, unb64(wrapped.data));
       })
@@ -121,21 +146,24 @@
       .catch(function () { throw new Error('Falsche PIN.'); });
   }
 
-  function isKeyEnvelope(obj) { /* Auto-Backup, verschlüsselt mit dem Hauptschlüssel */
+  /* Auto-Backup, verschlüsselt mit dem Hauptschlüssel. Der Hauptschlüssel
+     liegt in der Datei in einem oder zwei Umschlägen:
+     - mode 'pin-master'      (bis v0.53): `wrapped` (PIN/Passwort), optional `recovery`
+     - mode 'recovery-master' (ab v0.54):  nur `recovery` – kein PIN-Umschlag mehr,
+       damit eine kopierte Datei nicht per PIN-Raten zu öffnen ist (Audit-Befund 1). */
+  function isKeyEnvelope(obj) {
     return !!(obj && obj.app === 'SOL-Noten' && obj.encrypted === true &&
-      obj.mode === 'pin-master' && obj.wrapped && obj.iv && obj.data);
+      (obj.mode === 'pin-master' || obj.mode === 'recovery-master') &&
+      (obj.wrapped || obj.recovery) && obj.iv && obj.data);
   }
 
   /* ---------- Wiederherstellungsschlüssel ---------- *
    * Der Schlüssel ist ein zweites Geheimnis, mit dem derselbe Hauptschlüssel
    * ein weiteres Mal verpackt wird (genau wie bei PIN und Biometrie). Er wird
    * nirgends im Klartext gespeichert – nur der damit verpackte Hauptschlüssel.
-   * Alphabet ohne 0/O, 1/I/L: 32 Zeichen, also exakt 5 Bit je Zeichen und
-   * keine Verzerrung beim Ziehen aus einem Zufallsbyte (256 / 32 = 8).
-   * 24 Zeichen = 120 Bit – Erraten ist ausgeschlossen. */
-  /* Alphabet: Crockford-Base32 – ohne I, L, O und U. Genau 32 Zeichen, also
-     5 Bit je Zeichen und keine Verzerrung beim Ziehen aus einem Zufallsbyte
-     (256 / 32 = 8). 24 Zeichen = 120 Bit – Erraten ist ausgeschlossen. */
+   * Alphabet: Crockford-Base32 ohne I, L, O und U. Genau 32 Zeichen, also
+   * 5 Bit je Zeichen und keine Verzerrung beim Ziehen aus einem Zufallsbyte
+   * (256 / 32 = 8). 24 Zeichen = 120 Bit – Erraten ist ausgeschlossen. */
   var RECOVERY_ALPHABET = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
   var RECOVERY_LENGTH = 24;
 
@@ -292,7 +320,7 @@
 
   return {
     supported: supported, encrypt: encrypt, decrypt: decrypt,
-    isEncryptedEnvelope: isEncryptedEnvelope, isKeyEnvelope: isKeyEnvelope,
+    isEncryptedEnvelope: isEncryptedEnvelope, isKeyEnvelope: isKeyEnvelope, checkKdf: checkKdf,
     generateMasterRaw: generateMasterRaw, importAesKey: importAesKey,
     encryptWithKey: encryptWithKey, decryptWithKey: decryptWithKey,
     wrapMaster: wrapMaster, unwrapMaster: unwrapMaster,
