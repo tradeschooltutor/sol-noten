@@ -1,5 +1,5 @@
 /* SOL-Noten – Service Worker: macht die App vollständig offline nutzbar. */
-var CACHE = 'sol-noten-v0.56.0';
+var CACHE = 'sol-noten-v0.56.1';
 var FILES = [
   './',
   'index.html',
@@ -22,10 +22,22 @@ var FILES = [
   'icons/icon-512-maskable-v2.png'
 ];
 
+/* `cache: 'reload'` ist hier NICHT optional (Fehler bis v0.56.0):
+   `addAll` holt die Dateien sonst über den normalen HTTP-Cache des Browsers.
+   GitHub Pages liefert mit `Cache-Control: max-age=600` aus – hatte das Gerät
+   die App in den zehn Minuten davor offen, legt der neue Service Worker die
+   ALTEN Dateien unter dem NEUEN Cache-Namen ab. Da `install` je Cache-Namen
+   nur einmal läuft, bleibt dieser Zustand dauerhaft: Die App meldet die neue
+   Version, führt aber weiter alten Code aus, und kein Neustart hilft.
+   Beobachtet in Edge (Windows) und Chrome (Android); Safari entkam nur,
+   weil sein HTTP-Cache die alten Dateien nicht mehr vorrätig hatte. */
 self.addEventListener('install', function (e) {
   e.waitUntil(
-    caches.open(CACHE).then(function (c) { return c.addAll(FILES); })
-      .then(function () { return self.skipWaiting(); })
+    caches.open(CACHE).then(function (c) {
+      return c.addAll(FILES.map(function (u) {
+        return new Request(u, { cache: 'reload' });
+      }));
+    }).then(function () { return self.skipWaiting(); })
   );
 });
 

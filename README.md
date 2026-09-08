@@ -1,4 +1,4 @@
-# SOL-Noten (Version 0.56.0 – Beta)
+# SOL-Noten (Version 0.56.1 – Beta)
 
 Notenverwaltung zum selbstorganisierten Lernen (SOL) als Progressive Web App (PWA).
 Basierend auf der Excel-Notenverwaltung V8.0 von Andreas Vandelaar.
@@ -50,6 +50,8 @@ Basierend auf der Excel-Notenverwaltung V8.0 von Andreas Vandelaar.
 ## Hinweis bei Updates
 
 Bei jeder neuen Version die Versionsnummer in `sw.js` (Zeile `var CACHE = 'sol-noten-v…'`) erhöhen, damit installierte Apps die neuen Dateien laden.
+
+**Warum `cache: 'reload'` im Install-Handler steht (Fehler bis v0.56.0):** `cache.addAll(FILES)` holt die Dateien über den normalen HTTP-Cache des Browsers. GitHub Pages liefert mit `Cache-Control: max-age=600`; hatte das Gerät die App in den zehn Minuten davor offen, schreibt der neue Service Worker die **alten** Dateien unter den **neuen** Cache-Namen. Weil `install` je Cache-Namen nur einmal läuft, ist der Zustand selbsthaltend: Die App liefert dauerhaft alten Code aus, `sw.js` meldet aber die neue Version, und weder App- noch Geräteneustart helfen. Beobachtet in Edge (Windows) und Chrome (Android) bei 0.56.0; Safari auf iPad und Mac entkam nur, weil sein HTTP-Cache die alten Dateien nicht mehr vorrätig hatte. Seit 0.56.1 werden die Dateien über `new Request(u, { cache: 'reload' })` am HTTP-Cache vorbei geholt. Ein Gerät, das in diesem Zustand feststeckt, wird durch den nächsten Versionsbump befreit – `install` läuft dann erneut. **Websitedaten löschen ist keine Abhilfe, sondern Datenverlust:** Damit ginge die IndexedDB mit allen Schülerdaten verloren.
 
 ## Datenschutz
 
