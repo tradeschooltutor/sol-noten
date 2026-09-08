@@ -70,7 +70,7 @@
 
   /* ================= App-Start ================= */
 
-  var APP_VERSION = '0.55.0';
+  var APP_VERSION = '0.55.1';
 
   /* Mindestlänge für Datei-Passwörter: Backup, Foto-Sicherung, Kurs- und
      Punkte-Export. Jedes schützt genau eine Datei; ein Treffer kostet diese
@@ -1376,11 +1376,16 @@
       }
     }
 
+    /* Ein Punkt je eingegebener Ziffer – KEINE Platzhalter. Bis 0.55 standen
+       hier mindestens vier leere Punkte; das las sich wie „die PIN hat vier
+       Stellen“ (falsch, seit 0.54 sind es mindestens sechs) und verriet einem
+       Angreifer, der das gesperrte Gerät in die Hand bekommt, eine Vorgabe.
+       Im Ruhezustand bleibt die Zeile jetzt leer und sagt nichts über die
+       Länge; `min-height` in .pin-dots hält den Platz frei, damit die
+       Tastatur beim Tippen nicht springt. */
     function refreshDots() {
       UI.clear(dots);
-      for (var i = 0; i < Math.max(pin.length, 4); i++) {
-        dots.appendChild(h('span.pin-dot' + (i < pin.length ? '.filled' : '')));
-      }
+      for (var i = 0; i < pin.length; i++) dots.appendChild(h('span.pin-dot.filled'));
     }
 
     function waitCountdown() {
