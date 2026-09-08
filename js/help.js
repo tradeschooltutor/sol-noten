@@ -596,6 +596,23 @@
           ]
         },
         {
+          id: 'faq-mehrere-geraete',
+          group: 'Gerät & Technik',
+          title: 'Ich nutze SOL-Noten auf mehreren Geräten – worauf muss ich achten?',
+          body: [
+            { t: 'p', v: 'Das geht, verlangt aber eine klare Regel. SOL-Noten gleicht **nichts** zwischen Geräten ab: Es gibt keinen Server, und das ist Absicht. Ein {{Backup}} einzuspielen ist deshalb kein Zusammenführen, sondern ein **Ersetzen** – der gesamte Bestand des Zielgeräts weicht dem Inhalt der Datei.' },
+            { t: 'warn', v: 'Daraus folgt die wichtigste Regel: **Tragen Sie an einem Tag immer nur auf einem Gerät ein.** Haben Sie vormittags am Smartphone und nachmittags am PC etwas erfasst, geht beim Einspielen zwangsläufig eine der beiden Seiten verloren – vollständig und ohne Rückfrage. Legen Sie ein Gerät als das führende fest; die anderen ziehen nur nach.' },
+            { t: 'p', v: 'Jedes Gerät hat einen **eigenen** {{Wiederherstellungsschlüssel}}. Die Auto-Backup-Datei eines Geräts lässt sich nur mit dem Schlüssel **dieses** Geräts öffnen – der Schlüssel des Geräts, an dem Sie gerade sitzen, hilft nicht. Notieren Sie deshalb zu jedem Schlüssel, zu welchem Gerät er gehört.' },
+            { t: 'p', v: 'Damit Sie das erkennen, trägt jede Auto-Backup-Datei den **Gerätenamen** – im Dateinamen und in der Datei selbst. Beim Einspielen nennt die App das Gerät im Dialog. Den Namen legen Sie in den [[app:settings|Globalen Einstellungen]] unter „Datensicherung“ fest; er wird beim Einrichten des Backup-Ordners einmal abgefragt.' },
+            { t: 'steps', v: [
+              'Sichern beide Geräte in denselben Ordner (etwa einen von OneDrive synchronisierten), entstehen zwei Dateien mit verschiedenen Namen – sie überschreiben einander nicht.',
+              'Ohne Gerätenamen hießen die Dateien gleich. Dann überschreibt das zuletzt schreibende Gerät die Sicherung des anderen, und übrig bleibt womöglich eine Datei, die das danebenliegende Gerät gar nicht öffnen kann.',
+              'Der Gerätename steht **unverschlüsselt** im Dateinamen. Wählen Sie eine sachliche Bezeichnung wie „Dienst-Laptop“, nicht Ihren Namen.'
+            ] },
+            { t: 'note', v: 'Sollen einzelne Kurse tatsächlich zwischen zwei Personen oder Geräten zusammengeführt statt ersetzt werden, ist der Weg über das Teamteaching der richtige: Er überträgt gezielt Punkte und Notizen und lässt vorhandene Daten stehen.' }
+          ]
+        },
+        {
           id: 'faq-offline',
           group: 'Gerät & Technik',
           title: 'Funktioniert die App ohne Internet?',

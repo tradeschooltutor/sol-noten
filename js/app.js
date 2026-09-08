@@ -70,7 +70,7 @@
 
   /* ================= App-Start ================= */
 
-  var APP_VERSION = '0.54.0';
+  var APP_VERSION = '0.55.0';
 
   /* Mindestlänge für Datei-Passwörter: Backup, Foto-Sicherung, Kurs- und
      Punkte-Export. Jedes schützt genau eine Datei; ein Treffer kostet diese
@@ -7095,7 +7095,7 @@
         if (parsed.keyEnvelope) {
           var envl = parsed.envelope;
           var hasWrapped = !!envl.wrapped, hasRecovery = !!envl.recovery;
-          getData = askPassword(f.name, true, hasRecovery, hasWrapped).then(function (pin) {
+          getData = askPassword(f.name, true, hasRecovery, hasWrapped, envl.device).then(function (pin) {
             if (pin == null) return null;
             /* Ein automatisches Ordner-Backup trägt seit v0.54 in der Regel
                nur den Wiederherstellungsschlüssel-Umschlag. Ältere Dateien
@@ -7119,7 +7119,9 @@
                 throw new Error(hasWrapped
                   ? 'Die Datei ließ sich nicht öffnen. Ein automatisches Ordner-Backup verlangt die PIN bzw. das Passwort, die zum Zeitpunkt der Sicherung galten – nicht unbedingt die heutige. Haben Sie PIN oder Passwort seitdem geändert, versuchen Sie die frühere.' +
                     (hasRecovery ? ' Auch der Wiederherstellungsschlüssel öffnet diese Datei.' : '')
-                  : 'Die Datei ließ sich nicht öffnen. Dieses automatische Backup ist ausschließlich mit dem Wiederherstellungsschlüssel geschützt – PIN und App-Passwort öffnen es nicht. Bitte geben Sie den 24-stelligen Schlüssel ein (Bindestriche und Groß-/Kleinschreibung sind egal).');
+                  : 'Die Datei ließ sich nicht öffnen. Dieses automatische Backup ist ausschließlich mit dem Wiederherstellungsschlüssel ' +
+                    (envl.device ? 'des Geräts „' + String(envl.device).slice(0, 40) + '“' : 'des Geräts, das es geschrieben hat,') +
+                    ' geschützt – PIN, App-Passwort und der Schlüssel dieses Geräts öffnen es nicht. Bitte geben Sie den 24-stelligen Schlüssel jenes Geräts ein (Bindestriche und Groß-/Kleinschreibung sind egal).');
               });
           });
         } else if (parsed.encrypted) {
@@ -7144,8 +7146,12 @@
       }).catch(function (e) { UI.modal('Import fehlgeschlagen', h('p', {}, e.message)); });
     });
 
-    function askPassword(fileName, isKeyEnvelope, hasRecovery, hasWrapped) {
+    function askPassword(fileName, isKeyEnvelope, hasRecovery, hasWrapped, device) {
       if (isKeyEnvelope && hasWrapped === undefined) hasWrapped = true;
+      /* Der Gerätename sagt, WESSEN Wiederherstellungsschlüssel gebraucht wird:
+         Jedes Gerät hat einen eigenen Hauptschlüssel und damit einen eigenen
+         Schlüssel. Steht er in der Datei, wird er hier genannt. */
+      var dev = device ? String(device).slice(0, 40) : '';
       var label = isKeyEnvelope
         ? (!hasWrapped ? 'Wiederherstellungsschlüssel'
           : hasRecovery ? 'App-PIN / App-Passwort / Wiederherstellungsschlüssel' : 'App-PIN / App-Passwort')
@@ -7156,9 +7162,12 @@
          sagt, welches Geheimnis gefragt ist – der Erklärtext darunter muss
          dann nicht mehr allein die Unterscheidung tragen. */
       return UI.modal(isKeyEnvelope ? 'Automatisches Backup einspielen' : 'Manuelles Backup einspielen',
-        [h('p.hint', {}, isKeyEnvelope
+        [dev ? h('p', {}, 'Diese Datei wurde auf dem Gerät ', h('strong', {}, dev), ' erstellt.') : null,
+         h('p.hint', {}, isKeyEnvelope
           ? (!hasWrapped
-            ? 'Die Datei „' + fileName + '“ ist ein automatisches Backup und ausschließlich mit dem Wiederherstellungsschlüssel geschützt. Bitte geben Sie den 24-stelligen Schlüssel ein; PIN und App-Passwort öffnen diese Datei nicht.'
+            ? 'Die Datei „' + fileName + '“ ist ein automatisches Backup und ausschließlich mit dem Wiederherstellungsschlüssel ' +
+              (dev ? 'des Geräts „' + dev + '“' : 'des Geräts, das sie geschrieben hat,') +
+              ' geschützt. Jedes Gerät hat einen eigenen Schlüssel – der Schlüssel dieses Geräts öffnet die Datei nicht. Bitte geben Sie den 24-stelligen Schlüssel ein; PIN und App-Passwort öffnen sie ebenfalls nicht.'
             : 'Die Datei „' + fileName + '“ ist ein automatisches Backup. Bitte geben Sie die PIN bzw. das Passwort ein, die zum Zeitpunkt der Sicherung galten – nach einem PIN-Wechsel also die frühere.' +
               (hasRecovery ? ' Der Wiederherstellungsschlüssel funktioniert ebenfalls.' : ''))
           : 'Die Datei „' + fileName + '“ ist ein manuelles Backup. Bitte geben Sie das Passwort ein, das Sie beim Export selbst vergeben haben – nicht die PIN und nicht das App-Passwort dieses Geräts.'),
@@ -7257,6 +7266,7 @@
                   } }, 'Automatisches Backup beenden (Ordner: verbunden)')
                 : h('button.btn-plain.btn-block', { onclick: function () {
                     Store.chooseBackupFolder()
+                      .then(function () { return askDeviceNameIfMissing(); })
                       .then(function () { toast('Automatisches Backup eingerichtet.'); render(); })
                       .catch(function () {});
                   } }, 'Automatisches Backup: Ordner wählen'))
@@ -8306,6 +8316,75 @@
     }
   }
 
+  /* ---------- Gerätename ----------
+     Vorschlag für das Eingabefeld. Vollautomatisch geht es nicht: Das
+     Gerätemodell steht seit der User-Agent-Reduction nicht mehr im
+     User-Agent-String, sondern nur noch als „High-Entropy Hint“ über
+     navigator.userAgentData – und dort liefert es ausschließlich Android
+     einen Wert; auf PC und Mac ist `model` leer, Firefox und Safari kennen
+     die Schnittstelle gar nicht. Deshalb: raten, vorschlagen, überschreibbar
+     lassen. Rückgabe: Promise -> String (ggf. leer). */
+  function guessDeviceName() {
+    var uad = navigator.userAgentData;
+    var fallback = guessPlatformName();
+    if (!uad || typeof uad.getHighEntropyValues !== 'function') return Promise.resolve(fallback);
+    return uad.getHighEntropyValues(['model'])
+      .then(function (v) { return (v && v.model) ? String(v.model).trim() : fallback; })
+      .catch(function () { return fallback; });
+  }
+
+  function guessPlatformName() {
+    var uad = navigator.userAgentData;
+    var p = (uad && uad.platform) || navigator.platform || '';
+    var ua = navigator.userAgent || '';
+    if (/iPad/.test(ua) || (/Mac/.test(p) && navigator.maxTouchPoints > 1)) return 'iPad';
+    if (/iPhone/.test(ua)) return 'iPhone';
+    if (/Android/i.test(p) || /Android/i.test(ua)) return 'Android-Gerät';
+    if (/Win/i.test(p)) return 'Windows-PC';
+    if (/Mac/i.test(p)) return 'Mac';
+    if (/CrOS/i.test(p) || /CrOS/i.test(ua)) return 'Chromebook';
+    if (/Linux/i.test(p)) return 'Linux-PC';
+    return '';
+  }
+
+  /* Eingabefeld „Name dieses Geräts“. Ist noch keiner gesetzt, wird der
+     Vorschlag eingetragen, aber NICHT gespeichert – gespeichert wird erst,
+     wenn die Nutzerin das Feld verlässt oder bestätigt. */
+  function deviceNameField() {
+    var input = h('input.input', { type: 'text', maxlength: 40,
+      value: Store.deviceName(), placeholder: 'z. B. Dienst-Laptop' });
+    if (!Store.deviceName()) {
+      guessDeviceName().then(function (g) { if (g && !input.value) input.value = g; });
+    }
+    function commit() {
+      var v = input.value.trim();
+      if (v === Store.deviceName()) return;
+      Store.setDeviceName(v);
+      render();
+    }
+    input.addEventListener('change', commit);
+    input.addEventListener('blur', commit);
+    return input;
+  }
+
+  /* Einmalige Nachfrage beim Einrichten des Ordners: Ohne Gerätenamen
+     schreiben zwei Geräte in einen gemeinsamen Cloud-Ordner unter demselben
+     Dateinamen und überschreiben einander. */
+  function askDeviceNameIfMissing() {
+    if (Store.deviceName()) return Promise.resolve();
+    var input = h('input.input', { type: 'text', maxlength: 40, placeholder: 'z. B. Dienst-Laptop' });
+    return guessDeviceName().then(function (g) {
+      if (g) input.value = g;
+      return UI.modal('Name dieses Geräts', [
+        h('p', {}, 'Die Auto-Backup-Datei trägt den Gerätenamen im Dateinamen. Nutzen Sie SOL-Noten auf mehreren Geräten und sichern in denselben (etwa über OneDrive synchronisierten) Ordner, überschreiben sich die Dateien sonst gegenseitig.'),
+        h('p.hint', {}, 'Der Name steht unverschlüsselt im Dateinamen – wählen Sie deshalb eine sachliche Bezeichnung ohne Ihren Namen.'),
+        h('label.field', h('span.field-label', {}, 'Name dieses Geräts'), input)
+      ], [{ label: 'Übernehmen', value: true, primary: true }]).then(function () {
+        if (input.value.trim()) Store.setDeviceName(input.value);
+      });
+    });
+  }
+
   /* Statuszeile unter dem Backup-Ordner: Womit ist die Auto-Backup-Datei
      geschützt? Im Fall 'blocked' (PIN ohne Wiederherstellungsschlüssel) wird
      kein Auto-Backup geschrieben – das muss sichtbar sein, sonst wiegt sich
@@ -8313,10 +8392,18 @@
   function autoBackupStatusNode() {
     var mode = Store.autoBackupMode();
     if (mode === 'recovery') {
-      return h('p.hint', {}, 'Automatisches Backup aktiv – die Datei ist mit dem Wiederherstellungsschlüssel geschützt (nicht mit der PIN). Zum Einspielen auf einem anderen Gerät brauchen Sie diesen Schlüssel.');
+      return h('div', {},
+        h('p.hint', {}, 'Automatisches Backup aktiv – die Datei ist mit dem Wiederherstellungsschlüssel ' +
+          'dieses Geräts geschützt (nicht mit der PIN). Jedes Gerät hat einen eigenen Schlüssel: ' +
+          'Zum Einspielen auf einem anderen Gerät brauchen Sie den Schlüssel des Geräts, das die Datei geschrieben hat.'),
+        h('p.hint', {}, 'Dateiname: ', h('strong', {}, Store.autoBackupFileName())),
+        deviceNameRow());
     }
     if (mode === 'password') {
-      return h('p.hint', {}, 'Automatisches Backup aktiv – die Datei ist mit Ihrem App-Passwort geschützt. Mit einem Wiederherstellungsschlüssel wäre sie zusätzlich unabhängig von späteren Passwortwechseln.');
+      return h('div', {},
+        h('p.hint', {}, 'Automatisches Backup aktiv – die Datei ist mit Ihrem App-Passwort geschützt. Mit einem Wiederherstellungsschlüssel wäre sie zusätzlich unabhängig von späteren Passwortwechseln.'),
+        h('p.hint', {}, 'Dateiname: ', h('strong', {}, Store.autoBackupFileName())),
+        deviceNameRow());
     }
     if (mode === 'blocked') {
       return h('div.help-warn', {},
@@ -8336,6 +8423,15 @@
           h('button.btn-plain.btn-block', { onclick: changePinFlow }, 'Zum App-Passwort wechseln')));
     }
     return null;
+  }
+
+  /* Gerätename samt Begründung – erscheint unter dem Dateinamen. */
+  function deviceNameRow() {
+    return h('div', {},
+      h('label.field', h('span.field-label', {}, 'Name dieses Geräts'), deviceNameField()),
+      h('p.hint', {}, Store.deviceName()
+        ? 'Der Name steht im Dateinamen und in der Datei. So überschreiben sich die Auto-Backups mehrerer Geräte nicht, auch nicht in einem gemeinsamen Cloud-Ordner – und beim Einspielen sehen Sie, von welchem Gerät die Datei stammt.'
+        : 'Ohne Gerätenamen heißen die Auto-Backups aller Geräte gleich. Sichern zwei Geräte in denselben synchronisierten Ordner, überschreiben sie einander. Der Name steht unverschlüsselt im Dateinamen – wählen Sie eine sachliche Bezeichnung ohne Ihren Namen.'));
   }
 
   /* 'PIN' oder 'Passwort' – je nach aktivem Modus, für Beschriftungen. */

@@ -78,7 +78,8 @@
         theme: 'petrol',
         lastExport: null,
         lastPhotoExport: null,
-        autoBackupFolder: false
+        autoBackupFolder: false,
+        deviceName: ''    /* Name dieses Geräts, siehe deviceName()/setDeviceName() */
       },
       absences: [],      /* {id, courseId, studentId, date, quarter} */
       schoolYears: [],   /* {id, name, startDate, holidays[], quarters[4], holidaySource} */
@@ -105,6 +106,7 @@
     if (s && s.settings) {
       if (!s.settings.gradingPct) s.settings.gradingPct = Calc.DEFAULT_GRADING_PCT.slice();
       if (!s.settings.theme) s.settings.theme = 'petrol';
+      if (typeof s.settings.deviceName !== 'string') s.settings.deviceName = ''; /* Gerätename (ab 0.55) */
       if (!Array.isArray(s.absences)) s.absences = [];
       if (!Array.isArray(s.uploadTallies)) s.uploadTallies = [];
       if (!Array.isArray(s.notes)) s.notes = []; /* Kursnotizen (ab 0.20) */
@@ -1395,6 +1397,39 @@
       .then(function () { save(); });
   }
 
+  /* ---------- Gerätename ---------- *
+     Zwei Geräte, die ihr Auto-Backup in denselben (cloud-synchronisierten)
+     Ordner schreiben, würden einander sonst überschreiben: Der Dateiname
+     enthielt bis 0.54 nur das Datum. Das ist mehr als ein Namensproblem –
+     jede Datei ist mit dem HAUPTSCHLÜSSEL IHRES Geräts verschlüsselt und nur
+     mit dessen Wiederherstellungsschlüssel zu öffnen. Die überlebende Datei
+     wäre also womöglich die, die das danebenliegende Gerät nicht öffnen kann.
+     Deshalb steht der Gerätename im Dateinamen (verhindert die Kollision)
+     UND im Umschlag (überlebt das Umbenennen der Datei). */
+  function deviceName() {
+    return (state && state.settings && state.settings.deviceName) || '';
+  }
+  function setDeviceName(name) {
+    if (!state || !state.settings) return;
+    state.settings.deviceName = String(name || '').trim().slice(0, 40);
+    save();
+  }
+
+  /* Für den Dateinamen entschärft: nur Wortzeichen, Umlaute und Bindestrich.
+     Gleiche Regel wie in Share.courseFileName, damit Dateinamen überall nach
+     demselben Muster entstehen. */
+  function safeDeviceName(name) {
+    return String(name || '').replace(/[^\wäöüÄÖÜß-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 30);
+  }
+
+  /* Dateiname des automatischen Ordner-Backups. Der Gerätename steht als
+     letzter Teil vor der Endung; ohne gesetzten Namen bleibt es beim Muster
+     bis 0.54, damit Bestandsdateien weiter aktualisiert werden. */
+  function autoBackupFileName() {
+    var dev = safeDeviceName(deviceName());
+    return 'SOL-Noten-Backup-' + todayISO() + '-Auto-Backup' + (dev ? '-' + dev : '') + '.json';
+  }
+
   var lastFolderBackup = 0;
   var backupPermissionNeeded = false;
 
@@ -1449,6 +1484,7 @@
           app: 'SOL-Noten', encrypted: true, v: 3, mode: 'recovery-master',
           recovery: security.recovery, iv: box.iv, data: box.data
         };
+        if (deviceName()) env.device = deviceName();
       } else {
         /* Passwort-Modus ohne Wiederherstellungsschlüssel: Umschlag mit dem
            App-Passwort (mind. 10 Zeichen). Altes Format, bleibt lesbar. */
@@ -1456,6 +1492,7 @@
           app: 'SOL-Noten', encrypted: true, v: 2, mode: 'pin-master',
           wrapped: security.wrapped, iv: box.iv, data: box.data
         };
+        if (deviceName()) env.device = deviceName();
       }
       return JSON.stringify(env);
     }).then(function (text) {
@@ -1463,8 +1500,9 @@
          (gedrosselt auf höchstens alle 30 s). Mit Uhrzeit im Namen entstünde
          pro Unterrichtstag eine dreistellige Zahl von Dateien. Der
          Tagesname sorgt dafür, dass alle Schreibvorgänge eines Tages
-         dieselbe Datei aktualisieren. */
-      return backupDirHandle.getFileHandle('SOL-Noten-Backup-' + todayISO() + '-Auto-Backup.json', { create: true })
+         dieselbe Datei aktualisieren – der Gerätename hält die Dateien
+         verschiedener Geräte auseinander. */
+      return backupDirHandle.getFileHandle(autoBackupFileName(), { create: true })
         .then(function (fh) { return fh.createWritable(); })
         .then(function (w) {
           return w.write(text).then(function () { return w.close(); });
@@ -1686,7 +1724,8 @@
     resetDue: resetDue, resetWaitHours: resetWaitHours,
     folderBackupSupported: folderBackupSupported, chooseBackupFolder: chooseBackupFolder,
     backupFolderNeedsPermission: backupFolderNeedsPermission, regrantBackupPermission: regrantBackupPermission,
-    autoBackupMode: autoBackupMode,
+    autoBackupMode: autoBackupMode, autoBackupFileName: autoBackupFileName,
+    deviceName: deviceName, setDeviceName: setDeviceName,
     removeBackupFolder: removeBackupFolder, daysSinceExport: daysSinceExport,
     hasBackupFolder: function () { return !!backupDirHandle; }
   };
