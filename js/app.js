@@ -70,7 +70,7 @@
 
   /* ================= App-Start ================= */
 
-  var APP_VERSION = '0.55.1';
+  var APP_VERSION = '0.56.0';
 
   /* Mindestlänge für Datei-Passwörter: Backup, Foto-Sicherung, Kurs- und
      Punkte-Export. Jedes schützt genau eine Datei; ein Treffer kostet diese
@@ -670,6 +670,18 @@
 
   /* ================= Grundgerüst ================= */
 
+  /* Maskiert einen Wert für das Einsetzen in eine SVG-/HTML-Zeichenkette.
+     Die Diagramme bauen SVG als Text zusammen und weisen es `innerHTML` zu;
+     Werte aus einer importierten Datei (etwa das Datum einer Punktevergabe)
+     kämen sonst unmaskiert dort an (Audit-Befund 2). Bewusst auf ALLE
+     eingesetzten Werte angewandt, auch auf die heute unbedenklichen Zahlen –
+     sonst reißt die nächste Änderung an dieser Stelle die Lücke wieder auf. */
+  function escXml(v) {
+    return String(v === null || v === undefined ? '' : v)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
+
   var THEMES = [
     { id: 'petrol',    name: 'Petrol (Standard)', c: '#0e7c74' },
     { id: 'blau',      name: 'Ozeanblau',         c: '#1d63b8' },
@@ -680,11 +692,17 @@
     { id: 'wald',      name: 'Waldgrün',          c: '#3d7a3f' },
     { id: 'schiefer',  name: 'Schieferblau',      c: '#4a6274' }
   ];
+  /* Nur Kennungen aus THEMES werden gesetzt. Der Wert wandert im
+     Druckfenster in ein HTML-Attribut (`data-theme="…"`); stammte er
+     ungeprüft aus einer importierten Datei, könnte er dort ausbrechen
+     (Audit-Befund 2). Store.sanitizeState bereinigt ihn bereits beim Laden –
+     dies ist die zweite Verteidigungslinie an der Ausgabestelle. */
   function applyTheme() {
     var t = (S() && S().settings && S().settings.theme) || 'petrol';
-    document.documentElement.setAttribute('data-theme', t);
     var th = null;
     for (var i = 0; i < THEMES.length; i++) if (THEMES[i].id === t) th = THEMES[i];
+    if (!th) { t = 'petrol'; th = THEMES[0]; }
+    document.documentElement.setAttribute('data-theme', t);
     var m = document.querySelector('meta[name="theme-color"]');
     if (m && th) m.setAttribute('content', th.c);
   }
@@ -2050,6 +2068,22 @@
         UI.modal('Backup fehlgeschlagen', h('p', {}, e.message));
       });
     });
+  }
+
+  /* Bericht der Wertprüfung in Sätze übersetzen. „Kein gültiges Datums-
+     format“ statt „ungültiges Datum“: Ein Eintrag an einem Tag, der kein
+     Unterrichtstag ist (Vertretung, Exkursion), ist völlig in Ordnung und
+     wird nie verworfen – geprüft wird nur die Schreibweise. */
+  function cleanupLines(c) {
+    var out = [];
+    function n(count, one, many) { return count + ' ' + (count === 1 ? one : many); }
+    if (c.soleiEntries) out.push(n(c.soleiEntries, 'Punktevergabe', 'Punktevergaben') +
+      ' ohne gültiges Datumsformat oder mit unbrauchbarer Punktzahl');
+    if (c.absences) out.push(n(c.absences, 'Fehlzeit', 'Fehlzeiten') + ' ohne gültiges Datumsformat');
+    if (c.notes) out.push(n(c.notes, 'Kursnotiz', 'Kursnotizen') + ' ohne gültiges Datumsformat oder ohne Text');
+    if (c.uploadTallies) out.push(n(c.uploadTallies, 'Upload-Zählung', 'Upload-Zählungen') + ' ohne gültiges Quartal');
+    if (c.theme) out.push('Ein unbekanntes Farbschema wurde auf „Petrol“ zurückgesetzt');
+    return out;
   }
 
   function backupBanner() {
@@ -4128,10 +4162,10 @@
 
     var doc = win.document;
     doc.open();
-    doc.write('<!DOCTYPE html><html lang="de"' + (theme ? ' data-theme="' + theme + '"' : '') + '><head>' +
+    doc.write('<!DOCTYPE html><html lang="de"' + (theme ? ' data-theme="' + escXml(theme) + '"' : '') + '><head>' +
       '<meta charset="UTF-8">' +
       '<meta name="viewport" content="width=device-width, initial-scale=1">' +
-      '<title>' + (docTitle ? String(docTitle).replace(/[<>]/g, '') : 'SOL-Noten – Druck') + '</title>' +
+      '<title>' + (docTitle ? escXml(docTitle) : 'SOL-Noten – Druck') + '</title>' +
       '<style>' + pageRule + rootVars + printCss + '</style>' +
       '</head><body></body></html>');
     doc.close();
@@ -4531,7 +4565,7 @@
         var svg = ['<svg viewBox="0 0 ' + W + ' ' + H + '" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Klassendurchschnitte">'];
         for (var g2 = 1; g2 <= 6; g2++) {
           svg.push('<line x1="' + padL + '" y1="' + y(g2) + '" x2="' + (W - padR) + '" y2="' + y(g2) + '" stroke="var(--line)" stroke-width="1"/>');
-          svg.push('<text x="' + (padL - 6) + '" y="' + (y(g2) + 3.5) + '" text-anchor="end" font-size="10" fill="var(--ink-soft)">' + g2 + '</text>');
+          svg.push('<text x="' + (padL - 6) + '" y="' + (y(g2) + 3.5) + '" text-anchor="end" font-size="10" fill="var(--ink-soft)">' + escXml(g2) + '</text>');
         }
         if (n > 1) {
           var d2 = data2.map(function (pt2, i) { return (i ? 'L' : 'M') + x(i) + ' ' + y(pt2.v); }).join(' ');
@@ -4539,8 +4573,8 @@
         }
         data2.forEach(function (pt2, i) {
           svg.push('<circle cx="' + x(i) + '" cy="' + y(pt2.v) + '" r="4" fill="var(--teal)"/>');
-          svg.push('<text x="' + x(i) + '" y="' + (y(pt2.v) - 8) + '" text-anchor="middle" font-size="10" font-weight="700" fill="var(--teal)">' + Calc.fmt(pt2.v) + '</text>');
-          svg.push('<text x="' + x(i) + '" y="' + (H - 8) + '" text-anchor="middle" font-size="9.5" fill="var(--ink-soft)">' + pt2.label + '</text>');
+          svg.push('<text x="' + x(i) + '" y="' + (y(pt2.v) - 8) + '" text-anchor="middle" font-size="10" font-weight="700" fill="var(--teal)">' + escXml(Calc.fmt(pt2.v)) + '</text>');
+          svg.push('<text x="' + x(i) + '" y="' + (H - 8) + '" text-anchor="middle" font-size="9.5" fill="var(--ink-soft)">' + escXml(pt2.label) + '</text>');
         });
         svg.push('</svg>');
         chartNode = h('div.chart-host');
@@ -4606,13 +4640,13 @@
         Calc.tapValues(pts[0].max).forEach(function (v) {
           var yy = padT + ih - (v / pts[0].max) * ih;
           svg.push('<line x1="' + padL + '" y1="' + yy + '" x2="' + (W - padR) + '" y2="' + yy + '" stroke="var(--line)" stroke-width="1"/>');
-          svg.push('<text x="' + (padL - 6) + '" y="' + (yy + 3.5) + '" text-anchor="end" font-size="10" fill="var(--ink-soft)">' + Calc.fmt(v, 1) + '</text>');
+          svg.push('<text x="' + (padL - 6) + '" y="' + (yy + 3.5) + '" text-anchor="end" font-size="10" fill="var(--ink-soft)">' + escXml(Calc.fmt(v, 1)) + '</text>');
         });
       } else {
         [0, 0.5, 1].forEach(function (f) {
           var yy = padT + ih - f * ih;
           svg.push('<line x1="' + padL + '" y1="' + yy + '" x2="' + (W - padR) + '" y2="' + yy + '" stroke="var(--line)" stroke-width="1"/>');
-          svg.push('<text x="' + (padL - 6) + '" y="' + (yy + 3.5) + '" text-anchor="end" font-size="10" fill="var(--ink-soft)">' + (f * 100) + ' %</text>');
+          svg.push('<text x="' + (padL - 6) + '" y="' + (yy + 3.5) + '" text-anchor="end" font-size="10" fill="var(--ink-soft)">' + escXml(f * 100) + ' %</text>');
         });
       }
 
@@ -4621,7 +4655,7 @@
       for (var i = 1; i <= n; i++) {
         if (i === n || pts[i].q !== pts[i - 1].q) {
           var cx = (x(segStart) + x(i - 1)) / 2;
-          svg.push('<text x="' + cx + '" y="' + (padT - 5) + '" text-anchor="middle" font-size="9.5" fill="var(--ink-soft)">' + pts[segStart].q + '. Q</text>');
+          svg.push('<text x="' + cx + '" y="' + (padT - 5) + '" text-anchor="middle" font-size="9.5" fill="var(--ink-soft)">' + escXml(pts[segStart].q) + '. Q</text>');
           if (i < n) {
             var bx = (x(i - 1) + x(i)) / 2;
             svg.push('<line x1="' + bx + '" y1="' + padT + '" x2="' + bx + '" y2="' + (padT + ih) + '" stroke="var(--line)" stroke-width="1" stroke-dasharray="4 3"/>');
@@ -4641,7 +4675,7 @@
         svg.push('<circle cx="' + x(i) + '" cy="' + y(pt) + '" r="' + (pt.absence ? 5 : 4) + '" fill="' + (pt.absence ? 'var(--red)' : 'var(--teal)') + '"/>');
         if (i === 0 || i === n - 1 || i % step === 0) {
           var pp = pt.date.split('-');
-          svg.push('<text x="' + x(i) + '" y="' + (H - 8) + '" text-anchor="middle" font-size="9.5" fill="var(--ink-soft)">' + pp[2] + '.' + pp[1] + '.</text>');
+          svg.push('<text x="' + x(i) + '" y="' + (H - 8) + '" text-anchor="middle" font-size="9.5" fill="var(--ink-soft)">' + escXml(pp[2]) + '.' + escXml(pp[1]) + '.</text>');
         }
       });
       svg.push('</svg>');
@@ -6011,7 +6045,7 @@
         svg.push('<line x1="' + padL + '" y1="' + y(v) + '" x2="' + (W - padR) + '" y2="' + y(v) +
           '" stroke="var(--line)" stroke-width="1"/>');
         svg.push('<text x="' + (padL - 6) + '" y="' + (y(v) + 3.5) + '" text-anchor="end" font-size="10" fill="var(--ink-soft)">' +
-          Calc.fmt(v, 1) + '</text>');
+          escXml(Calc.fmt(v, 1)) + '</text>');
       });
       /* Linie */
       if (n > 1) {
@@ -6026,7 +6060,7 @@
         if (i === 0 || i === n - 1 || i % step === 0) {
           var pp = pt.date.split('-');
           svg.push('<text x="' + x(i) + '" y="' + (H - 8) + '" text-anchor="middle" font-size="9.5" fill="var(--ink-soft)">' +
-            pp[2] + '.' + pp[1] + '.</text>');
+            escXml(pp[2]) + '.' + escXml(pp[1]) + '.</text>');
         }
       });
       svg.push('</svg>');
@@ -7139,9 +7173,21 @@
         }
         return getData.then(function (data) {
           if (!data) return;
-          return UI.confirmDialog('Backup einspielen?',
-            'Achtung: Alle aktuell auf diesem Gerät gespeicherten Daten werden durch den Inhalt der Datei „' + f.name + '“ ersetzt.',
-            'Backup einspielen', true).then(function (ok) {
+          /* Datei prüfen UND bereinigen, BEVOR gefragt wird: Verworfene
+             Einträge ändern Noten, das darf nicht unbemerkt geschehen. */
+          var cleaned = Store.inspectImport(data);
+          var body = [
+            h('p', {}, 'Achtung: Alle aktuell auf diesem Gerät gespeicherten Daten werden durch den Inhalt der Datei „' + f.name + '“ ersetzt.')
+          ];
+          if (cleaned.total) body.push(h('div.help-warn', {},
+            h('p', {}, h('strong', {}, 'Die Datei enthält unbrauchbare Einträge. '),
+              'Sie werden nicht übernommen:'),
+            h('ul', {}, cleanupLines(cleaned).map(function (t) { return h('li', {}, t); })),
+            h('p', {}, 'Alles Übrige wird unverändert eingespielt.')));
+          return UI.modal('Backup einspielen?', body, [
+            { label: 'Abbrechen', value: false },
+            { label: 'Backup einspielen', value: true, danger: true }
+          ]).then(function (ok) {
               if (!ok) return;
               Store.applyImport(data);
               toast('Backup wurde eingespielt.');

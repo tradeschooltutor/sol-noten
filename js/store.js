@@ -18,6 +18,12 @@
                                der auch nach biometrischem Entsperren erscheinen muss (v0.54). */
   var masterRaw = null;     /* Uint8Array – nur im Arbeitsspeicher der entsperrten App */
   var masterKey = null;     /* CryptoKey */
+  var lastCleanup = null;   /* Bericht der letzten Wertprüfung, siehe sanitizeState */
+
+  /* Erlaubte Farbschema-Kennungen. Muss zu THEMES in js/app.js passen: Der
+     Wert landet im Druckfenster in einem HTML-Attribut (`data-theme="…"`),
+     ein Fremdwert könnte dort ausbrechen (Audit-Befund 2). */
+  var THEME_IDS = { petrol: 1, blau: 1, himmel: 1, orange: 1, beere: 1, aubergine: 1, wald: 1, schiefer: 1 };
 
   function openDB() {
     return new Promise(function (resolve, reject) {
@@ -100,6 +106,128 @@
     };
   }
 
+  /* ---------- Wertprüfung (Audit-Befund 2) ---------- *
+     Einträge aus einer Datei können Werte tragen, die die App selbst nie
+     schreibt. Zwei Folgen: Ein Datum wie „<svg onload=…>“ landet unmaskiert
+     in den SVG-Diagrammen, und ein FEHLENDES Datum lässt schon den
+     Sortiervergleich `a.date.localeCompare(b.date)` abstürzen – die
+     Notenübersicht wäre danach unbenutzbar.
+
+     Wichtig, was hier NICHT geprüft wird: Wochentag, Unterrichtstage des
+     Kurses, Quartalsgrenzen und Ferien. Eine Vertretungsstunde am Montag in
+     einem Donnerstagskurs ist ein völlig normaler Eintrag und bleibt es;
+     die App lässt solche Ausnahmen bewusst zu. Geprüft wird ausschließlich,
+     ob die Zeichenkette überhaupt ein Kalenderdatum sein KANN.
+
+     Ebenso wird `quarter` NICHT gegen `date` abgeglichen: Verschiebt man
+     später die Quartalsgrenzen eines Kurses, passen beide nicht mehr
+     zusammen – ein „hilfreiches“ Neuberechnen würde Vergaben zwischen
+     Quartalen verschieben und damit Noten ändern.
+
+     Läuft in migrate() und damit auf ALLEN Ladepfaden (Start, Entsperren,
+     Import, Sicherungsstand). Wirft nie – Zurückweisen einer Datei wäre nach
+     einem Geräteverlust der größere Schaden. Stattdessen wird gezählt und
+     berichtet. */
+  var DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+  function isDateString(v) { return typeof v === 'string' && DATE_RE.test(v); }
+  function isNum(v) { return typeof v === 'number' && isFinite(v); }
+
+  /* Zahl oder eindeutiger Zahl-String ('5', '5.5') -> Zahl, sonst null.
+     Umwandeln statt verwerfen: Der Eintrag trägt eine Note mit; ihn wegen
+     der Schreibweise zu verlieren wäre der größere Schaden. Kommazahlen mit
+     Komma statt Punkt bleiben bewusst außen vor – „5,5“ ist nicht eindeutig
+     von einer Aufzählung zu unterscheiden. */
+  function numOrNull(v) {
+    if (isNum(v)) return v;
+    if (typeof v === 'string' && /^-?\d+(\.\d+)?$/.test(v)) return Number(v);
+    return null;
+  }
+
+  /* Ganzzahl im Bereich, mit Umwandlung von Zahl-Strings ('2' -> 2).
+     Rückgabe: Zahl oder null. */
+  function intInRange(v, lo, hi) {
+    var n = (typeof v === 'string' && /^-?\d+$/.test(v)) ? Number(v) : v;
+    if (typeof n !== 'number' || !isFinite(n) || n !== Math.floor(n)) return null;
+    return (n >= lo && n <= hi) ? n : null;
+  }
+
+  function sanitizeState(s) {
+    var report = { soleiEntries: 0, absences: 0, notes: 0, uploadTallies: 0, theme: 0 };
+    if (!s || typeof s !== 'object') return report;
+
+    if (s.settings && typeof s.settings === 'object') {
+      if (!THEME_IDS[s.settings.theme]) {
+        if (s.settings.theme !== undefined) report.theme++;
+        s.settings.theme = 'petrol';
+      }
+    }
+
+    if (Array.isArray(s.soleiEntries)) {
+      s.soleiEntries = s.soleiEntries.filter(function (e) {
+        if (!e || typeof e !== 'object' || !isDateString(e.date)) return false;
+        var q = intInRange(e.quarter, 1, 4);
+        var c = intInRange(e.criterion, 0, 4);
+        var pts = numOrNull(e.points);
+        if (q === null || c === null || pts === null || pts < 0) return false;
+        e.quarter = q; e.criterion = c; e.points = pts;
+        if (typeof e.createdAt !== 'string') e.createdAt = e.date + 'T00:00:00.000Z'; /* Sortierschlüssel */
+        return true;
+      });
+    }
+
+    if (Array.isArray(s.absences)) {
+      s.absences = s.absences.filter(function (a) {
+        if (!a || typeof a !== 'object' || !isDateString(a.date)) return false;
+        var q = intInRange(a.quarter, 1, 4);
+        if (q === null) return false;
+        a.quarter = q;
+        return true;
+      });
+    }
+
+    if (Array.isArray(s.notes)) {
+      s.notes = s.notes.filter(function (n) {
+        return n && typeof n === 'object' && isDateString(n.date) && typeof n.text === 'string';
+      });
+    }
+
+    if (Array.isArray(s.uploadTallies)) {
+      s.uploadTallies = s.uploadTallies.filter(function (t) {
+        if (!t || typeof t !== 'object') return false;
+        var q = intInRange(t.quarter, 1, 4);
+        if (q === null) return false;
+        t.quarter = q;
+        /* done/missed sind Zähler – reparieren statt verwerfen. */
+        var d = numOrNull(t.done), m = numOrNull(t.missed);
+        t.done = (d === null || d < 0) ? 0 : d;
+        t.missed = (m === null || m < 0) ? 0 : m;
+        return true;
+      });
+    }
+    return report;
+  }
+
+  /* Prüft und zählt in einem Durchgang. Rückgabe: {soleiEntries, absences,
+     notes, uploadTallies, theme, total} – wie viele Einträge entfernt wurden. */
+  function sanitizeWithReport(s) {
+    function len(a) { return Array.isArray(a) ? a.length : 0; }
+    var before = {
+      soleiEntries: len(s && s.soleiEntries), absences: len(s && s.absences),
+      notes: len(s && s.notes), uploadTallies: len(s && s.uploadTallies)
+    };
+    var r = sanitizeState(s);
+    var out = {
+      soleiEntries: before.soleiEntries - len(s && s.soleiEntries),
+      absences: before.absences - len(s && s.absences),
+      notes: before.notes - len(s && s.notes),
+      uploadTallies: before.uploadTallies - len(s && s.uploadTallies),
+      theme: r.theme
+    };
+    out.total = out.soleiEntries + out.absences + out.notes + out.uploadTallies + out.theme;
+    return out;
+  }
+
   /* ---------- Laden / Speichern ---------- */
 
   function migrate(s) {
@@ -130,6 +258,12 @@
           c.activeSeating = c.seatings[0].id;
         }
       });
+      /* Wertprüfung zuletzt: Die Felder oben müssen vorher ergänzt sein. */
+      var cleaned = sanitizeWithReport(s);
+      if (cleaned.total) {
+        lastCleanup = cleaned;
+        console.warn('SOL-Noten: unbrauchbare Einträge verworfen', cleaned);
+      }
     }
     return s;
   }
@@ -1093,6 +1227,17 @@
     save();
   }
 
+  /* Für die Vorschau: Datei prüfen UND bereinigen, BEVOR der Bestätigungs-
+     dialog erscheint. Die Zahlen gehen in den Dialogtext; übernommen wird
+     anschließend dasselbe (bereits bereinigte) Objekt, die Prüfung läuft
+     also nicht doppelt. */
+  function inspectImport(data) {
+    validateImport(data);
+    return sanitizeWithReport(data);
+  }
+
+  function lastCleanupReport() { return lastCleanup; }
+
   function importJSON(text) { /* unverschlüsselter Direktimport (Altbestand) */
     var p = parseBackup(text);
     if (p.encrypted) throw new Error('Diese Backup-Datei ist verschlüsselt.');
@@ -1724,6 +1869,7 @@
     resetDue: resetDue, resetWaitHours: resetWaitHours,
     folderBackupSupported: folderBackupSupported, chooseBackupFolder: chooseBackupFolder,
     backupFolderNeedsPermission: backupFolderNeedsPermission, regrantBackupPermission: regrantBackupPermission,
+    inspectImport: inspectImport, lastCleanupReport: lastCleanupReport,
     autoBackupMode: autoBackupMode, autoBackupFileName: autoBackupFileName,
     deviceName: deviceName, setDeviceName: setDeviceName,
     removeBackupFolder: removeBackupFolder, daysSinceExport: daysSinceExport,
