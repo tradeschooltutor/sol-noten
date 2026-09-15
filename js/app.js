@@ -70,7 +70,7 @@
 
   /* ================= App-Start ================= */
 
-  var APP_VERSION = '0.58.0';
+  var APP_VERSION = '0.58.1';
 
   /* Mindestlänge für Datei-Passwörter: Backup, Foto-Sicherung, Kurs- und
      Punkte-Export. Jedes schützt genau eine Datei; ein Treffer kostet diese
@@ -1299,6 +1299,27 @@
        Die Fotos werden VORHER geladen: printNode druckt nach 300 ms los,
        und die Bilder kommen asynchron aus der verschlüsselten Datenbank –
        ohne Vorladen bliebe der Ausdruck bei großen Klassen leer. */
+    /* Nutzbare Fläche für das Raster, in mm.
+       A4 = 297 × 210 (quer) bzw. 210 × 297 (hoch). Davon gehen ab:
+       - der @page-Rand aus printNode (7 mm quer, 12 mm hoch), zweimal
+       - `body{padding:6mm}` aus dem Druck-CSS, zweimal  ← bis 0.58.0 vergessen,
+         weshalb das Lehrerpult auf Seite 2 rutschte
+       - Kopfzeile, Lehrerpult und eine Sicherheitsreserve
+       Die Ausrichtung wird vorher erfragt: `@page size` wird von Safari
+       ignoriert, dort wählt sie die Nutzerin im Druckdialog – eine feste
+       Annahme „quer“ wäre also falsch, sobald jemand hoch druckt. */
+    function seatPrintArea(landscape) {
+      var pageW = landscape ? 297 : 210;
+      var pageH = landscape ? 210 : 297;
+      var pageMargin = landscape ? 7 : 12;   /* muss zu printNode passen */
+      var bodyPad = 6;                        /* body{padding:6mm} im Druck-CSS */
+      var chrome = 11 + 9 + 4;                /* Kopfzeile + Pult + Reserve */
+      return {
+        w: pageW - 2 * pageMargin - 2 * bodyPad,
+        h: pageH - 2 * pageMargin - 2 * bodyPad - chrome
+      };
+    }
+
     function printSeating() {
       var plan = Store.activeSeating(course);
       var positions = plan.positions || {};
@@ -1318,14 +1339,19 @@
       var pcols = Math.max(plan.cols || 1, maxC + 1);
       var prows = maxR + 1;
 
-      /* A4 quer abzüglich Rand (7 mm) und Kopfzeile/Pult: nutzbar rund
-         283 × 175 mm. Die Abstände zwischen den Zellen müssen VOR dem Teilen
-         abgezogen werden – sonst läuft der Plan ab etwa fünf Spalten über den
-         Rand und die Zusage „passt auf eine Seite“ wäre gebrochen.
+      askOrientation().then(function (landscape) {
+        if (landscape === null) return;
+        buildAndPrint(landscape);
+      });
+
+      function buildAndPrint(landscape) {
+      var area = seatPrintArea(landscape);
+      /* Die Abstände zwischen den Zellen müssen VOR dem Teilen abgezogen
+         werden – sonst läuft der Plan ab etwa fünf Spalten über den Rand.
          Gedeckelt, damit wenige Personen nicht bildschirmfüllend werden. */
       var GAP = 1.5;
-      var cellW = Math.min(46, Math.floor((283 - GAP * (pcols - 1)) / pcols * 10) / 10);
-      var cellH = Math.min(38, Math.floor((175 - GAP * (prows - 1)) / prows * 10) / 10);
+      var cellW = Math.min(46, Math.floor((area.w - GAP * (pcols - 1)) / pcols * 10) / 10);
+      var cellH = Math.min(38, Math.floor((area.h - GAP * (prows - 1)) / prows * 10) / 10);
 
       /* Bei sehr vielen Reihen bleibt für ein Foto kein Platz mehr. Dann
          lieber Namen ohne Foto als ein überlaufendes Raster. */
@@ -1364,8 +1390,13 @@
               var ph = h('div.seatprint-photo', { style: { width: photoPx + 'mm', height: photoPx + 'mm' } });
               if (urls[sid]) ph.appendChild(h('img', { src: urls[sid], alt: '' }));
               else ph.appendChild(h('span.seatprint-initials', {}, initials(stu)));
-              if (hasRole) ph.appendChild(h('span.seatprint-badge' + (stu.rep === 'K2' ? '.k2' : ''), {}, stu.rep));
               box.appendChild(ph);
+            }
+            /* Abzeichen an die ZELLE, nicht ans Foto: .seatprint-photo ist
+               rund und hat overflow:hidden – dort wurde es bis 0.58.0
+               weggeschnitten und war im Ausdruck unsichtbar. */
+            if (hasRole && showPhotos) {
+              box.appendChild(h('span.seatprint-badge' + (stu.rep === 'K2' ? '.k2' : ''), {}, stu.rep));
             }
             if (twoLines) box.appendChild(h('span.seatprint-name', {}, stu.firstName || ''));
             box.appendChild(h('span.seatprint-name.last', {},
@@ -1389,8 +1420,22 @@
               }).join(' · '))
             : null);
 
-        printNode(sheet, true, 'Sitzplan ' + cls.name + ' ' + plan.name);
+        printNode(sheet, landscape, 'Sitzplan ' + cls.name + ' ' + plan.name);
       });
+      }
+    }
+
+    /* Rückgabe: true (quer), false (hoch) oder null (abgebrochen). */
+    function askOrientation() {
+      return UI.modal('Sitzplan drucken', [
+        h('p', {}, 'In welcher Ausrichtung möchten Sie drucken?'),
+        h('p.hint', {}, 'Die Kachelgröße wird daraus berechnet, damit der Plan auf eine Seite passt. ' +
+          'Bitte im anschließenden Druckdialog dieselbe Ausrichtung wählen – manche Browser übernehmen sie nicht von allein.')
+      ], [
+        { label: 'Abbrechen', value: null },
+        { label: 'Hochformat', value: false },
+        { label: 'Querformat', value: true, primary: true }
+      ]);
     }
 
     function seatLabel(stu) {
@@ -4350,7 +4395,7 @@
       '.seatprint-head h2{font-size:13pt;margin:0 0 0.5mm;}' +
       '.seatprint-head p{font-size:9pt;color:#444;margin:0;}' +
       '.seatprint-grid{display:grid;justify-content:center;margin:0 auto;}' +
-      '.seatprint-cell{border:0.4mm solid #bbb;border-radius:1.5mm;display:flex;' +
+      '.seatprint-cell{position:relative;border:0.4mm solid #bbb;border-radius:1.5mm;display:flex;' +
         'flex-direction:column;align-items:center;justify-content:flex-start;' +
         'padding:1mm 0.5mm;overflow:hidden;}' +
       '.seatprint-cell.empty{border:0.3mm dashed #e2e2e2;}' +
@@ -4358,7 +4403,7 @@
         'display:flex;align-items:center;justify-content:center;flex:none;}' +
       '.seatprint-photo img{width:100%;height:100%;object-fit:cover;display:block;}' +
       '.seatprint-initials{font-size:8pt;font-weight:700;color:#666;}' +
-      '.seatprint-badge{position:absolute;top:-0.3mm;right:-0.3mm;background:' +
+      '.seatprint-badge{position:absolute;top:0.6mm;right:0.6mm;z-index:2;background:' +
         cssVar('--teal', '#0e7c74') + ';color:#fff;font-size:5.5pt;font-weight:700;' +
         'line-height:1;padding:0.6mm 0.9mm;border-radius:1mm;' +
         '-webkit-print-color-adjust:exact;print-color-adjust:exact;}' +
@@ -4368,6 +4413,11 @@
       '.seatprint-name.last{font-weight:700;}' +
       '.seatprint-desk{margin:2.5mm auto 0;max-width:120mm;text-align:center;font-size:8.5pt;' +
         'border:0.4mm solid #888;border-radius:1.5mm;padding:1mm;}' +
+      /* Das Blatt darf unter keinen Umständen umbrechen – der Inhalt ist auf
+         genau eine Seite gerechnet. */
+      '.seatprint{page-break-inside:avoid;break-inside:avoid;}' +
+      '.seatprint-grid{page-break-inside:avoid;break-inside:avoid;}' +
+      '.seatprint-desk{page-break-before:avoid;break-before:avoid;}' +
       '.seatprint-rest{font-size:8pt;color:#444;margin:2.5mm 0 0;text-align:center;}' +
       '.charts-print h2{font-size:13pt;margin:0 0 1mm;}' +
       '.charts-print .print-sub{font-size:9pt;margin:0 0 3mm;}' +
