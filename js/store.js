@@ -1006,14 +1006,57 @@
 
   /* Alle Fotos als eine Sicherungsdatei exportieren; immer mit Passwort
      verschlüsselt (AES-256-GCM). Ein Klartext-Export ist bewusst nicht möglich. */
-  function exportPhotos(password) {
+  /* Alle Schüler-IDs, die auf diesem Gerät in IRGENDEINER Klasse stehen –
+     bewusst über alle Schuljahre, nicht nur das aktive: Fotos einer Klasse
+     aus dem Vorjahr sind gültig und dürfen nicht als Waisen gelten. */
+  function knownStudentIds() {
+    var set = {};
+    (state.classes || []).forEach(function (c) {
+      (c.students || []).forEach(function (s2) { set[s2.id] = true; });
+    });
+    return set;
+  }
+
+  /* Schüler-IDs der angegebenen Klassen (für den klassenweisen Foto-Export). */
+  function studentIdsOfClasses(classIds) {
+    var want = {}, out = {};
+    (classIds || []).forEach(function (id) { want[id] = true; });
+    (state.classes || []).forEach(function (c) {
+      if (!want[c.id]) return;
+      (c.students || []).forEach(function (s2) { out[s2.id] = true; });
+    });
+    return out;
+  }
+
+  /* Gespeicherte Fotos, die zu keiner Person mehr gehören. Entstehen beim
+     Löschen einer Klasse ohne Foto-Aufräumen und – bis v0.57 – beim
+     Einspielen fremder Foto-Sicherungen. */
+  function orphanPhotoKeys() {
+    var known = knownStudentIds();
+    return photoKeys().then(function (keys) {
+      return keys.filter(function (k) { return !known[k]; });
+    });
+  }
+
+  function deleteOrphanPhotos() {
+    return orphanPhotoKeys().then(function (keys) {
+      var chain = Promise.resolve();
+      keys.forEach(function (k) { chain = chain.then(function () { return deletePhoto(k); }); });
+      return chain.then(function () { return keys.length; });
+    });
+  }
+
+  /* `classIds` optional: ohne Angabe alle Fotos (Verhalten bis v0.56),
+     mit Angabe nur die Personen dieser Klassen. */
+  function exportPhotos(password, classIds) {
     if (!password) {
       return Promise.reject(new Error('Für die Foto-Sicherung ist ein Passwort erforderlich.'));
     }
+    var limit = (classIds && classIds.length) ? studentIdsOfClasses(classIds) : null;
     return photoKeys().then(function (keys) {
       var chain = Promise.resolve();
       var out = {};
-      keys.forEach(function (k) {
+      keys.filter(function (k) { return !limit || limit[k]; }).forEach(function (k) {
         chain = chain.then(function () { return getPhoto(k); }).then(function (url) {
           if (url) out[k] = url;
         });
@@ -1026,7 +1069,15 @@
            Der Name trägt Datum UND Uhrzeit, damit zwei Sicherungen desselben
            Tages einander nicht ersetzen. Mit dem automatischen Ordner-Backup
            kann es keine Namenskollision geben – das schreibt „…-Backup-…“. */
-        var name = 'SOL-Noten-Fotos-' + todayISO() + '-' + hhmmNow() + '.json';
+        /* Bei genau EINER gewählten Klasse deren Name im Dateinamen – die
+           Empfängerin sieht sonst nicht, was in der Datei steckt. Gefiltert
+           wie die übrigen Dateinamen (vgl. safeDeviceName). */
+        var tag = '';
+        if (classIds && classIds.length === 1) {
+          var c1 = classById(classIds[0]);
+          if (c1) tag = '-' + String(c1.name).replace(/[^\wäöüÄÖÜß-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 30);
+        }
+        var name = 'SOL-Noten-Fotos-' + todayISO() + '-' + hhmmNow() + tag + '.json';
         return CryptoBox.encrypt(JSON.stringify(payload), password).then(function (env) {
           env.kind = 'photos';
           var text = JSON.stringify(env);
@@ -1069,11 +1120,32 @@
         throw new Error('Die Foto-Sicherung enthält ungültige Bilddaten und wurde abgelehnt.');
       }
     });
-    var chain = Promise.resolve();
-    entries.forEach(function (studentId) {
-      chain = chain.then(function () { return savePhoto(studentId, data.photos[studentId]); });
+    /* Nur Fotos zu Personen übernehmen, die es auf diesem Gerät gibt.
+       Waisen würden sonst dauerhaft Speicher belegen, ohne je angezeigt zu
+       werden – die Datei bleibt ja erhalten, falls sie später doch gebraucht
+       werden. Passt NICHTS, liegt es fast immer daran, dass die Klasse hier
+       selbst angelegt statt über den Kurs-Import übernommen wurde: Dann sind
+       die Schüler-IDs andere, und kein Foto findet seine Person. */
+    var known = knownStudentIds();
+    var match = entries.filter(function (id) { return known[id]; });
+    var skipped = entries.length - match.length;
+    if (!match.length) {
+      throw new Error('Keines der ' + entries.length + ' Fotos gehört zu einer Person auf diesem Gerät. ' +
+        'Vermutlich wurde die Klasse hier selbst angelegt statt über den Kurs-Import übernommen – dann sind die Schülerkennungen andere. ' +
+        'Wurde der Kurs noch nicht importiert, holen Sie das nach und spielen die Foto-Sicherung anschließend erneut ein.');
+    }
+    return photoKeys().then(function (existing) {
+      var have = {};
+      existing.forEach(function (k) { have[k] = true; });
+      var replaced = match.filter(function (id) { return have[id]; }).length;
+      var chain = Promise.resolve();
+      match.forEach(function (studentId) {
+        chain = chain.then(function () { return savePhoto(studentId, data.photos[studentId]); });
+      });
+      return chain.then(function () {
+        return { imported: match.length, skipped: skipped, replaced: replaced, total: entries.length };
+      });
     });
-    return chain.then(function () { return entries.length; });
   }
 
   function daysSincePhotoExport() {
@@ -1854,6 +1926,8 @@
     savePhoto: savePhoto, getPhoto: getPhoto, deletePhoto: deletePhoto,
     hasPhoto: hasPhoto, photoKeys: photoKeys,
     exportPhotos: exportPhotos, parsePhotoBackup: parsePhotoBackup, applyPhotoImport: applyPhotoImport,
+    orphanPhotoKeys: orphanPhotoKeys, deleteOrphanPhotos: deleteOrphanPhotos,
+    studentIdsOfClasses: studentIdsOfClasses, knownStudentIds: knownStudentIds,
     daysSincePhotoExport: daysSincePhotoExport,
     isEncrypted: isEncrypted, isLocked: isLocked, unlock: unlock, lock: lock,
     enableEncryption: enableEncryption,

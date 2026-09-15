@@ -1223,3 +1223,9 @@ button:focus-visible, .input:focus-visible, select:focus-visible {
   border: 1px dashed var(--teal);
   font-size: 0.72rem; font-weight: 700; white-space: nowrap;
 }
+
+/* Klassenauswahl im Foto-Sicherungs-Dialog */
+.check-row { display: flex; align-items: center; gap: 10px; padding: 6px 2px; line-height: 1.35; }
+.check-row input[type="checkbox"] { width: 20px; height: 20px; flex: none; }
+.check-row input:disabled + span { color: var(--ink-soft); }
+.class-pick { max-height: 210px; overflow-y: auto; margin: 4px 0 8px; padding-left: 18px; }

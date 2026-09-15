@@ -70,7 +70,7 @@
 
   /* ================= App-Start ================= */
 
-  var APP_VERSION = '0.56.1';
+  var APP_VERSION = '0.57.0';
 
   /* Mindestlänge für Datei-Passwörter: Backup, Foto-Sicherung, Kurs- und
      Punkte-Export. Jedes schützt genau eine Datei; ein Treffer kostet diese
@@ -1306,10 +1306,23 @@
           : Promise.resolve(parsed.data);
         return getData.then(function (data) {
           if (!data) return;
-          return Store.applyPhotoImport(data).then(function (n) {
+          return Store.applyPhotoImport(data).then(function (r) {
             photoCache = {};
-            toast(n + ' Fotos eingespielt.');
             render();
+            /* Beide Zahlen nennen: Verworfene Fotos verschwinden sonst
+               spurlos, und beim nächsten Mal sucht man den Fehler bei der
+               Kamera. */
+            if (r.skipped) {
+              UI.modal('Fotos eingespielt', [
+                h('p', {}, r.imported + ' von ' + r.total + ' Fotos übernommen' +
+                  (r.replaced ? ' (davon ' + r.replaced + ' vorhandene ersetzt)' : '') + '.'),
+                h('p.hint', {}, r.skipped + ' Foto(s) wurden verworfen – sie gehören zu keiner Person auf diesem Gerät. ' +
+                  'Sie belegen dadurch keinen Speicher; die Sicherungsdatei bleibt erhalten, falls die Personen später hinzukommen.')
+              ]);
+            } else {
+              toast(r.imported + ' Fotos eingespielt' +
+                (r.replaced ? ', davon ' + r.replaced + ' ersetzt' : '') + '.');
+            }
           });
         });
       }).catch(function (e) { UI.modal('Import fehlgeschlagen', h('p', {}, e.message)); });
@@ -1337,11 +1350,61 @@
   }
 
   function photoExportDialog() {
+    /* Klassenauswahl: Vorgabe „alle“. Einzelne Klassen erlauben, die Fotos
+       genau einer Klasse an eine Kollegin weiterzugeben, statt den gesamten
+       Bestand aller Klassen zu verschicken. */
+    var st0 = S();
+    var classes = st0.classes.slice().sort(function (a, b) { return a.name.localeCompare(b.name); });
+    var boxes = classes.map(function (c) {
+      return { cls: c, cb: h('input', { type: 'checkbox' }) };
+    });
+    var allCb = h('input', { type: 'checkbox', checked: 'checked' });
+    var countLine = h('p.hint');
+
+    function chosenClassIds() {
+      if (allCb.checked) return null;
+      return boxes.filter(function (b) { return b.cb.checked; }).map(function (b) { return b.cls.id; });
+    }
+    /* Gezählt werden die tatsächlich vorhandenen FOTOS, nicht die Personen –
+       sonst verspricht der Dialog mehr, als in der Datei landet. Die
+       Schlüsselliste wird einmal geladen und dann nur noch gefiltert. */
+    var photoIds = null;
+    function refreshCount() {
+      var ids = chosenClassIds();
+      if (ids && ids.length === 0) { countLine.textContent = 'Bitte mindestens eine Klasse wählen.'; return; }
+      if (!photoIds) { countLine.textContent = 'Fotos werden gezählt …'; return; }
+      var limit = ids ? Store.studentIdsOfClasses(ids) : null;
+      var n = photoIds.filter(function (k) { return !limit || limit[k]; }).length;
+      countLine.textContent = n === 0
+        ? 'Zu den gewählten Klassen ist noch kein Foto gespeichert.'
+        : n + ' Foto(s) werden gesichert' + (limit ? ' (von insgesamt ' + photoIds.length + ').' : '.');
+    }
+    Store.photoKeys().then(function (keys) { photoIds = keys; refreshCount(); })
+      .catch(function () { photoIds = []; refreshCount(); });
+    allCb.addEventListener('change', function () {
+      boxes.forEach(function (b) { b.cb.disabled = allCb.checked; });
+      refreshCount();
+    });
+    boxes.forEach(function (b) {
+      b.cb.disabled = true;
+      b.cb.addEventListener('change', refreshCount);
+    });
+    refreshCount();
+
+    var classPick = h('div.card.card-tight',
+      h('label.check-row', allCb, h('span', {}, 'Alle Klassen')),
+      h('div.class-pick', boxes.map(function (b) {
+        return h('label.check-row', b.cb, h('span', {}, b.cls.name + ' (' + (b.cls.students || []).length + ')'));
+      })),
+      countLine);
+
     var pw1 = h('input.input', { type: 'password', autocomplete: 'new-password', placeholder: PW_MIN_TEXT });
     var pw2 = h('input.input', { type: 'password', autocomplete: 'new-password', placeholder: 'Passwort wiederholen' });
     var err = h('p.hint.error-text');
     UI.modal('Fotos sichern', [
-      h('p.hint', {}, 'Alle Fotos werden in eine einzelne, mit Passwort verschlüsselte Sicherungsdatei geschrieben. Da Schülerfotos besonders schützenswert sind, ist ein Passwort verpflichtend.'),
+      h('p.hint', {}, 'Die Fotos werden in eine einzelne, mit Passwort verschlüsselte Sicherungsdatei geschrieben. Da Schülerfotos besonders schützenswert sind, ist ein Passwort verpflichtend.'),
+      classPick,
+      h('p.hint', {}, 'Geben Sie die Datei weiter, achten Sie darauf, dass die Empfängerin die Klasse über den Kurs-Import erhalten hat – nur dann stimmen die Schülerkennungen überein und die Fotos finden ihre Person. Das Passwort gehört über einen anderen Weg als die Datei.'),
       h('label.field', h('span.field-label', {}, 'Passwort'), pw1),
       h('label.field', h('span.field-label', {}, 'Wiederholung'), pw2),
       h('p.hint', {}, 'Wichtig: Ein vergessenes Passwort kann nicht wiederhergestellt werden – die Sicherungsdatei ist dann unlesbar. Bewahren Sie das Passwort sicher auf (z. B. in einem Passwort-Manager).'),
@@ -1349,13 +1412,15 @@
     ], [
       { label: 'Abbrechen', value: false },
       { label: 'Sicherung speichern', value: true, primary: true, validate: function () {
+          var ids = chosenClassIds();
+          if (ids && ids.length === 0) { err.textContent = 'Bitte mindestens eine Klasse wählen – oder „Alle Klassen“.'; return false; }
           if (pwTooShort(pw1.value)) { err.textContent = 'Bitte ein Passwort mit mindestens ' + PW_MIN + ' Zeichen vergeben.'; return false; }
           if (pw1.value !== pw2.value) { err.textContent = 'Die Passwörter stimmen nicht überein.'; return false; }
           return true;
         } }
     ]).then(function (ok) {
       if (!ok) return;
-      Store.exportPhotos(pw1.value).then(function (res) {
+      Store.exportPhotos(pw1.value, chosenClassIds()).then(function (res) {
         toast(res && res.toFolder
           ? 'Foto-Sicherung im verbundenen Ordner gespeichert: ' + res.fileName
           : 'Verschlüsselte Foto-Sicherung wird gespeichert.');
@@ -2159,6 +2224,9 @@
           'Schülerliste ansehen (' + cls.students.length + ')'),
         h('button.btn-plain.btn-block', { onclick: function () { courseShareImportDialog(); } },
           'Kurs-Abgleich importieren (neue Datei der Kollegin / des Kollegen)'),
+        h('button.btn-plain.btn-block', { onclick: function () { go('editCourse', { from: course.id }); } },
+          'Neuer Kurs für ein anderes Fach in dieser Klasse'),
+        h('p.hint', {}, 'Unterrichten Sie dieselbe Klasse in einem weiteren Fach und vergeben dort selbst die Note, legen Sie den Kurs hier an – die Schülerliste wird übernommen, Abtippen entfällt. Bewertungsstruktur und Maximalpunkte beginnen bei den Voreinstellungen, weil dieser Partnerkurs sie nicht mitbringt. Der Partnerkurs bleibt davon unberührt.'),
         h('div.danger-zone',
           h('p.hint', {}, 'Gefahrenbereich'),
           h('button.btn-plain.btn-block.danger-text', { onclick: function () { delPartnerCourse(course); } }, 'Kurs löschen …'))
@@ -2203,12 +2271,19 @@
        Bewertungsdaten und (wie beim Schuljahreswechsel) nicht die
        Unterrichtstage, da ein anderes Fach meist anders liegt. */
     var tpl = (!course && p.from) ? Store.courseById(p.from) : null;
-    var pre = course || tpl;
+    /* Ein Partnerkurs trägt Platzhalter aus dem Import (numOBT/numKA = 0,
+       Gewichtung 100/0/0, Maximalpunkte der anderen Lehrkraft). Als Vorlage
+       für einen eigenen Kurs, in dem man selbst die Note vergibt, wäre das
+       falsch – dort gelten die normalen Voreinstellungen. Übernommen wird
+       vom Partnerkurs nur die KLASSE. */
+    var tplIsPartner = !!(tpl && tpl.sharedRole === 'partner');
+    var pre = course || (tplIsPartner ? null : tpl);
 
     var classSel = h('select.input');
     classSel.appendChild(h('option', { value: '' }, 'Klasse wählen …'));
     st.classes.filter(function (c) { return c.yearId === year.id; }).forEach(function (c) {
-      classSel.appendChild(h('option', { value: c.id, selected: pre && pre.classId === c.id }, c.name));
+      var preClassId = (pre && pre.classId) || (tpl && tpl.classId);
+      classSel.appendChild(h('option', { value: c.id, selected: preClassId === c.id }, c.name));
     });
     classSel.appendChild(h('option', { value: '__new__' }, '+ Neue Klasse anlegen'));
     var newClassInput = h('input.input', { type: 'text', placeholder: 'Name der Klasse, z. B. AK 2026', style: { display: 'none' } });
@@ -2339,18 +2414,27 @@
         /* Aus einem bestehenden Kurs heraus angelegt: Maximalpunkte und
            Sitzplan übernehmen (beide hängen an Klasse/Personen, nicht am
            Fach). Bewertungsdaten bleiben bewusst außen vor. */
-        if (tpl) {
+        if (tpl && !tplIsPartner) {
           if (tpl.maxPoints) course.maxPoints = JSON.parse(JSON.stringify(tpl.maxPoints));
           if (Array.isArray(tpl.seatings) && tpl.seatings.length) {
             course.seatings = JSON.parse(JSON.stringify(tpl.seatings));
             course.activeSeating = tpl.activeSeating;
           }
+        } else if (tplIsPartner && Array.isArray(tpl.seatings) && tpl.seatings.length) {
+          /* Der Sitzplan hängt an der Klasse, nicht am Fach – der ist auch
+             aus einem Partnerkurs brauchbar. Maximalpunkte dagegen nicht. */
+          course.seatings = JSON.parse(JSON.stringify(tpl.seatings));
+          course.activeSeating = tpl.activeSeating;
         }
         st.courses.push(course);
         Store.save();
         if (tpl) {
-          toast('Kurs „' + course.subject + '“ für ' + Store.classById(classId).name +
-            ' angelegt – Schülerliste, Einstellungen und Sitzplan wurden übernommen.');
+          toast(tplIsPartner
+            ? 'Kurs „' + course.subject + '“ für ' + Store.classById(classId).name +
+              ' angelegt – Schülerliste übernommen. Bitte jetzt die Maximalpunkte festlegen.'
+            : 'Kurs „' + course.subject + '“ für ' + Store.classById(classId).name +
+              ' angelegt – Schülerliste, Einstellungen und Sitzplan wurden übernommen.');
+          if (tplIsPartner) { go('maxPoints', { id: course.id, intro: true }); return; }
           go('course', { id: course.id });
           return;
         }
@@ -7331,7 +7415,7 @@
         snapHost
       ),
 
-      h('div.section-head', {}, 'Foto-Sicherung (alle Klassen)'),
+      h('div.section-head', {}, 'Foto-Sicherung'),
       h('div.card', {}, photoBackupCard()),
 
       h('div.section-head', {}, 'Schuljahre'),
@@ -7542,7 +7626,37 @@
       usageLine.textContent = 'Belegter Speicherplatz: nicht ermittelbar.';
     }
 
-    return [stateLine, explain, usageLine, btnHost,
+    /* Verwaiste Fotos: Bilder zu Personen, die in keiner Klasse mehr stehen.
+       Sie entstehen beim Löschen einer Klasse und – bis v0.57 – beim
+       Einspielen fremder Foto-Sicherungen. Bewusst NICHT automatisch
+       gelöscht: Wer jemanden kurz aus einer Klasse nimmt und wieder
+       einfügt, verlöre sonst das Foto. Deshalb nur nennen und anbieten. */
+    var orphanHost = h('div');
+    function paintOrphans() {
+      clear(orphanHost);
+      Store.orphanPhotoKeys().then(function (keys) {
+        if (!keys.length) return;
+        orphanHost.appendChild(h('p.hint', {},
+          keys.length + ' gespeicherte(s) Foto(s) gehören zu keiner Person in Ihren Klassen. ' +
+          'Das kommt von gelöschten Klassen oder von früher eingespielten Foto-Sicherungen.'));
+        orphanHost.appendChild(h('button.btn-plain.btn-block', { onclick: function () {
+          UI.confirmDialog('Verwaiste Fotos löschen?',
+            keys.length + ' Foto(s) ohne zugehörige Person werden von diesem Gerät gelöscht. ' +
+            'Fotos von Personen, die in einer Ihrer Klassen stehen, sind nicht betroffen. Diese Aktion kann nicht rückgängig gemacht werden.',
+            'Endgültig löschen', true).then(function (ok) {
+              if (!ok) return;
+              Store.deleteOrphanPhotos().then(function (n) {
+                photoCache = {};
+                toast(n + ' verwaiste Foto(s) gelöscht.');
+                paintOrphans();
+              });
+            });
+        } }, 'Verwaiste Fotos löschen …'));
+      }).catch(function () {});
+    }
+    paintOrphans();
+
+    return [stateLine, explain, usageLine, btnHost, orphanHost,
       h('p.hint', {}, 'Auch mit dauerhaftem Speicher bleibt ein Backup nötig: Gegen ein verlorenes, defektes oder neu aufgesetztes Gerät hilft nur eine Datei außerhalb dieses Browsers.')];
   }
 
