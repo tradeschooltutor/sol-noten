@@ -106,6 +106,38 @@
     };
   }
 
+  /* ---------- Klassensprecher ---------- *
+     Die Rolle hängt an der PERSON in der Klasse, nicht am Kurs: Eine Klasse
+     hat eine Klassensprecherin, unabhängig vom Fach. Damit erscheint sie
+     ohne Zutun in allen Kursen der Klasse und in jedem Sitzplan.
+     Sie reist NICHT über den Teamteaching-Export mit (der gibt je Person nur
+     id, lastName, firstName heraus) und wird vom Kurs-Abgleich auch nicht
+     angetastet – der aktualisiert bei vorhandenen Personen ausschließlich
+     Vor- und Nachnamen. Dateien aus älteren Versionen kennen das Feld nicht;
+     „fehlt“ bedeutet überall „keine Rolle“. */
+  var REP_ROLES = { K1: 1, K2: 1 };
+
+  function setClassRep(classId, role, studentId) {
+    if (!REP_ROLES[role]) return;
+    var cls = classById(classId);
+    if (!cls) return;
+    (cls.students || []).forEach(function (s2) {
+      if (s2.rep === role) s2.rep = '';                 /* Rolle ist einmalig */
+      if (s2.id === studentId && s2.rep === (role === 'K1' ? 'K2' : 'K1')) s2.rep = '';
+    });
+    if (studentId) {
+      var stu = (cls.students || []).find(function (s2) { return s2.id === studentId; });
+      if (stu) stu.rep = role;
+    }
+    save();
+  }
+
+  function classRep(classId, role) {
+    var cls = classById(classId);
+    if (!cls) return null;
+    return (cls.students || []).find(function (s2) { return s2.rep === role; }) || null;
+  }
+
   /* ---------- Wertprüfung (Audit-Befund 2) ---------- *
      Einträge aus einer Datei können Werte tragen, die die App selbst nie
      schreibt. Zwei Folgen: Ein Datum wie „<svg onload=…>“ landet unmaskiert
@@ -161,6 +193,16 @@
         if (s.settings.theme !== undefined) report.theme++;
         s.settings.theme = 'petrol';
       }
+    }
+
+    /* Rolle nur K1/K2 – ein Fremdwert käme allenfalls aus einer präparierten
+       Datei und würde sonst im Sitzplan als Abzeichen ausgegeben. */
+    if (Array.isArray(s.classes)) {
+      s.classes.forEach(function (c) {
+        (c.students || []).forEach(function (s2) {
+          if (s2 && s2.rep && !REP_ROLES[s2.rep]) s2.rep = '';
+        });
+      });
     }
 
     if (Array.isArray(s.soleiEntries)) {
@@ -694,7 +736,7 @@
       }
       cls.students.push({ id: s.id, lastName: s.lastName, firstName: s.firstName,
         company: '', phone: '', email: '', trainerName: '', trainerPhone: '', trainerEmail: '',
-        trainerName2: '', trainerPhone2: '', trainerEmail2: '' });
+        trainerName2: '', trainerPhone2: '', trainerEmail2: '', rep: '' });
       summary.added++;
     });
     summary.missing = inspect.plan.studentsMissing;
@@ -1943,6 +1985,7 @@
     resetDue: resetDue, resetWaitHours: resetWaitHours,
     folderBackupSupported: folderBackupSupported, chooseBackupFolder: chooseBackupFolder,
     backupFolderNeedsPermission: backupFolderNeedsPermission, regrantBackupPermission: regrantBackupPermission,
+    setClassRep: setClassRep, classRep: classRep,
     inspectImport: inspectImport, lastCleanupReport: lastCleanupReport,
     autoBackupMode: autoBackupMode, autoBackupFileName: autoBackupFileName,
     deviceName: deviceName, setDeviceName: setDeviceName,

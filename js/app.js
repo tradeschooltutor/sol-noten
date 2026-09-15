@@ -70,7 +70,7 @@
 
   /* ================= App-Start ================= */
 
-  var APP_VERSION = '0.57.0';
+  var APP_VERSION = '0.58.0';
 
   /* Mindestlänge für Datei-Passwörter: Backup, Foto-Sicherung, Kurs- und
      Punkte-Export. Jedes schützt genau eine Datei; ein Treffer kostet diese
@@ -870,6 +870,14 @@
     return ((stu.firstName || ' ')[0] + (stu.lastName || ' ')[0]).toUpperCase();
   }
 
+  /* Abzeichen „K1“/„K2“ – oben rechts am Foto. Gibt null zurück, wenn die
+     Person keine Rolle hat, damit Aufrufer es bedenkenlos einhängen können. */
+  function repBadge(stu) {
+    if (!stu || (stu.rep !== 'K1' && stu.rep !== 'K2')) return null;
+    return h('span.rep-badge' + (stu.rep === 'K2' ? '.k2' : ''),
+      { title: stu.rep === 'K1' ? 'Klassensprecher/in' : 'Stellvertretung' }, stu.rep);
+  }
+
   function photoTile(stu, opts) {
     opts = opts || {};
     var img = h('img.photo-img', { alt: '' });
@@ -877,6 +885,10 @@
     var tile = h(cls,
       h('span.photo-fallback', {}, initials(stu)), img);
     loadPhotoInto(stu.id, img);
+    if (!opts.noBadge) {
+      var b = repBadge(stu);
+      if (b) tile.appendChild(b);
+    }
     return tile;
   }
 
@@ -894,6 +906,8 @@
         return;
       }
       wrap.appendChild(h('img.stu-photo-img', { src: url, alt: '' }));
+      var b = repBadge(stu);
+      if (b) wrap.appendChild(b);
     }
     if (photoCache[stu.id] !== undefined) {
       show(photoCache[stu.id]);
@@ -1145,7 +1159,7 @@
         }, 'SL-Punkte geben'),
         h('button.seat-mode-btn' + (editMode ? '.active' : ''), {
           onclick: function () { if (!editMode) go('seating', { id: course.id, tab: 'plan', mode: 'edit' }); }
-        }, 'Sitzplan bearbeiten')
+        }, 'bearbeiten/drucken')
       );
 
       /* ---- Planauswahl und -verwaltung ----
@@ -1196,6 +1210,7 @@
                   render();
                 });
               } }, 'Umbenennen'),
+              h('button.btn-small.btn-plain', { onclick: function () { printSeating(); } }, 'Drucken'),
               plans.length > 1
                 ? h('button.btn-small.btn-plain.danger-text', { onclick: function () {
                     UI.confirmDialog('Sitzplan löschen?',
@@ -1276,6 +1291,108 @@
     }
 
     /* Kachelbeschriftung: Vorname ganz, Nachname bei Bedarf abgekürzt. */
+    /* ---- Sitzplan drucken ----
+       Eigenes Raster statt des Bildschirmlayouts: Am Bildschirm sind die
+       Spalten 88 px breit und scrollen bei Bedarf – auf Papier scrollt
+       nichts. Zellbreite und -höhe werden aus Spalten- und Reihenzahl
+       berechnet, sodass der Plan IMMER auf eine A4-Querseite passt.
+       Die Fotos werden VORHER geladen: printNode druckt nach 300 ms los,
+       und die Bilder kommen asynchron aus der verschlüsselten Datenbank –
+       ohne Vorladen bliebe der Ausdruck bei großen Klassen leer. */
+    function printSeating() {
+      var plan = Store.activeSeating(course);
+      var positions = plan.positions || {};
+      var placedIds = Object.keys(positions).filter(function (sid) {
+        return cls.students.some(function (x) { return x.id === sid; });
+      });
+      if (!placedIds.length) {
+        UI.modal('Nichts zu drucken', h('p', {}, 'In diesem Sitzplan ist noch niemand platziert.'));
+        return;
+      }
+
+      var maxR = 0, maxC = 0;
+      placedIds.forEach(function (sid) {
+        if (positions[sid].r > maxR) maxR = positions[sid].r;
+        if (positions[sid].c > maxC) maxC = positions[sid].c;
+      });
+      var pcols = Math.max(plan.cols || 1, maxC + 1);
+      var prows = maxR + 1;
+
+      /* A4 quer abzüglich Rand (7 mm) und Kopfzeile/Pult: nutzbar rund
+         283 × 175 mm. Die Abstände zwischen den Zellen müssen VOR dem Teilen
+         abgezogen werden – sonst läuft der Plan ab etwa fünf Spalten über den
+         Rand und die Zusage „passt auf eine Seite“ wäre gebrochen.
+         Gedeckelt, damit wenige Personen nicht bildschirmfüllend werden. */
+      var GAP = 1.5;
+      var cellW = Math.min(46, Math.floor((283 - GAP * (pcols - 1)) / pcols * 10) / 10);
+      var cellH = Math.min(38, Math.floor((175 - GAP * (prows - 1)) / prows * 10) / 10);
+
+      /* Bei sehr vielen Reihen bleibt für ein Foto kein Platz mehr. Dann
+         lieber Namen ohne Foto als ein überlaufendes Raster. */
+      var photoPx = Math.min(cellW - 4, cellH - 9);
+      var showPhotos = photoPx >= 8;
+      var twoLines = cellH >= 12;
+
+      var byPos = {};
+      placedIds.forEach(function (sid) { byPos[positions[sid].r + '_' + positions[sid].c] = sid; });
+
+      /* Fotos aller platzierten Personen vorladen. */
+      var chain = Promise.resolve();
+      var urls = {};
+      placedIds.forEach(function (sid) {
+        chain = chain.then(function () {
+          if (photoCache[sid] !== undefined) { urls[sid] = photoCache[sid]; return; }
+          return Store.getPhoto(sid).then(function (u) { photoCache[sid] = u || null; urls[sid] = u || null; })
+            .catch(function () { urls[sid] = null; });
+        });
+      });
+
+      chain.then(function () {
+        var grid = h('div.seatprint-grid', { style: {
+          gridTemplateColumns: 'repeat(' + pcols + ', ' + cellW + 'mm)',
+          gridAutoRows: cellH + 'mm',
+          gap: GAP + 'mm'
+        } });
+        for (var r = prows - 1; r >= 0; r--) {
+          for (var c = 0; c < pcols; c++) {
+            var sid = byPos[r + '_' + c];
+            var stu = sid ? cls.students.find(function (x) { return x.id === sid; }) : null;
+            if (!stu) { grid.appendChild(h('div.seatprint-cell.empty')); continue; }
+            var box = h('div.seatprint-cell');
+            var hasRole = (stu.rep === 'K1' || stu.rep === 'K2');
+            if (showPhotos) {
+              var ph = h('div.seatprint-photo', { style: { width: photoPx + 'mm', height: photoPx + 'mm' } });
+              if (urls[sid]) ph.appendChild(h('img', { src: urls[sid], alt: '' }));
+              else ph.appendChild(h('span.seatprint-initials', {}, initials(stu)));
+              if (hasRole) ph.appendChild(h('span.seatprint-badge' + (stu.rep === 'K2' ? '.k2' : ''), {}, stu.rep));
+              box.appendChild(ph);
+            }
+            if (twoLines) box.appendChild(h('span.seatprint-name', {}, stu.firstName || ''));
+            box.appendChild(h('span.seatprint-name.last', {},
+              (stu.lastName || '') + (hasRole && !showPhotos ? ' (' + stu.rep + ')' : '')));
+            grid.appendChild(box);
+          }
+        }
+
+        var unplaced = cls.students.filter(function (x) { return !positions[x.id]; })
+          .sort(function (a, b) { return (a.lastName + a.firstName).localeCompare(b.lastName + b.firstName, 'de'); });
+
+        var sheet = h('div.seatprint',
+          h('div.seatprint-head',
+            h('h2', {}, cls.name + ' – ' + course.subject),
+            h('p', {}, 'Sitzplan „' + plan.name + '“ · Stand ' + UI.fmtDate(Store.todayISO()))),
+          grid,
+          h('div.seatprint-desk', h('span', {}, 'Lehrerpult')),
+          unplaced.length
+            ? h('p.seatprint-rest', {}, 'Nicht platziert: ' + unplaced.map(function (x) {
+                return x.lastName + ', ' + x.firstName + (x.rep ? ' (' + x.rep + ')' : '');
+              }).join(' · '))
+            : null);
+
+        printNode(sheet, true, 'Sitzplan ' + cls.name + ' ' + plan.name);
+      });
+    }
+
     function seatLabel(stu) {
       var last = stu.lastName || '';
       var lastShort = last.length > 10 ? last.slice(0, 9) + '.' : last;
@@ -4227,6 +4344,31 @@
       '.mirror-tbl .mirror-avg{border-left:2px solid #333;}' +
       '.grades-table tr.avg-row td{font-weight:700;background:#eef3f2;border-top:1pt solid #333;' +
         '-webkit-print-color-adjust:exact;print-color-adjust:exact;}' +
+      /* Sitzplan: eigenes Raster, damit der Plan garantiert auf EINE
+         Querseite passt. Maße kommen als Inline-Stil aus printSeating. */
+      '.seatprint-head{text-align:center;margin:0 0 2mm;}' +
+      '.seatprint-head h2{font-size:13pt;margin:0 0 0.5mm;}' +
+      '.seatprint-head p{font-size:9pt;color:#444;margin:0;}' +
+      '.seatprint-grid{display:grid;justify-content:center;margin:0 auto;}' +
+      '.seatprint-cell{border:0.4mm solid #bbb;border-radius:1.5mm;display:flex;' +
+        'flex-direction:column;align-items:center;justify-content:flex-start;' +
+        'padding:1mm 0.5mm;overflow:hidden;}' +
+      '.seatprint-cell.empty{border:0.3mm dashed #e2e2e2;}' +
+      '.seatprint-photo{position:relative;border-radius:50%;overflow:hidden;background:#eee;' +
+        'display:flex;align-items:center;justify-content:center;flex:none;}' +
+      '.seatprint-photo img{width:100%;height:100%;object-fit:cover;display:block;}' +
+      '.seatprint-initials{font-size:8pt;font-weight:700;color:#666;}' +
+      '.seatprint-badge{position:absolute;top:-0.3mm;right:-0.3mm;background:' +
+        cssVar('--teal', '#0e7c74') + ';color:#fff;font-size:5.5pt;font-weight:700;' +
+        'line-height:1;padding:0.6mm 0.9mm;border-radius:1mm;' +
+        '-webkit-print-color-adjust:exact;print-color-adjust:exact;}' +
+      '.seatprint-badge.k2{background:' + cssVar('--ink-soft', '#5c6b68') + ';}' +
+      '.seatprint-name{font-size:6.5pt;line-height:1.15;text-align:center;max-width:100%;' +
+        'overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}' +
+      '.seatprint-name.last{font-weight:700;}' +
+      '.seatprint-desk{margin:2.5mm auto 0;max-width:120mm;text-align:center;font-size:8.5pt;' +
+        'border:0.4mm solid #888;border-radius:1.5mm;padding:1mm;}' +
+      '.seatprint-rest{font-size:8pt;color:#444;margin:2.5mm 0 0;text-align:center;}' +
       '.charts-print h2{font-size:13pt;margin:0 0 1mm;}' +
       '.charts-print .print-sub{font-size:9pt;margin:0 0 3mm;}' +
       '.charts-print .report-block{page-break-inside:avoid;margin:0 0 2.5mm;}' +
@@ -5356,7 +5498,8 @@
             ].filter(Boolean);
             return h('div.card.card-tight.stu-card',
               floatPhoto(stu),
-              h('p.stu-name', {}, stu.lastName + ', ' + stu.firstName),
+              h('p.stu-name', {}, stu.lastName + ', ' + stu.firstName,
+                stu.rep ? h('span.rep-inline' + (stu.rep === 'K2' ? '.k2' : ''), {}, stu.rep) : null),
               rows.length ? rows : h('p.hint', {}, 'Keine Kontaktdaten hinterlegt.'));
           })),
       h('p.hint', {}, 'Zum Ändern der Daten: Kurs-Einstellungen, dann „Schülerliste bearbeiten“.')
@@ -5389,6 +5532,7 @@
       .map(function (stu) {
         return h('div.student-row', {},
           h('div.student-name', {}, stu.lastName + ', ' + stu.firstName,
+            stu.rep ? h('span.rep-inline' + (stu.rep === 'K2' ? '.k2' : ''), {}, stu.rep) : null,
             stu.company ? h('span.hint.block', {}, stu.company) : null),
           h('div.row-gap',
             partner ? null : h('button.btn-small.btn-plain', { onclick: function () { editStudent(stu); } }, 'Bearbeiten'),
@@ -5404,6 +5548,7 @@
         : h('div.card.card-tight.course-box.course-box-row',
             h('strong', {}, cls.name),
             helpBtn(Help.CONTEXT.students)),
+      repCard(),
       h('div.card.card-list', {}, list.length ? list : h('div.empty', h('p', {}, 'Noch keine Schüler/innen.'))),
       partner
         ? h('p.hint', {}, 'Partnerkurs: Neue Schüler/innen und Namensänderungen erhalten Sie über den Kurs-Abgleich von der Lehrkraft, welche die Note vergibt. Ausgeschiedene können Sie hier löschen.')
@@ -5412,6 +5557,38 @@
             h('button.btn-primary.btn-block', { onclick: importStudents }, 'Aus Excel einfügen (Kopieren & Einfügen)')
           )
     );
+
+    /* Klassensprecher/in und Stellvertretung als zwei Auswahlfelder über der
+       Liste. Bewusst hier statt nur im Bearbeiten-Dialog: Ein Wechsel ist
+       damit zwei Tipps weit weg statt zwei geöffneter Dialoge, und eine
+       Doppelvergabe ist konstruktiv ausgeschlossen. */
+    function repCard() {
+      if (!cls.students.length) return null;
+      function sel(role, label) {
+        var cur = Store.classRep(cls.id, role);
+        var s2 = h('select.input', { disabled: partner ? 'disabled' : null });
+        s2.appendChild(h('option', { value: '', selected: !cur }, '— nicht vergeben —'));
+        cls.students.slice().sort(function (a, b) {
+          return (a.lastName + a.firstName).localeCompare(b.lastName + b.firstName, 'de');
+        }).forEach(function (stu) {
+          s2.appendChild(h('option', { value: stu.id, selected: cur && cur.id === stu.id },
+            stu.lastName + ', ' + stu.firstName));
+        });
+        if (!partner) {
+          s2.addEventListener('change', function () {
+            Store.setClassRep(cls.id, role, s2.value);
+            render();
+          });
+        }
+        return h('label.field', h('span.field-label', {}, label), s2);
+      }
+      return h('div.card.card-tight',
+        sel('K1', 'Klassensprecher/in (K1)'),
+        sel('K2', 'Stellvertretung (K2)'),
+        h('p.hint', {}, partner
+          ? 'Im Partnerkurs nicht änderbar: Die Schülerliste kommt von der Lehrkraft, welche die Note vergibt.'
+          : 'Gilt für die ganze Klasse, also für alle Ihre Kurse dieser Klasse. K1 und K2 erscheinen in der Schülerliste und im Sitzplan.'));
+    }
 
     function editStudent(stu) {
       var fields = [
@@ -5427,14 +5604,28 @@
         inputs[f[0]] = h('input.input', { type: 'text', value: (stu && stu[f[0]]) || '' });
         return h('label.field', h('span.field-label', {}, f[1]), inputs[f[0]]);
       });
+      /* Dieselbe Rolle auch hier – wer ohnehin Daten pflegt, soll sie sehen
+         und setzen können. Gespeichert wird über Store.setClassRep, damit die
+         Einmaligkeit der Rolle auch von hier aus gilt. */
+      var repSel = h('select.input');
+      [['', '— keine —'], ['K1', 'Klassensprecher/in (K1)'], ['K2', 'Stellvertretung (K2)']]
+        .forEach(function (o) {
+          repSel.appendChild(h('option', { value: o[0], selected: (stu && stu.rep) === o[0] || (!stu && !o[0]) }, o[1]));
+        });
+      body.push(h('label.field', h('span.field-label', {}, 'Funktion in der Klasse'), repSel));
       UI.modal(stu ? 'Schüler/in bearbeiten' : 'Schüler/in hinzufügen', body, [
         { label: 'Abbrechen', value: false },
         { label: 'Speichern', value: true, primary: true,
           validate: function () { return inputs.lastName.value.trim() && inputs.firstName.value.trim(); } }
       ]).then(function (ok) {
         if (!ok) return;
-        if (!stu) { stu = { id: Store.uid() }; cls.students.push(stu); }
+        if (!stu) { stu = { id: Store.uid(), rep: '' }; cls.students.push(stu); }
         fields.forEach(function (f) { stu[f[0]] = inputs[f[0]].value.trim(); });
+        var want = repSel.value;
+        if (want !== (stu.rep || '')) {
+          if (want) Store.setClassRep(cls.id, want, stu.id);
+          else stu.rep = '';
+        }
         Store.save();
         render();
       });

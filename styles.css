@@ -1229,3 +1229,24 @@ button:focus-visible, .input:focus-visible, select:focus-visible {
 .check-row input[type="checkbox"] { width: 20px; height: 20px; flex: none; }
 .check-row input:disabled + span { color: var(--ink-soft); }
 .class-pick { max-height: 210px; overflow-y: auto; margin: 4px 0 8px; padding-left: 18px; }
+
+/* Klassensprecher-Abzeichen. Sitzt INNEN oben rechts: Die Foto-Rahmen
+   (.photo-avatar, .stu-photo) haben overflow:hidden – ein negativer Versatz
+   würde abgeschnitten. */
+.rep-badge {
+  position: absolute; top: 3px; right: 3px; z-index: 2;
+  background: var(--teal); color: #fff;
+  font-size: 10px; font-weight: 700; line-height: 1;
+  padding: 2px 4px; border-radius: 5px;
+  box-shadow: 0 0 0 1.5px rgba(255, 255, 255, 0.85);
+}
+.rep-badge.k2 { background: var(--ink-soft); }
+.photo-avatar.seat .rep-badge { top: 2px; right: 2px; font-size: 9px; padding: 2px 3px; }
+.stu-photo { position: relative; }
+.rep-inline {
+  display: inline-block; margin-left: 8px; vertical-align: middle;
+  background: var(--teal); color: #fff;
+  font-size: 11px; font-weight: 700; line-height: 1;
+  padding: 3px 6px; border-radius: 6px;
+}
+.rep-inline.k2 { background: var(--ink-soft); }
