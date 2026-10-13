@@ -1,5 +1,9 @@
 /* SOL-Noten – Service Worker: macht die App vollständig offline nutzbar. */
-var CACHE = 'sol-noten-v0.58.1';
+/* EINE Stelle für die Versionsnummer: Der Cache-Name wird abgeleitet, und
+   die App fragt sie unten per Nachricht ab, um echte Updates von
+   Fehlalarmen zu unterscheiden (siehe message-Handler). */
+var VERSION = '0.59.0';
+var CACHE = 'sol-noten-v' + VERSION;
 var FILES = [
   './',
   'index.html',
@@ -106,4 +110,24 @@ self.addEventListener('fetch', function (e) {
       });
     })
   );
+});
+
+/* ---------- Auskunft an die App ----------
+   `version`: Bis 0.58.1 erkannte die App ein Update allein an Zustands-
+   wechseln des Service Workers und wusste nie, WELCHE Version bereitliegt.
+   Jedes Aktivieren – auch das der Erstinstallation – konnte das Banner
+   auslösen. Jetzt fragt die App hier nach und zeigt das Banner nur bei einer
+   tatsächlich abweichenden Version.
+   `skipWaiting`: Hängt ein Worker im Zustand „waiting“, kontrolliert er die
+   Seite nicht, und ein Neuladen aktiviert ihn auch nicht – auf dem Mac
+   führte das zu einem Banner, das nach jedem Klick wiederkam. Auf diese
+   Nachricht hin übernimmt er. */
+self.addEventListener('message', function (e) {
+  var data = e.data || {};
+  if (data.type === 'version') {
+    var port = (e.ports && e.ports[0]) || null;
+    if (port) port.postMessage({ version: VERSION });
+    return;
+  }
+  if (data.type === 'skipWaiting') self.skipWaiting();
 });

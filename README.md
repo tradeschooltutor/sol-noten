@@ -1,4 +1,4 @@
-# SOL-Noten (Version 0.58.1 – Beta)
+# SOL-Noten (Version 0.59.0 – Beta)
 
 Notenverwaltung zum selbstorganisierten Lernen (SOL) als Progressive Web App (PWA).
 Basierend auf der Excel-Notenverwaltung V8.0 von Andreas Vandelaar.
@@ -49,7 +49,9 @@ Basierend auf der Excel-Notenverwaltung V8.0 von Andreas Vandelaar.
 
 ## Hinweis bei Updates
 
-Bei jeder neuen Version die Versionsnummer in `sw.js` (Zeile `var CACHE = 'sol-noten-v…'`) erhöhen, damit installierte Apps die neuen Dateien laden.
+Bei jeder neuen Version die Versionsnummer in `sw.js` erhöhen, damit installierte Apps die neuen Dateien laden — seit 0.59.0 steht sie dort an **einer** Stelle (`var VERSION = '…'`), der Cache-Name wird daraus abgeleitet.
+
+**Wie ein Update erkannt wird (ab v0.59.0):** Das Banner „Version X ist bereit“ erscheint nur, wenn der Service Worker auf Nachfrage (`{type:'version'}` über einen `MessageChannel`) eine **andere** Version meldet als die laufende `APP_VERSION`. Geprüft wird beim Start, bei `controllerchange` und nach der stündlichen Rückkehr-Prüfung. Bleibt die Antwort aus (alter Worker ohne Handler, kein Controller, kein `MessageChannel`), erscheint **kein** Banner: Ein ausbleibendes Signal ist kein Beleg für ein Update, und ein Fehlalarm kostet die Nutzerin einen Neustart samt PIN-Eingabe. Bis 0.58.1 löste stattdessen jeder Zustandswechsel des Workers das Banner aus, ohne die Version je zu prüfen — auch das Aktivieren bei der Erstinstallation, das seit `skipWaiting()`/`clients.claim()` denselben Zustand `activated` durchläuft; ob der Wettlauf gegen `clients.claim()` den Controller rechtzeitig setzt, entscheidet die Browser-Engine, daher die unterschiedlichen Beobachtungen je Plattform bei identischer Version. Ein wartender Worker löst kein Banner mehr aus (er kontrolliert die Seite nicht, und ein Reload aktiviert ihn auch nicht — auf macOS kam das Banner deshalb nach jedem Klick sofort wieder); er bekommt stattdessen `{type:'skipWaiting'}`. Die Registrierung nutzt `updateViaCache: 'none'`, damit `sw.js` selbst nie aus dem HTTP-Cache bedient wird.
 
 **Warum `cache: 'reload'` im Install-Handler steht (Fehler bis v0.56.0):** `cache.addAll(FILES)` holt die Dateien über den normalen HTTP-Cache des Browsers. GitHub Pages liefert mit `Cache-Control: max-age=600`; hatte das Gerät die App in den zehn Minuten davor offen, schreibt der neue Service Worker die **alten** Dateien unter den **neuen** Cache-Namen. Weil `install` je Cache-Namen nur einmal läuft, ist der Zustand selbsthaltend: Die App liefert dauerhaft alten Code aus, `sw.js` meldet aber die neue Version, und weder App- noch Geräteneustart helfen. Beobachtet in Edge (Windows) und Chrome (Android) bei 0.56.0; Safari auf iPad und Mac entkam nur, weil sein HTTP-Cache die alten Dateien nicht mehr vorrätig hatte. Seit 0.56.1 werden die Dateien über `new Request(u, { cache: 'reload' })` am HTTP-Cache vorbei geholt. Ein Gerät, das in diesem Zustand feststeckt, wird durch den nächsten Versionsbump befreit – `install` läuft dann erneut. **Websitedaten löschen ist keine Abhilfe, sondern Datenverlust:** Damit ginge die IndexedDB mit allen Schülerdaten verloren.
 

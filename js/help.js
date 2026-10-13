@@ -642,8 +642,8 @@
           group: 'Gerät & Technik',
           title: 'Wie bekomme ich Aktualisierungen der App?',
           body: [
-            { t: 'p', v: 'Automatisch. Sobald eine neue Fassung vorliegt und Sie online sind, erscheint oben ein Hinweis mit dem Button „Jetzt aktualisieren“. Ihre Daten bleiben dabei unverändert erhalten.' },
-            { t: 'p', v: 'Die installierte Version sehen Sie ganz unten auf jeder Seite unter „Über diese App“.' }
+            { t: 'p', v: 'Automatisch. Sobald eine neue Fassung vorliegt und Sie online sind, erscheint oben ein Hinweis mit dem Button „Jetzt aktualisieren“. Der Hinweis nennt die bereitstehende Versionsnummer und die gerade laufende. Ihre Daten bleiben dabei unverändert erhalten; nach dem Aktualisieren fragt die App wie bei jedem Start nach PIN bzw. Passwort.' },
+            { t: 'p', v: 'Die installierte Version sehen Sie ganz unten auf jeder Seite unter „Über diese App“. Stimmt sie mit der im Hinweis genannten überein, ist nichts zu tun – ab Version 0.59.0 erscheint der Hinweis nur noch bei einer tatsächlich abweichenden Version.' }
           ]
         },
         {

@@ -70,7 +70,7 @@
 
   /* ================= App-Start ================= */
 
-  var APP_VERSION = '0.58.1';
+  var APP_VERSION = '0.59.0';
 
   /* Mindestlänge für Datei-Passwörter: Backup, Foto-Sicherung, Kurs- und
      Punkte-Export. Jedes schützt genau eine Datei; ein Treffer kostet diese
@@ -523,23 +523,29 @@
 
   Store.init().then(function () {
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('sw.js').then(function (reg) {
+      /* `updateViaCache: 'none'`: Das Service-Worker-Skript nie aus dem
+         HTTP-Cache bedienen. GitHub Pages liefert mit max-age=600 aus – an
+         genau dieser Stelle saß schon der Auslieferungsfehler aus 0.56.0. */
+      navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).then(function (reg) {
         /* Beim Start aktiv nach einer neuen Version suchen */
         if (reg.update) reg.update().catch(function () {});
 
-        /* Eine bereits fertig installierte Version kann beim Registrieren
-           schon warten – dann kommt `updatefound` nicht mehr, und der Hinweis
-           bliebe aus. Das erklärt Fenster, die tagelang offen bleiben (PC). */
-        if (reg.waiting && navigator.serviceWorker.controller) showUpdateBanner();
+        /* Ein wartender Worker kontrolliert die Seite NICHT, und ein Neuladen
+           aktiviert ihn auch nicht. Bis 0.58.1 löste er trotzdem das Banner
+           aus – auf dem Mac kam es deshalb nach jedem Klick auf „Jetzt
+           aktualisieren“ sofort wieder, und die App fiel jedes Mal auf den
+           Sperrbildschirm zurück. Statt zu melden wird er jetzt zur Übernahme
+           aufgefordert; meldet sich danach eine andere Version, greift der
+           Versionsvergleich in checkSwVersion(). */
+        if (reg.waiting) {
+          try { reg.waiting.postMessage({ type: 'skipWaiting' }); } catch (e) {}
+        }
 
         reg.addEventListener('updatefound', function () {
           var nw = reg.installing;
           if (!nw) return;
           nw.addEventListener('statechange', function () {
-            if ((nw.state === 'installed' || nw.state === 'activated') &&
-                navigator.serviceWorker.controller) {
-              showUpdateBanner();
-            }
+            if (nw.state === 'activated') checkSwVersion();
           });
         });
 
@@ -554,6 +560,14 @@
           if (reg.update) reg.update().catch(function () {});
         });
       }).catch(function () {});
+
+      /* Übernimmt ein neuer Worker die Kontrolle (clients.claim), ist das der
+         verlässlichste Zeitpunkt für die Prüfung – unabhängig davon, über
+         welchen Weg er aktiv wurde. */
+      try {
+        navigator.serviceWorker.addEventListener('controllerchange', checkSwVersion);
+      } catch (e) {}
+      checkSwVersion();
     }
     startAutolockWatch();
     if (Store.isLocked()) go('lock');
@@ -659,10 +673,51 @@
     }, 20000);
   }
 
-  function showUpdateBanner() {
+  /* ---------- Update-Erkennung (ab 0.59.0) ----------
+     Grundsatz: Das Banner erscheint NUR, wenn der Service Worker eine
+     ANDERE Version meldet als die laufende App. Bis 0.58.1 löste jeder
+     Zustandswechsel des Workers das Banner aus, ohne je zu prüfen, welche
+     Version bereitliegt – auch das Aktivieren bei der Erstinstallation.
+     Ob dieser Wettlauf gegen `clients.claim()` ausgeht, entscheidet die
+     Browser-Engine; daher die unterschiedlichen Beobachtungen auf macOS,
+     iOS, Windows und Android bei identischer Version. */
+  var SW_ANSWER_MS = 1500;
+
+  /* Fragt den kontrollierenden Worker nach seiner Version.
+     Rückgabe: Promise -> Versionszeichenkette oder null. */
+  function swVersion() {
+    return new Promise(function (resolve) {
+      var sw = navigator.serviceWorker && navigator.serviceWorker.controller;
+      if (!sw || typeof MessageChannel !== 'function') { resolve(null); return; }
+      var ch;
+      try { ch = new MessageChannel(); } catch (e) { resolve(null); return; }
+      var done = false;
+      function finish(v) { if (done) return; done = true; resolve(v); }
+      setTimeout(function () { finish(null); }, SW_ANSWER_MS);
+      ch.port1.onmessage = function (ev) {
+        finish(ev && ev.data && ev.data.version ? String(ev.data.version) : null);
+      };
+      try { sw.postMessage({ type: 'version' }, [ch.port2]); }
+      catch (e) { finish(null); }
+    });
+  }
+
+  /* Keine Antwort heißt bewusst „kein Banner“: Ein ausbleibendes Signal ist
+     kein Beleg für ein Update, und ein Fehlalarm kostet die Nutzerin einen
+     Neustart samt PIN-Eingabe. Ein echtes Update meldet sich spätestens beim
+     nächsten Start oder über controllerchange. */
+  function checkSwVersion() {
+    swVersion().then(function (v) {
+      if (v && v !== APP_VERSION) showUpdateBanner(v);
+    }).catch(function () {});
+  }
+
+  function showUpdateBanner(version) {
     if (document.getElementById('update-banner')) return;
     var b = h('div#update-banner.update-banner',
-      h('span', {}, 'Eine neue Version von SOL-Noten ist geladen.'),
+      h('span', {}, version
+        ? 'Version ' + version + ' ist bereit – diese App läuft noch mit ' + APP_VERSION + '.'
+        : 'Eine neue Version von SOL-Noten ist geladen.'),
       h('button.btn-small.btn-primary', { onclick: function () { location.reload(); } }, 'Jetzt aktualisieren')
     );
     document.body.appendChild(b);
