@@ -70,7 +70,7 @@
 
   /* ================= App-Start ================= */
 
-  var APP_VERSION = '0.59.0';
+  var APP_VERSION = '0.59.1';
 
   /* Mindestlänge für Datei-Passwörter: Backup, Foto-Sicherung, Kurs- und
      Punkte-Export. Jedes schützt genau eine Datei; ein Treffer kostet diese
@@ -5611,6 +5611,17 @@
     );
   };
 
+  /* Spaltenreihenfolge beim Einfügen aus Excel.
+     Steht bewusst AUSSERHALB von views.students: Dort kehrt die Funktion
+     mit `return h('div.screen', …)` zurück, bevor sie unten ankommt. Die
+     Hilfsfunktionen darunter werden gehoben und funktionieren trotzdem –
+     eine `var`-Zuweisung dagegen läuft nach dem return nie. So war es von
+     0.53.0 bis 0.59.0: IMPORT_FIELDS blieb undefined, und beide Knöpfe der
+     Vorschau scheiterten stumm an rowToStudent (Fehler behoben in 0.59.1). */
+  var IMPORT_FIELDS = ['lastName', 'firstName', 'phone', 'email', 'company',
+    'trainerName', 'trainerPhone', 'trainerEmail',
+    'trainerName2', 'trainerPhone2', 'trainerEmail2'];
+
   views.students = function (p) {
     var cls = Store.classById(p.classId);
     /* Der Kurs, aus dem die Liste geöffnet wurde – seine Bezeichnung steht in
@@ -5800,10 +5811,6 @@
       return (String(last || '').trim() + '|' + String(first || '').trim())
         .replace(/\s+/g, ' ').toLowerCase();
     }
-
-    var IMPORT_FIELDS = ['lastName', 'firstName', 'phone', 'email', 'company',
-      'trainerName', 'trainerPhone', 'trainerEmail',
-      'trainerName2', 'trainerPhone2', 'trainerEmail2'];
 
     function rowToStudent(r) {
       var o = { id: Store.uid() };

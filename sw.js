@@ -2,7 +2,7 @@
 /* EINE Stelle für die Versionsnummer: Der Cache-Name wird abgeleitet, und
    die App fragt sie unten per Nachricht ab, um echte Updates von
    Fehlalarmen zu unterscheiden (siehe message-Handler). */
-var VERSION = '0.59.0';
+var VERSION = '0.59.1';
 var CACHE = 'sol-noten-v' + VERSION;
 var FILES = [
   './',
