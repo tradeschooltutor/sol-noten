@@ -70,7 +70,7 @@
 
   /* ================= App-Start ================= */
 
-  var APP_VERSION = '0.59.1';
+  var APP_VERSION = '0.60.0';
 
   /* Mindestlänge für Datei-Passwörter: Backup, Foto-Sicherung, Kurs- und
      Punkte-Export. Jedes schützt genau eine Datei; ein Treffer kostet diese
@@ -4940,9 +4940,23 @@
      Notenübersicht. Y-Achse relativ zum Quartals-Maximum: Sind die Maxima
      aller Quartale gleich (Regelfall), werden absolute Punktwerte
      beschriftet, sonst Prozent. Quartalsgrenzen als gestrichelte Linien. */
+  /* Bis zu welchem Quartal reichen die Diagramme? Bis zum letzten Quartal,
+     das im Kurs Punktevergaben enthält – mindestens bis zum aktuellen.
+     Bis 0.59.1 endeten sie beim aktuellen Quartal (aus dem heutigen Datum);
+     vorhandene spätere Vergaben fehlten dann, etwa in der Demo, deren
+     Quartale 1–3 unabhängig vom Datum bewertet sind. Bewusst kursweit statt
+     je Person: Beim Blättern zwischen Schüler/innen bleibt die Achse gleich. */
+  function chartLastQuarter(course) {
+    var last = Math.min(4, Math.max(1, course.currentQuarter || 1));
+    S().soleiEntries.forEach(function (e) {
+      if (e.courseId === course.id && e.quarter > last && e.quarter <= 4) last = e.quarter;
+    });
+    return last;
+  }
+
   function buildStudentChartsContent(course, stu, forPrint) {
     var names = S().settings.criteriaNames;
-    var lastQ = Math.min(4, Math.max(1, course.currentQuarter || 1));
+    var lastQ = chartLastQuarter(course);
     var upCi = typeof course.uploadCriterion === 'number' ? course.uploadCriterion : 2;
 
     function chartFor(ci) {

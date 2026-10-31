@@ -3,6 +3,66 @@
 Geplante Funktionen in grober Reihenfolge. Nicht terminiert; Reihenfolge und
 Zuschnitt werden vor der Umsetzung jeweils gemeinsam festgelegt.
 
+## 15. Liniendiagramm über alle Quartale mit Daten (Schritt 1 von 4, abgestimmt 31.10.2026)
+
+Die Diagramme der Punkteentwicklung (Notenübersicht, Ansicht Schüler/in)
+endeten beim aktuellen Quartal des Kurses, das aus dem heutigen Datum folgt.
+Künftig reichen sie bis zum letzten Quartal, das im Kurs Punktevergaben
+enthält – mindestens bis zum aktuellen. Leere Folgequartale bleiben weg.
+
+## 16. „Für alle Schüler/innen diese Punktzahl vergeben“ und Vorrang der Fehlzeit (Schritt 2 von 4, abgestimmt 31.10.2026)
+
+Auf „SoLei-Punkte vergeben“, Ansicht Kriterium, eine Zeile oberhalb der
+Klassenliste mit vier Knöpfen. Die Werte sind die Tipp-Stufen des gewählten
+Kriteriums im aktuellen Quartal (`Calc.tapValues`: 3/2/1/0, 4,5/3/1,5/0 …).
+- Punkte erhalten nur Schüler/innen ohne Vergabe für dieses Kriterium an
+  diesem Datum; vorhandene Einzelbewertungen bleiben unangetastet.
+- Wer an diesem Tag eine unentschuldigte Fehlzeit hat, wird übersprungen.
+- Eine Meldung „n Vergaben erteilt“ mit **Rückgängig** nimmt alle auf einmal
+  zurück. Keine zusätzliche Sicherheitsabfrage.
+
+**Vorrang der Fehlzeit** (löst ein Problem, das schon heute besteht und mit
+dem Massen-Knopf alltäglich würde – Fehlzeiten werden oft erst am
+Quartalsende eingetragen): An einem Tag mit unentschuldigter Fehlzeit zählen
+für diese Person nur die 0 Punkte der Fehlzeit. Andere Vergaben desselben
+Tages bleiben gespeichert, fließen aber nicht in Berechnung und
+Liniendiagramm ein; im Punktestand erscheinen sie durchgestrichen mit
+„durch Fehlzeit ersetzt“. Umsetzung zentral in `Store.entriesFor`. Wird die
+Fehlzeit entfernt, zählen die Vergaben wieder. Gilt auch für Vergaben der
+zweiten Lehrkraft. Beim Eintragen der Fehlzeit weist die App auf ersetzte
+Vergaben hin. Gesondert zu behandeln: Rohdaten-Export (Kennzeichnung
+„durch Fehlzeit ersetzt“), SoLei-Austausch (unverändert), Zählungen in
+Lösch-Dialogen (zählen alles), Erfassung (zeigt an Fehlzeit-Tagen die
+Fehlzeit, keine weitere Vergabe möglich).
+
+## 17. Versionshistorie (Schritt 3 von 4, abgestimmt 31.10.2026)
+
+Link „Versionshistorie“ im Kasten „Über diese App“ unter Versionsnummer und
+Copyright. Eigene Seite, offline verfügbar, Einträge in Sie-Form für
+Lehrkräfte (neu / verbessert / behoben). Jede Version ab 0.53.0 einzeln,
+davor ein Sammeleintrag. Der Versionsbump wird damit fünffach; das Prüfgate
+kontrolliert den Eintrag.
+
+## 18. Mehrere Bewertungsspiegel für das Prozent-Schema (Schritt 4 von 4, abgestimmt 31.10.2026)
+
+Nur das Prozent-Schema (Open Book Tests, Klausuren); das 15-Punkte-Schema
+bleibt einheitlich und unverändert. Alle Schemata liefern Noten 1 bis 6.
+- „Standard“ und „IHK-Schema“ fest eingebaut, editierbar, auf ihre
+  Ursprungswerte zurücksetzbar. Eigene Schemata als Kopie mit eigenem Namen.
+- Jede Zeile hat ein eigenes, editierbares Notenwort. Vorschlag beim Ändern
+  der Zahl nach der neuen Regel: Minus erst ab ,3 (1,0–1,2 sehr gut,
+  1,3–1,4 sehr gut (-), 1,5–1,7 gut (+), 1,8–2,2 gut, 2,3–2,4 gut (-) …;
+  ab 5,5 ungenügend). Das Plus beginnt weiterhin bei ,5. Im Standard-Schema
+  ändern sich dadurch bestehende Wörter (z. B. 2,2 → „gut“), nicht die Noten.
+- IHK-Schema: Noten aus Andreas' Tabelle „Alternativer Bewertungsspiegel“
+  (0–100 %, unverändert einschließlich 50 % → 4,4 und 70 % → 3,1), Wörter
+  nach der ,3-Regel.
+- Rundung für alle Schemata wie bisher: abgerundet auf den vollen
+  Prozentpunkt (91,9 % → 91 % → im IHK-Schema 1,5).
+- Auswahl je Kurs in den Kurs-Einstellungen; bestehende Kurse erhalten
+  „Standard“. Beim Wechsel Warnung (Noten bereits korrigierter Klausuren und
+  OBTs ändern sich rückwirkend) und Bestätigung mit PIN bzw. Passwort.
+
 ## 14. Sichtbarkeit ausgesetzter Ordner-Backups (zunächst nur beobachten)
 
 Die Ordner-Freigabe erteilt der Browser nur je Sitzung. Fehlt sie, überspringt
@@ -27,6 +87,8 @@ Mögliche Maßnahmen, falls sich das Problem bestätigt:
 
 
 ---
+
+Umgesetzt: Liniendiagramm über alle Quartale mit Daten (v0.60.0) – Schritt 1 von 4 (Roadmap-Punkt 15). Die Diagramme der Punkteentwicklung in der Schüler-Ansicht der Notenübersicht endeten beim aktuellen Quartal des Kurses, das `views.course` bei jedem Öffnen aus dem heutigen Datum setzt. In der Demo, deren Quartale 1–3 unabhängig vom Datum bewertet sind, fehlte dadurch im Oktober das 3. Quartal. Neu: `chartLastQuarter(course)` liefert das letzte Quartal mit Punktevergaben im Kurs, mindestens das aktuelle; leere Folgequartale bleiben weg. Bewusst kursweit statt je Person, damit die Achse beim Blättern gleich bleibt. Die Upload-Zählung unter dem Upload-Kriterium folgt demselben Bereich, ebenso der Ausdruck. Hilfe (Notenübersicht) und README ergänzt.
 
 Umgesetzt: Einfügen aus Excel repariert (v0.59.1) – in der Schülerliste zeigte „Aus Excel einfügen“ die Vorschau korrekt an, doch weder „Alle als neu anlegen“ noch „Neue anlegen, vorhandene ergänzen“ legte jemanden an; gemeldet auf Android, iPadOS, macOS und Windows. Ursache seit 0.53.0: Die Liste der Importspalten `IMPORT_FIELDS` stand als `var`-Zuweisung in `views.students` **hinter** dem `return` der Ansicht. Die Hilfsfunktionen daneben werden gehoben und liefen, die Zuweisung dagegen nie – `rowToStudent` brach beim ersten Datensatz mit einem Skriptfehler ab, bevor gespeichert wurde, und eine Rückmeldung erschien nicht. Behoben, indem `IMPORT_FIELDS` vor die Ansicht verlegt wurde. Eine Prüfung über alle JS-Dateien (Syntaxbaum: Anweisungen nach einem `return` auf oberster Ebene eines Funktionsrumpfs) fand keine weitere Stelle dieser Art und ist jetzt Teil des Prüfgates; dazu ein Ende-zu-Ende-Test im echten Chromium, der Einrichtung, Kursanlage und beide Knöpfe durchspielt – gegen 0.59.0 schlägt er fehl, gegen 0.59.1 besteht er. Daten gingen nicht verloren: Es wurde schlicht nichts gespeichert.
 

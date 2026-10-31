@@ -332,7 +332,7 @@
           body: [
             { t: 'p', v: 'Auf „Notenübersicht & Zeugnisnoten“ führt die App alles zusammen: SoLei-Quartalsnoten, {{OBT}} und Klausuren. Aus der in den Kurs-Einstellungen festgelegten {{Gewichtung}} – standardmäßig 40 % sonstige Leistungen, 20 % Open Book Tests, 40 % Klausuren – berechnet sie einen **Vorschlag** für Halbjahr und Schuljahr.' },
             { t: 'p', v: 'Eintragen und verantworten müssen Sie die Note selbst; dafür gibt es eigene Spalten. Die letzte Zeile zeigt den Klassendurchschnitt, darunter lässt sich die Entwicklung als Liniendiagramm einblenden.' },
-            { t: 'p', v: 'Ein Tipp auf einen Namen öffnet die Einzelansicht mit allen Werten, optionalen Diagrammen und einem Ausdruck für das Notengespräch.' }
+            { t: 'p', v: 'Ein Tipp auf einen Namen öffnet die Einzelansicht mit allen Werten, optionalen Diagrammen und einem Ausdruck für das Notengespräch. Die Diagramme der Punkteentwicklung reichen bis zum letzten Quartal, in dem im Kurs Punkte vergeben wurden – mindestens bis zum aktuellen.' }
           ]
         },
         {
